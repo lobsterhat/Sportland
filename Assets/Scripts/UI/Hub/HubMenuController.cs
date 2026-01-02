@@ -1,8 +1,9 @@
 using UnityEngine;
 using UnityEngine.UI;
-using Sportland.Core;
+using Sportland.Core.GameManagement;
+using Sportland.Core.Athlete;
 
-namespace Sportland.UI
+namespace Sportland.UI.Hub
 {
     public class HubMenuController : MonoBehaviour
     {

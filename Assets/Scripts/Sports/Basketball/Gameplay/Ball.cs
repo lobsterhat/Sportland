@@ -1,6 +1,6 @@
 ﻿using UnityEngine;
 
-namespace Sportland.Basketball
+namespace Sportland.Sports.Basketball.Gameplay
 {
     public class Ball : MonoBehaviour
     {

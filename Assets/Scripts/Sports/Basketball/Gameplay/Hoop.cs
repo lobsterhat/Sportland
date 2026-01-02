@@ -1,8 +1,9 @@
 ﻿using UnityEngine;
 using System.Collections;
 using System.Collections.Generic;
+using Sportland.Sports.Basketball.Stats;
 
-namespace Sportland.Basketball
+namespace Sportland.Sports.Basketball.Gameplay
 {
     public class Hoop : MonoBehaviour
     {
