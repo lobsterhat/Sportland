@@ -28,7 +28,7 @@ namespace Sportland.Core.GameManagement
         /// Called when sport module is first loaded
         /// Setup any sport-specific systems here
         /// </summary>
-        void Initialize(List<Athlete.Athlete> availableAthletes);
+        void Initialize(List<Athlete> availableAthletes);
 
         /// <summary>
         /// Called when a game is about to start
@@ -55,7 +55,7 @@ namespace Sportland.Core.GameManagement
         /// Can this athlete participate in a game?
         /// Check fatigue, injuries, eligibility, etc.
         /// </summary>
-        bool CanAthletePlay(Athlete.Athlete athlete, GameContext context);
+        bool CanAthletePlay(Athlete athlete, GameContext context);
     }
 
     /// <summary>
@@ -65,8 +65,8 @@ namespace Sportland.Core.GameManagement
     public class GameContext
     {
         public System.DateTime gameDate;
-        public List<Athlete.Athlete> homeRoster;
-        public List<Athlete.Athlete> awayRoster;
+        public List<Athlete> homeRoster;
+        public List<Athlete> awayRoster;
         public bool isPlayoffGame;
         public string venueName;
         public int homeScore; // For continuing games

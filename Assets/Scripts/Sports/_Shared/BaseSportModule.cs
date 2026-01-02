@@ -17,7 +17,7 @@ namespace Sportland.Sports.Shared
         protected string sportName;
 
         // Game State
-        protected List<Athlete.Athlete> availableAthletes;
+        protected List<Athlete> availableAthletes;
         protected GameContext currentContext;
         protected GameResult gameResult;
 
@@ -26,7 +26,7 @@ namespace Sportland.Sports.Shared
         public virtual SportType GetSportType() => sportType;
         public virtual string GetSportName() => sportName;
 
-        public virtual void Initialize(List<Athlete.Athlete> athletes)
+        public virtual void Initialize(List<Athlete> athletes)
         {
             availableAthletes = athletes;
             Debug.Log($"{sportName} module initialized with {athletes.Count} athletes");
@@ -45,7 +45,7 @@ namespace Sportland.Sports.Shared
 
         public abstract GameResult GetGameResults();
 
-        public virtual bool CanAthletePlay(Athlete.Athlete athlete, GameContext context)
+        public virtual bool CanAthletePlay(Athlete athlete, GameContext context)
         {
             // Default implementation - check fatigue
             if (athlete.fatigue > 80f)
