@@ -1,7 +1,8 @@
 using UnityEngine;
 using System.Collections.Generic;
+using Sportland.Core.Athlete;
 
-namespace Sportland.Core
+namespace Sportland.Core.GameManagement
 {
     /// <summary>
     /// Interface that all sport modules must implement
@@ -27,7 +28,7 @@ namespace Sportland.Core
         /// Called when sport module is first loaded
         /// Setup any sport-specific systems here
         /// </summary>
-        void Initialize(List<Athlete> availableAthletes);
+        void Initialize(List<Athlete.Athlete> availableAthletes);
 
         /// <summary>
         /// Called when a game is about to start
@@ -54,7 +55,7 @@ namespace Sportland.Core
         /// Can this athlete participate in a game?
         /// Check fatigue, injuries, eligibility, etc.
         /// </summary>
-        bool CanAthletePlay(Athlete athlete, GameContext context);
+        bool CanAthletePlay(Athlete.Athlete athlete, GameContext context);
     }
 
     /// <summary>
@@ -64,8 +65,8 @@ namespace Sportland.Core
     public class GameContext
     {
         public System.DateTime gameDate;
-        public List<Athlete> homeRoster;
-        public List<Athlete> awayRoster;
+        public List<Athlete.Athlete> homeRoster;
+        public List<Athlete.Athlete> awayRoster;
         public bool isPlayoffGame;
         public string venueName;
         public int homeScore; // For continuing games
@@ -126,5 +127,18 @@ namespace Sportland.Core
         public string athleteID; // Who was involved
         public string description;
         public float gameTime; // When it happened
+    }
+
+    /// <summary>
+    /// Enum for all supported sports
+    /// </summary>
+    public enum SportType
+    {
+        Basketball,
+        Baseball,
+        Football,
+        Volleyball,
+        Dodgeball,
+        Hockey
     }
 }

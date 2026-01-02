@@ -1,10 +1,11 @@
-using Sportland.Core;
+using Sportland.Core.GameManagement;
+using Sportland.Core.Athlete;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.UI;
 
-namespace Sportland.Basketball
+namespace Sportland.Sports.Basketball.Gameplay
 {
     public class BasketballGameController : MonoBehaviour
     {

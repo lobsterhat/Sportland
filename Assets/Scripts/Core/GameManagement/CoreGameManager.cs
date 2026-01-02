@@ -1,11 +1,12 @@
-using Sportland.Core;
+using Sportland.Core.Athlete;
+using Sportland.Core.GameManagement;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using UnityEngine.WSA;
 
-namespace Sportland.Core
+namespace Sportland.Core.GameManagement
 {
     /// <summary>
     /// CoreGameManager - The persistent singleton that manages everything
@@ -17,7 +18,7 @@ namespace Sportland.Core
         public static CoreGameManager Instance { get; private set; }
 
         [Header("Athlete Database")]
-        public List<Athlete> allAthletes = new List<Athlete>();
+        public List<Athlete.Athlete> allAthletes = new List<Athlete.Athlete>();
 
         [Header("Sport Modules")]
         private Dictionary<SportType, ISportModule> loadedModules = new Dictionary<SportType, ISportModule>();
@@ -60,7 +61,7 @@ namespace Sportland.Core
         private void LoadAthletes()
         {
             // Load all Athlete ScriptableObjects from Resources/Athletes folder
-            Athlete[] loadedAthletes = Resources.LoadAll<Athlete>("Athletes");
+            Athlete.Athlete[] loadedAthletes = Resources.LoadAll<Athlete.Athlete>("Athletes");
             allAthletes.AddRange(loadedAthletes);
 
             // If no athletes exist, create a test athlete
@@ -224,7 +225,7 @@ namespace Sportland.Core
             // Update athlete stats
             foreach (var playerStats in results.playerStats)
             {
-                Athlete athlete = GetAthleteByID(playerStats.athleteID);
+                Athlete.Athlete athlete = GetAthleteByID(playerStats.athleteID);
                 if (athlete != null)
                 {
                     UpdateAthleteStats(athlete, results.sport, playerStats);
@@ -244,7 +245,7 @@ namespace Sportland.Core
             AdvanceDay();
         }
 
-        private void UpdateAthleteStats(Athlete athlete, SportType sport, PlayerGameStats stats)
+        private void UpdateAthleteStats(Athlete.Athlete athlete, SportType sport, PlayerGameStats stats)
         {
             SportStats sportStats = athlete.GetSportStats(sport);
             if (sportStats == null)
@@ -268,7 +269,7 @@ namespace Sportland.Core
             // Example: If clutch shot, maybe add "Clutch Gene" flag
             if (gameEvent.type == GameEvent.EventType.ClutchShot)
             {
-                Athlete athlete = GetAthleteByID(gameEvent.athleteID);
+                Athlete.Athlete athlete = GetAthleteByID(gameEvent.athleteID);
                 if (athlete != null)
                 {
                     // Simple flag acquisition for now
@@ -282,7 +283,7 @@ namespace Sportland.Core
             // Add fatigue based on game duration and minutes played
             foreach (var playerStats in results.playerStats)
             {
-                Athlete athlete = GetAthleteByID(playerStats.athleteID);
+                Athlete.Athlete athlete = GetAthleteByID(playerStats.athleteID);
                 if (athlete != null)
                 {
                     float fatigueGain = playerStats.minutesPlayed * 0.5f; // Adjust this formula
@@ -310,14 +311,14 @@ namespace Sportland.Core
 
         // ===== HELPER METHODS =====
 
-        public Athlete GetAthleteByID(string athleteID)
+        public Athlete.Athlete GetAthleteByID(string athleteID)
         {
             return allAthletes.Find(a => a.athleteID == athleteID);
         }
 
-        public List<Athlete> GetAllAthletes()
+        public List<Athlete.Athlete> GetAllAthletes()
         {
-            return new List<Athlete>(allAthletes);
+            return new List<Athlete.Athlete>(allAthletes);
         }
     }
 }

@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 
-namespace Sportland.Basketball
+namespace Sportland.Sports.Basketball.Stats
 {
     public enum ShotResult
     {

@@ -1,8 +1,9 @@
 using UnityEngine;
 using System;
 using System.Collections.Generic;
+using Sportland.Core.GameManagement;
 
-namespace Sportland.Core
+namespace Sportland.Core.Athlete
 {
     /// <summary>
     /// Athlete - The core character class that persists across all sports
@@ -126,18 +127,5 @@ namespace Sportland.Core
         B = 3,
         A = 4,
         S = 5
-    }
-
-    /// <summary>
-    /// Sport type enum
-    /// </summary>
-    public enum SportType
-    {
-        Basketball,
-        Baseball,
-        Football,
-        Volleyball,
-        Dodgeball,
-        Hockey
     }
 }
