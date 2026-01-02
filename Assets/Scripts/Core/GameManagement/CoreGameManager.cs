@@ -1,4 +1,4 @@
-using Sportland.Core.Athlete;
+using Sportland.Core.Athletes;
 using Sportland.Core.GameManagement;
 using System.Collections.Generic;
 using System.Threading.Tasks;

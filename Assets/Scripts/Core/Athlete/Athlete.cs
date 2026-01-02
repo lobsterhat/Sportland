@@ -3,7 +3,7 @@ using System;
 using System.Collections.Generic;
 using Sportland.Core.GameManagement;
 
-namespace Sportland.Core.Athlete
+namespace Sportland.Core.Athletes
 {
     /// <summary>
     /// Athlete - The core character class that persists across all sports
