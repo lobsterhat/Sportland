@@ -16,7 +16,7 @@ namespace Sportland.Core.Calendar
         [Header("Current Date")]
         public DateTime currentDate = new DateTime(2025, 9, 1); // Sept 1, 2025
 
-        [Header("Active Seasons")]
+        // Active Seasons
         // TODO: Track which sports are in season
         // TODO: Handle season overlaps
         // TODO: Manage schedules across multiple sports

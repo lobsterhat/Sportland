@@ -12,11 +12,11 @@ namespace Sportland.Sports.Shared
     /// </summary>
     public abstract class BaseSportModule : MonoBehaviour, ISportModule
     {
-        [Header("Sport Identity")]
+        // Sport Identity
         protected SportType sportType;
         protected string sportName;
 
-        [Header("Game State")]
+        // Game State
         protected List<Athlete.Athlete> availableAthletes;
         protected GameContext currentContext;
         protected GameResult gameResult;
