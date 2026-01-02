@@ -1,7 +1,7 @@
 using UnityEngine;
 using System.Collections.Generic;
 using Sportland.Core.GameManagement;
-using Sportland.Core.Athlete;
+using Sportland.Core.Athletes;
 
 namespace Sportland.Sports.Shared
 {

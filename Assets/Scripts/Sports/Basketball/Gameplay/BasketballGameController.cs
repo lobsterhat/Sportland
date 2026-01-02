@@ -1,5 +1,5 @@
 using Sportland.Core.GameManagement;
-using Sportland.Core.Athlete;
+using Sportland.Core.Athletes;
 using TMPro;
 using UnityEngine;
 using UnityEngine.SceneManagement;

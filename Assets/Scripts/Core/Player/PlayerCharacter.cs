@@ -1,5 +1,5 @@
 using UnityEngine;
-using Sportland.Core.Athlete;
+using Sportland.Core.Athletes;
 
 namespace Sportland.Core.Player
 {

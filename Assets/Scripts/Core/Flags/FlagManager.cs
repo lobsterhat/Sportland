@@ -1,6 +1,6 @@
 using UnityEngine;
 using System.Collections.Generic;
-using Sportland.Core.Athlete;
+using Sportland.Core.Athletes;
 
 namespace Sportland.Core.Flags
 {

@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.UI;
 using Sportland.Core.GameManagement;
-using Sportland.Core.Athlete;
+using Sportland.Core.Athletes;
 
 namespace Sportland.UI.Hub
 {
