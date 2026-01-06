@@ -39,6 +39,8 @@ namespace Sportland.Sports.Basketball.Gameplay
                 {
                     courtPosition = player.courtPosition;
                     height = 1.0f;
+                    verticalVelocity = 0f;  // Reset velocity when held
+                    courtVelocity = Vector2.zero;  // Reset court velocity too
                 }
             }
             else
