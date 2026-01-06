@@ -123,10 +123,10 @@ namespace Sportland.Sports.Basketball.Gameplay
             // Calculate backboard Y position (behind the hoop)
             float backboardYPos = targetHoop.CourtPosition.y + backboardY;
 
-            // Check if ball crossed the backboard plane this frame
-            bool wasInFront = previousPosition.y < backboardYPos;
-            bool isNowBehind = courtPosition.y >= backboardYPos;
-            bool crossedBackboard = wasInFront && isNowBehind;
+            // Check if ball crossed the backboard plane in EITHER direction
+            bool crossedFromFront = previousPosition.y < backboardYPos && courtPosition.y >= backboardYPos;
+            bool crossedFromBehind = previousPosition.y > backboardYPos && courtPosition.y <= backboardYPos;
+            bool crossedBackboard = crossedFromFront || crossedFromBehind;
 
             if (!crossedBackboard) return;
 
@@ -145,7 +145,7 @@ namespace Sportland.Sports.Basketball.Gameplay
                 // Snap ball to backboard surface
                 courtPosition.y = backboardYPos;
 
-                // Reflect Y velocity (bounce back toward shooter)
+                // Reflect Y velocity (bounce in opposite direction)
                 courtVelocity.y = -courtVelocity.y * backboardRestitution;
 
                 // Dampen X velocity slightly
