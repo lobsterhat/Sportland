@@ -356,7 +356,7 @@ private void LaunchBallToHoop(Vector2 hoopPos, float rimHeight, ShotOutcome outc
 {
     Vector2 startPos = courtPosition;
     float startHeight = jumpHeight + ballOverheadOffset;
-    float peakHeight = rimHeight + 1.5f;
+    float peakHeight = rimHeight + 2.5f;  // Increased from 1.5f for higher arc
 
     if (peakHeight < startHeight + 0.5f)
         peakHeight = startHeight + 0.5f;
