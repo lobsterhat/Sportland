@@ -202,20 +202,28 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void OnDrawGizmos()
         {
-            if (targetHoop == null) return;
+            // Find hoop if not set (for edit mode)
+            Hoop hoop = targetHoop;
+            if (hoop == null)
+            {
+                hoop = FindAnyObjectByType<Hoop>();
+            }
+
+            if (hoop == null) return;
 
             // Draw backboard collision zone
             Gizmos.color = Color.cyan;
 
-            float backboardYPos = targetHoop.CourtPosition.y + backboardY;
-            float hoopX = targetHoop.CourtPosition.x;
+            float backboardCourtY = hoop.CourtPosition.y + backboardY;
+            float hoopX = hoop.CourtPosition.x;
             float halfWidth = backboardWidth / 2f;
 
-            // Calculate corner points of backboard rectangle
-            Vector3 bottomLeft = new Vector3(hoopX - halfWidth, backboardYPos, backboardMinHeight);
-            Vector3 bottomRight = new Vector3(hoopX + halfWidth, backboardYPos, backboardMinHeight);
-            Vector3 topLeft = new Vector3(hoopX - halfWidth, backboardYPos, backboardMaxHeight);
-            Vector3 topRight = new Vector3(hoopX + halfWidth, backboardYPos, backboardMaxHeight);
+            // Calculate corner points of backboard rectangle (vertical plane)
+            // In 2.5D: X = horizontal, Y = vertical height, Z = depth (0)
+            Vector3 bottomLeft = new Vector3(hoopX - halfWidth, backboardCourtY + backboardMinHeight, 0);
+            Vector3 bottomRight = new Vector3(hoopX + halfWidth, backboardCourtY + backboardMinHeight, 0);
+            Vector3 topLeft = new Vector3(hoopX - halfWidth, backboardCourtY + backboardMaxHeight, 0);
+            Vector3 topRight = new Vector3(hoopX + halfWidth, backboardCourtY + backboardMaxHeight, 0);
 
             // Draw rectangle edges
             Gizmos.DrawLine(bottomLeft, bottomRight);  // Bottom
