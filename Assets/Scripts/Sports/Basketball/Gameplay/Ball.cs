@@ -24,8 +24,8 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         [Header("Backboard Collision")]
         public float backboardY = 0.5f;  // How far behind hoop (positive = away from shooter)
-        public float backboardMinHeight = 2.0f;  // Bottom of backboard
-        public float backboardMaxHeight = 4.5f;  // Top of backboard
+        public float backboardMinHeight = 2.5f;  // Bottom of backboard (at rim level)
+        public float backboardMaxHeight = 3.8f;  // Top of backboard
         public float backboardWidth = 1.2f;  // Width of backboard
         public float backboardRestitution = 0.7f;  // Bounce dampening (0-1)
 
