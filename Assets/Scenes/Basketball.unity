@@ -406,14 +406,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 543158430}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 5415cdfc06140b74bbe2a48c585fb79e, type: 3}
+  m_Script: {fileID: 11500000, guid: caf7762a4bd703546aebf6cee8978230, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   courtPosition: {x: 13.11, y: 0}
   rimHeight: 2.5
   rimScale: {x: 0.73, y: 0.57}
   points: 2
-  rimBounceVertical: 5
+  rimBounceVertical: 4
   rimBounceHorizontal: 1.5
   timeBetweenRimContacts: 0.15
 --- !u!4 &543158432
@@ -682,7 +682,7 @@ SpriteRenderer:
   m_SortingLayerID: 0
   m_SortingLayer: 0
   m_SortingOrder: 0
-  m_Sprite: {fileID: -2413806693520163455, guid: a86470a33a6bf42c4b3595704624658b, type: 3}
+  m_Sprite: {fileID: 1115807950392717336, guid: ebfca8581824e8f44b6fbcbc19a66419, type: 3}
   m_Color: {r: 1, g: 0.5, b: 0, a: 1}
   m_FlipX: 0
   m_FlipY: 0
@@ -855,7 +855,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1187651156}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a84a2b7b360f17f4588b1da1018b5df4, type: 3}
+  m_Script: {fileID: 11500000, guid: e574a88ce08632c48a3e3fdeb9079b7a, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   courtPosition: {x: 0, y: 0}
@@ -865,9 +865,9 @@ MonoBehaviour:
   moveSpeed: 5
   ball: {fileID: 1716409013}
   targetHoop: {fileID: 543158432}
-  baseJumpHeight: 0.5
-  jumpSkillModifier: 0.1
-  jumpGravity: -10
+  baseJumpHeight: 0.6
+  jumpSkillModifier: 0.06
+  jumpGravity: -12
   jumpSkill: 5
   isJumping: 0
   jumpHeight: 0
@@ -886,7 +886,7 @@ MonoBehaviour:
   fallingPenalty: 0.25
   hangtimeFlagReduction: 0.5
   hasHangtimeFlag: 0
-  shootingSkill: 5
+  shootingSkill: 70
 --- !u!4 &1187651158
 Transform:
   m_ObjectHideFlags: 0
@@ -1235,14 +1235,14 @@ MonoBehaviour:
   m_GameObject: {fileID: 1716409012}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: a377f3329b72bbd43a68c465346add3e, type: 3}
+  m_Script: {fileID: 11500000, guid: 78dc456ded7a93a4ab24b08c5033f442, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   courtPosition: {x: 0, y: 0}
   height: 0
   ballSprite: {fileID: 819934412}
   shadowSprite: {fileID: 1876681391}
-  heightVisualScale: 1.2
+  heightVisualScale: 1
   courtVelocity: {x: 0, y: 0}
   verticalVelocity: 0
   gravity: -9.8
@@ -1376,7 +1376,7 @@ MonoBehaviour:
   m_GameObject: {fileID: 1899985017}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 62977f9b71ab2224683f42344ba43f77, type: 3}
+  m_Script: {fileID: 11500000, guid: a8766094da0c24c40aa80a01614a0b93, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
   scoreText: {fileID: 1980644358}
