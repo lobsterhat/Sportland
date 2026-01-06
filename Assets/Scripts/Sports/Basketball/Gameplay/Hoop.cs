@@ -91,10 +91,6 @@ namespace Sportland.Sports.Basketball.Gameplay
         {
             processingRimSequence = true;
 
-            // Stop ball movement during rim sequence
-            ball.courtVelocity = Vector2.zero;
-            ball.verticalVelocity = 0f;
-
             // Swish - ball goes straight through
             if (currentOutcome.result == ShotResult.Swish)
             {
@@ -103,18 +99,18 @@ namespace Sportland.Sports.Basketball.Gameplay
                 yield break;
             }
 
-            // Process each rim contact
+            // Process each rim contact - apply bounces instead of teleporting
             for (int i = 0; i < currentOutcome.rimContacts.Count; i++)
             {
                 RimContact contact = currentOutcome.rimContacts[i];
-                Debug.Log($"Ball hit {contact}!");
 
-                // Move ball to contact point on rim
-                Vector2 contactPoint = GetRimContactPoint(contact);
-                ball.courtPosition = contactPoint;
-                ball.height = rimHeight;
+                // Wait for ball to naturally reach this contact point
+                yield return StartCoroutine(WaitForRimContact(contact));
 
-                yield return new WaitForSeconds(timeBetweenRimContacts);
+                // Apply bounce at this contact
+                ApplyRimBounce(contact, i < currentOutcome.rimContacts.Count - 1);
+
+                Debug.Log($"Ball bounced off {contact}!");
             }
 
             // Sequence complete - determine final outcome
@@ -126,6 +122,44 @@ namespace Sportland.Sports.Basketball.Gameplay
             {
                 Score();
             }
+        }
+
+        private IEnumerator WaitForRimContact(RimContact contact)
+        {
+            Vector2 contactPoint = GetRimContactPoint(contact);
+            float timeout = 2f; // Safety timeout
+            float elapsed = 0f;
+
+            // Wait until ball is near the contact point or timeout
+            while (elapsed < timeout)
+            {
+                float distanceToContact = Vector2.Distance(ball.courtPosition, contactPoint);
+                bool nearContact = distanceToContact < 0.3f;
+                bool atRimHeight = Mathf.Abs(ball.height - rimHeight) < 0.3f;
+
+                if (nearContact || atRimHeight)
+                {
+                    yield break;
+                }
+
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+        }
+
+        private void ApplyRimBounce(RimContact contact, bool hasMoreContacts)
+        {
+            Vector2 bounceDir = GetBounceDirection(contact);
+
+            // Energy loss per bounce
+            float energyRetention = 0.7f;
+
+            // Apply bounce velocities
+            ball.courtVelocity = bounceDir * rimBounceHorizontal * energyRetention;
+            ball.verticalVelocity = rimBounceVertical * energyRetention;
+
+            // Nudge ball slightly away from rim to prevent getting stuck
+            ball.courtPosition += bounceDir * 0.1f;
         }
 
         private Vector2 GetRimContactPoint(RimContact contact)
