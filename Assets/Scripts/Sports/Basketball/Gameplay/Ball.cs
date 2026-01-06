@@ -91,18 +91,21 @@ namespace Sportland.Sports.Basketball.Gameplay
         {
             if (shadowSprite != null)
             {
+                // Shadow stays at ground level
                 shadowSprite.transform.position = new Vector3(
                     courtPosition.x,
-                    courtPosition.y + (height * heightVisualScale),
+                    courtPosition.y,  // No height offset - shadow on ground
                     0
                 );
 
+                // Shadow gets smaller as ball goes higher
                 float shadowScale = Mathf.Lerp(0.3f, 0.15f, height / 5f);
                 shadowSprite.transform.localScale = Vector3.one * shadowScale;
             }
 
             if (ballSprite != null)
             {
+                // Ball sprite elevated by height
                 ballSprite.transform.position = new Vector3(
                     courtPosition.x,
                     courtPosition.y + (height * heightVisualScale),
