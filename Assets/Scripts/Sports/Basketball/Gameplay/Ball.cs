@@ -22,6 +22,15 @@ namespace Sportland.Sports.Basketball.Gameplay
         public bool isHeld = true;
         public Transform holder;
 
+        [Header("Backboard Collision")]
+        public float backboardY = 0.5f;  // How far behind hoop (positive = away from shooter)
+        public float backboardMinHeight = 2.0f;  // Bottom of backboard
+        public float backboardMaxHeight = 4.5f;  // Top of backboard
+        public float backboardWidth = 1.2f;  // Width of backboard
+        public float backboardRestitution = 0.7f;  // Bounce dampening (0-1)
+
+        private Hoop targetHoop;  // Reference to the hoop we're shooting at
+
 
         private void Awake()
         {
@@ -29,6 +38,9 @@ namespace Sportland.Sports.Basketball.Gameplay
             {
                 courtPosition = new Vector2(transform.position.x, transform.position.y);
             }
+
+            // Find the hoop for backboard position reference
+            targetHoop = FindAnyObjectByType<Hoop>();
         }
 
         private void Update()
@@ -46,10 +58,16 @@ namespace Sportland.Sports.Basketball.Gameplay
             else
             {
                 // Ball in flight
+                Vector2 previousPosition = courtPosition;
+                float previousHeight = height;
+
                 courtPosition += courtVelocity * Time.deltaTime;
 
                 verticalVelocity += gravity * Time.deltaTime;
                 height += verticalVelocity * Time.deltaTime;
+
+                // Check backboard collision
+                CheckBackboardCollision(previousPosition, previousHeight);
 
                 // Bounce on ground
                 if (height <= 0f)
@@ -92,6 +110,46 @@ namespace Sportland.Sports.Basketball.Gameplay
                 );
 
                 ballSprite.sortingOrder = 1000 - (int)(courtPosition.y * 100);
+            }
+        }
+
+        private void CheckBackboardCollision(Vector2 previousPosition, float previousHeight)
+        {
+            if (targetHoop == null) return;
+
+            // Calculate backboard Y position (behind the hoop)
+            float backboardYPos = targetHoop.CourtPosition.y + backboardY;
+
+            // Check if ball crossed the backboard plane this frame
+            bool wasInFront = previousPosition.y < backboardYPos;
+            bool isNowBehind = courtPosition.y >= backboardYPos;
+            bool crossedBackboard = wasInFront && isNowBehind;
+
+            if (!crossedBackboard) return;
+
+            // Check if ball is within backboard boundaries
+            float hoopX = targetHoop.CourtPosition.x;
+            float halfWidth = backboardWidth / 2f;
+
+            bool withinWidth = courtPosition.x >= (hoopX - halfWidth) && courtPosition.x <= (hoopX + halfWidth);
+            bool withinHeight = height >= backboardMinHeight && height <= backboardMaxHeight;
+
+            if (withinWidth && withinHeight)
+            {
+                // Ball hit backboard! Reflect it back
+                Debug.Log($"BACKBOARD HIT at height {height:F2}!");
+
+                // Snap ball to backboard surface
+                courtPosition.y = backboardYPos;
+
+                // Reflect Y velocity (bounce back toward shooter)
+                courtVelocity.y = -courtVelocity.y * backboardRestitution;
+
+                // Dampen X velocity slightly
+                courtVelocity.x *= 0.95f;
+
+                // Reduce vertical velocity slightly from impact
+                verticalVelocity *= 0.9f;
             }
         }
 
