@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 7775548a6bdfcbd4e904cadeec2c6a30
+guid: 9d7bffea0a3038644bf3791a1294bc09
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: 5419688709389488718
-    second: court example_0
+      213: -6862522945813909921
+    second: bb_hoop_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,13 +100,13 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: court example_0
+      name: bb_hoop_0
       rect:
         serializedVersion: 2
         x: 0
-        y: 0
-        width: 1307
-        height: 735
+        y: 8
+        width: 1024
+        height: 1503
       alignment: 0
       pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
@@ -115,8 +115,8 @@ TextureImporter:
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: e421b5c9a2a963b40800000000000000
-      internalID: 5419688709389488718
+      spriteID: f5e6bcf6dbb63c0a0800000000000000
+      internalID: -6862522945813909921
       vertices: []
       indices: 
       edges: []
@@ -134,8 +134,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      court example_0: 5419688709389488718
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
