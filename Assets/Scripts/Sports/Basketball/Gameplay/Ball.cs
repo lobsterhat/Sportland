@@ -199,5 +199,34 @@ namespace Sportland.Sports.Basketball.Gameplay
             //Debug.Log("Ball captured at hoop, dropping straight down");
             //Debug.Log($"Ball rendering at height={height}, courtPos={courtPosition}");
         }
+
+        private void OnDrawGizmos()
+        {
+            if (targetHoop == null) return;
+
+            // Draw backboard collision zone
+            Gizmos.color = Color.cyan;
+
+            float backboardYPos = targetHoop.CourtPosition.y + backboardY;
+            float hoopX = targetHoop.CourtPosition.x;
+            float halfWidth = backboardWidth / 2f;
+
+            // Calculate corner points of backboard rectangle
+            Vector3 bottomLeft = new Vector3(hoopX - halfWidth, backboardYPos, backboardMinHeight);
+            Vector3 bottomRight = new Vector3(hoopX + halfWidth, backboardYPos, backboardMinHeight);
+            Vector3 topLeft = new Vector3(hoopX - halfWidth, backboardYPos, backboardMaxHeight);
+            Vector3 topRight = new Vector3(hoopX + halfWidth, backboardYPos, backboardMaxHeight);
+
+            // Draw rectangle edges
+            Gizmos.DrawLine(bottomLeft, bottomRight);  // Bottom
+            Gizmos.DrawLine(topLeft, topRight);        // Top
+            Gizmos.DrawLine(bottomLeft, topLeft);      // Left
+            Gizmos.DrawLine(bottomRight, topRight);    // Right
+
+            // Draw diagonals for better visibility
+            Gizmos.color = new Color(0, 1, 1, 0.3f);  // Semi-transparent cyan
+            Gizmos.DrawLine(bottomLeft, topRight);
+            Gizmos.DrawLine(bottomRight, topLeft);
+        }
     }
 }
