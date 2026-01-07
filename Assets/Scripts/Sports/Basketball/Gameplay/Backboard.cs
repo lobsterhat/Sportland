@@ -75,6 +75,7 @@ namespace Sportland.Sports.Basketball.Gameplay
             {
                 // Ball hit backboard! Bounce it back
                 Debug.Log($"BACKBOARD HIT at height {ball.height:F2}!");
+                Debug.Log($"Before collision - Ball velocity: ({ball.courtVelocity.x:F2}, {ball.courtVelocity.y:F2}), Vertical: {ball.verticalVelocity:F2}");
 
                 // Snap ball to backboard surface
                 Vector2 pos = ball.courtPosition;
@@ -89,6 +90,8 @@ namespace Sportland.Sports.Basketball.Gameplay
 
                 // Reduce vertical velocity slightly from impact
                 ball.verticalVelocity *= 0.9f;
+
+                Debug.Log($"After collision - Ball velocity: ({ball.courtVelocity.x:F2}, {ball.courtVelocity.y:F2}), Vertical: {ball.verticalVelocity:F2}");
             }
         }
 
