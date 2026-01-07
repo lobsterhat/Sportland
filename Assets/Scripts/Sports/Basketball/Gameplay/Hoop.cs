@@ -227,19 +227,9 @@ namespace Sportland.Sports.Basketball.Gameplay
             waitingForBall = false;
             processingRimSequence = false;
 
-            // Get final bounce direction from last contact
-            RimContact lastContact = currentOutcome.rimContacts.Count > 0
-                ? currentOutcome.rimContacts[currentOutcome.rimContacts.Count - 1]
-                : RimContact.FrontRim;
-
-            Vector2 bounceDir = GetBounceDirection(lastContact);
-
-            float energyMultiplier = Mathf.Pow(0.7f, currentOutcome.rimContacts.Count);
-            float horizontalSpeed = rimBounceHorizontal * energyMultiplier * Random.Range(0.8f, 1.2f);
-            float verticalSpeed = rimBounceVertical * energyMultiplier * Random.Range(0.8f, 1.2f);
-
-            ball.courtVelocity = bounceDir * horizontalSpeed;
-            ball.verticalVelocity = verticalSpeed;
+            // Ball already has velocity from the last rim bounce (ApplyRimBounce)
+            // Don't override it - let physics continue naturally
+            // This allows backboard collisions to work correctly on rebounds
         }
 
         private void OnDrawGizmos()
