@@ -218,12 +218,15 @@ namespace Sportland.Sports.Basketball.Gameplay
             float hoopX = hoop.CourtPosition.x;
             float halfWidth = backboardWidth / 2f;
 
-            // Calculate corner points of backboard rectangle (vertical plane)
-            // In 2.5D: X = horizontal, Y = vertical height, Z = depth (0)
-            Vector3 bottomLeft = new Vector3(hoopX - halfWidth, backboardCourtY + backboardMinHeight, 0);
-            Vector3 bottomRight = new Vector3(hoopX + halfWidth, backboardCourtY + backboardMinHeight, 0);
-            Vector3 topLeft = new Vector3(hoopX - halfWidth, backboardCourtY + backboardMaxHeight, 0);
-            Vector3 topRight = new Vector3(hoopX + halfWidth, backboardCourtY + backboardMaxHeight, 0);
+            // Calculate corner points using same coordinate system as ball rendering
+            // World Y = courtY + (height * heightVisualScale)
+            float bottomWorldY = backboardCourtY + (backboardMinHeight * heightVisualScale);
+            float topWorldY = backboardCourtY + (backboardMaxHeight * heightVisualScale);
+
+            Vector3 bottomLeft = new Vector3(hoopX - halfWidth, bottomWorldY, 0);
+            Vector3 bottomRight = new Vector3(hoopX + halfWidth, bottomWorldY, 0);
+            Vector3 topLeft = new Vector3(hoopX - halfWidth, topWorldY, 0);
+            Vector3 topRight = new Vector3(hoopX + halfWidth, topWorldY, 0);
 
             // Draw rectangle edges
             Gizmos.DrawLine(bottomLeft, bottomRight);  // Bottom
