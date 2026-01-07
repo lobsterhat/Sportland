@@ -50,25 +50,25 @@ namespace Sportland.Sports.Basketball.Gameplay
                 return;
             }
 
-            // Check if ball crossed the backboard plane in EITHER direction
-            bool crossedFromFront = previousBallCourtPosition.y < courtPosition.y && ball.courtPosition.y >= courtPosition.y;
-            bool crossedFromBehind = previousBallCourtPosition.y > courtPosition.y && ball.courtPosition.y <= courtPosition.y;
+            // Check if ball crossed the backboard plane (X axis) in EITHER direction
+            bool crossedFromFront = previousBallCourtPosition.x < courtPosition.x && ball.courtPosition.x >= courtPosition.x;
+            bool crossedFromBehind = previousBallCourtPosition.x > courtPosition.x && ball.courtPosition.x <= courtPosition.x;
             bool crossedBackboard = crossedFromFront || crossedFromBehind;
 
             if (crossedBackboard)
             {
-                Debug.Log($"Ball crossed backboard plane! Ball Y: {ball.courtPosition.y:F2}, Backboard Y: {courtPosition.y:F2}, Ball X: {ball.courtPosition.x:F2}, Ball Height: {ball.height:F2}");
+                Debug.Log($"Ball crossed backboard plane! Ball X: {ball.courtPosition.x:F2}, Backboard X: {courtPosition.x:F2}, Ball Y: {ball.courtPosition.y:F2}, Ball Height: {ball.height:F2}");
             }
 
             if (!crossedBackboard) return;
 
             // Check if ball is within backboard boundaries
             float halfWidth = width / 2f;
-            bool withinWidth = ball.courtPosition.x >= (courtPosition.x - halfWidth) &&
-                              ball.courtPosition.x <= (courtPosition.x + halfWidth);
+            bool withinWidth = ball.courtPosition.y >= (courtPosition.y - halfWidth) &&
+                              ball.courtPosition.y <= (courtPosition.y + halfWidth);
             bool withinHeight = ball.height >= minHeight && ball.height <= maxHeight;
 
-            Debug.Log($"Backboard bounds check - X range: [{courtPosition.x - halfWidth:F2}, {courtPosition.x + halfWidth:F2}], Height range: [{minHeight:F2}, {maxHeight:F2}]");
+            Debug.Log($"Backboard bounds check - Y range: [{courtPosition.y - halfWidth:F2}, {courtPosition.y + halfWidth:F2}], Height range: [{minHeight:F2}, {maxHeight:F2}]");
             Debug.Log($"Within width: {withinWidth}, Within height: {withinHeight}");
 
             if (withinWidth && withinHeight)
@@ -78,13 +78,13 @@ namespace Sportland.Sports.Basketball.Gameplay
 
                 // Snap ball to backboard surface
                 Vector2 pos = ball.courtPosition;
-                pos.y = courtPosition.y;
+                pos.x = courtPosition.x;
                 ball.courtPosition = pos;
 
-                // Reflect Y velocity (bounce in opposite direction)
+                // Reflect X velocity (bounce back toward court)
                 Vector2 vel = ball.courtVelocity;
-                vel.y = -vel.y * restitution;
-                vel.x *= 0.95f;  // Dampen X velocity slightly
+                vel.x = -vel.x * restitution;
+                vel.y *= 0.95f;  // Dampen Y velocity slightly
                 ball.courtVelocity = vel;
 
                 // Reduce vertical velocity slightly from impact
