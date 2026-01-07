@@ -86,15 +86,12 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void OnDrawGizmos()
         {
-            // Use transform position as the base reference point
-            Vector2 pos = new Vector2(transform.position.x, transform.position.y);
+            // Determine the court position to use
+            Vector2 courtPos = courtPosition != Vector2.zero ? courtPosition : new Vector2(transform.position.x, transform.position.y);
             float halfWidth = width / 2f;
 
             // Draw backboard collision zone
             Gizmos.color = Color.cyan;
-
-            // Get the court position (use field if set, otherwise use transform Y as court Y)
-            float courtY = courtPosition != Vector2.zero ? courtPosition.y : pos.y;
 
             // Get heightVisualScale from ball (if available) to ensure gizmo matches ball rendering
             float heightScale = 1.0f;
@@ -109,13 +106,14 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
 
             // Calculate visual positions - these are where ball sprites at these heights would render
-            float bottomWorldY = courtY + (minHeight * heightScale);
-            float topWorldY = courtY + (maxHeight * heightScale);
+            // World Y = courtY + (height * heightScale)
+            float bottomWorldY = courtPos.y + (minHeight * heightScale);
+            float topWorldY = courtPos.y + (maxHeight * heightScale);
 
-            Vector3 bottomLeft = new Vector3(pos.x - halfWidth, bottomWorldY, 0);
-            Vector3 bottomRight = new Vector3(pos.x + halfWidth, bottomWorldY, 0);
-            Vector3 topLeft = new Vector3(pos.x - halfWidth, topWorldY, 0);
-            Vector3 topRight = new Vector3(pos.x + halfWidth, topWorldY, 0);
+            Vector3 bottomLeft = new Vector3(courtPos.x - halfWidth, bottomWorldY, 0);
+            Vector3 bottomRight = new Vector3(courtPos.x + halfWidth, bottomWorldY, 0);
+            Vector3 topLeft = new Vector3(courtPos.x - halfWidth, topWorldY, 0);
+            Vector3 topRight = new Vector3(courtPos.x + halfWidth, topWorldY, 0);
 
             // Draw rectangle edges
             Gizmos.DrawLine(bottomLeft, bottomRight);  // Bottom
