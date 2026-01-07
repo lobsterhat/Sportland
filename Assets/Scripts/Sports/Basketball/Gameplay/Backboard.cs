@@ -15,9 +15,6 @@ namespace Sportland.Sports.Basketball.Gameplay
         [Header("Physics")]
         [SerializeField] private float restitution = 0.7f;  // Bounce dampening (0-1)
 
-        [Header("Rendering")]
-        [SerializeField] private float heightVisualScale = 1.0f;  // Match ball's visual scale
-
         private Ball ball;
         private Vector2 previousBallCourtPosition;
 
@@ -89,17 +86,31 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void OnDrawGizmos()
         {
-            // Use courtPosition if set, otherwise use transform position
-            Vector2 pos = courtPosition != Vector2.zero ? courtPosition : new Vector2(transform.position.x, transform.position.y);
+            // Use transform position as the base reference point
+            Vector2 pos = new Vector2(transform.position.x, transform.position.y);
             float halfWidth = width / 2f;
 
             // Draw backboard collision zone
             Gizmos.color = Color.cyan;
 
-            // Calculate corner points using same coordinate system as ball rendering
-            // World Y = courtY + (height * heightVisualScale)
-            float bottomWorldY = pos.y + (minHeight * heightVisualScale);
-            float topWorldY = pos.y + (maxHeight * heightVisualScale);
+            // Get the court position (use field if set, otherwise use transform Y as court Y)
+            float courtY = courtPosition != Vector2.zero ? courtPosition.y : pos.y;
+
+            // Get heightVisualScale from ball (if available) to ensure gizmo matches ball rendering
+            float heightScale = 1.0f;
+            Ball ballRef = ball;
+            if (ballRef == null)
+            {
+                ballRef = FindAnyObjectByType<Ball>();
+            }
+            if (ballRef != null)
+            {
+                heightScale = ballRef.heightVisualScale;
+            }
+
+            // Calculate visual positions - these are where ball sprites at these heights would render
+            float bottomWorldY = courtY + (minHeight * heightScale);
+            float topWorldY = courtY + (maxHeight * heightScale);
 
             Vector3 bottomLeft = new Vector3(pos.x - halfWidth, bottomWorldY, 0);
             Vector3 bottomRight = new Vector3(pos.x + halfWidth, bottomWorldY, 0);
