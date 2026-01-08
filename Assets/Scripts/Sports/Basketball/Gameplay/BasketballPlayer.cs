@@ -265,11 +265,21 @@ namespace Sportland.Sports.Basketball.Gameplay
             float dunkJumpHeight = baseJumpHeight + (jumpSkill * jumpSkillModifier) + 0.3f;
             jumpVelocity = Mathf.Sqrt(2f * Mathf.Abs(jumpGravity) * dunkJumpHeight);
 
-            // Calculate drift toward basket
+            // Calculate drift toward basket - velocity to reach rim at apex
             if (targetHoop.TryGetComponent<Hoop>(out var hoop))
             {
-                Vector2 toHoop = (hoop.CourtPosition - courtPosition).normalized;
-                dunkDriftVelocity = toHoop * moveSpeed * 1.2f; // Slightly faster than regular movement
+                Vector2 toHoop = hoop.CourtPosition - courtPosition;
+                float distanceToRim = toHoop.magnitude;
+
+                // Time to reach apex (when we want to be at rim)
+                float timeToApex = jumpVelocity / Mathf.Abs(jumpGravity);
+
+                // Calculate velocity needed to cover distance in that time
+                // But leave a small gap so we don't overshoot
+                float targetDistance = Mathf.Max(0f, distanceToRim - 0.3f);
+                dunkDriftVelocity = toHoop.normalized * (targetDistance / timeToApex);
+
+                Debug.Log($"Dunk: Distance={distanceToRim:F2}, TimeToApex={timeToApex:F2}, DriftSpeed={dunkDriftVelocity.magnitude:F2}");
             }
         }
 
