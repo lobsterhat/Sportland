@@ -283,10 +283,10 @@ namespace Sportland.Sports.Basketball.Gameplay
             Hoop hoop = targetHoop.GetComponent<Hoop>();
             if (hoop == null) return;
 
-            // Create guaranteed make outcome
+            // Create guaranteed make outcome (Swish = clean through)
             ShotOutcome outcome = new ShotOutcome
             {
-                result = ShotResult.Make,
+                result = ShotResult.Swish,
                 rimContacts = new System.Collections.Generic.List<RimContact>()
             };
 
