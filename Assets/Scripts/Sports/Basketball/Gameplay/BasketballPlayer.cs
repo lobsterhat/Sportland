@@ -64,6 +64,9 @@ namespace Sportland.Sports.Basketball.Gameplay
         [Header("Dunk State")]
         private bool isDunking = false;
         private Vector2 dunkDriftVelocity;
+        private bool isHangingOnRim = false;
+        private float rimHangTimer = 0f;
+        public float rimHangDuration = 0.5f;  // How long to hang on rim
 
         private Vector2 moveInput;
 
@@ -126,7 +129,12 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void HandleMovement()
         {
-            if (isDunking)
+            if (isHangingOnRim)
+            {
+                // No movement while hanging on rim
+                return;
+            }
+            else if (isDunking)
             {
                 // Drift toward basket during dunk
                 courtPosition += dunkDriftVelocity * Time.deltaTime;
@@ -154,6 +162,27 @@ namespace Sportland.Sports.Basketball.Gameplay
         {
             if (!isJumping) return;
 
+            // Handle rim hang state
+            if (isHangingOnRim)
+            {
+                rimHangTimer += Time.deltaTime;
+
+                // Keep player at rim height, no movement
+                jumpVelocity = 0f;
+                dunkDriftVelocity = Vector2.zero;
+
+                // Release from rim after hang duration
+                if (rimHangTimer >= rimHangDuration)
+                {
+                    Debug.Log("Released from rim!");
+                    isHangingOnRim = false;
+                    isDunking = false;
+                    rimHangTimer = 0f;
+                    // Let gravity take over
+                }
+                return;
+            }
+
             float previousHeight = jumpHeight;
 
             jumpVelocity += jumpGravity * Time.deltaTime;
@@ -175,7 +204,7 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
 
             // Check for dunk release at rim
-            if (isDunking && targetHoop != null)
+            if (isDunking && !isHangingOnRim && targetHoop != null)
             {
                 if (targetHoop.TryGetComponent<Hoop>(out var hoop))
                 {
@@ -196,12 +225,14 @@ namespace Sportland.Sports.Basketball.Gameplay
                 jumpHeight = 0f;
                 isJumping = false;
                 isDunking = false;
+                isHangingOnRim = false;
                 passedApex = false;
                 jumpApex = 0f;
                 jumpMomentum = Vector2.zero;
                 isStationaryJump = false;
                 driftVelocity = Vector2.zero;
                 dunkDriftVelocity = Vector2.zero;
+                rimHangTimer = 0f;
                 totalDriftDistance = 0f;
                // Debug.Log("Landed");
             }
@@ -285,13 +316,21 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void FinishDunk()
         {
-            Debug.Log("DUNK FINISHED!");
+            Debug.Log("DUNK FINISHED! Hanging on rim...");
 
             // Force dunk to always go in
             if (ball == null || targetHoop == null) return;
 
             Hoop hoop = targetHoop.GetComponent<Hoop>();
             if (hoop == null) return;
+
+            // Start hanging on rim
+            isHangingOnRim = true;
+            rimHangTimer = 0f;
+
+            // Stop all movement
+            jumpVelocity = 0f;
+            dunkDriftVelocity = Vector2.zero;
 
             // Create guaranteed make outcome (Swish = clean through)
             ShotOutcome outcome = new ShotOutcome
@@ -308,8 +347,6 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             // Dunk aims DOWN through the rim
             ball.Launch(startPos, startHeight, Vector2.zero, -5f); // Negative velocity = downward
-
-            isDunking = false;
 
             Invoke("ResetBall", 5f);
         }
