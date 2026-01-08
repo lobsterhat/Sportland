@@ -215,14 +215,14 @@ namespace Sportland.Sports.Basketball.Gameplay
             // Apply net physics - the net slows down the ball and affects trajectory
             if (ball != null)
             {
-                // Net dampens horizontal velocity significantly
-                ball.courtVelocity *= 0.3f;
+                // Net kills most horizontal movement - ball falls nearly straight down
+                ball.courtVelocity *= 0.1f;
 
                 // Net slows vertical velocity but ensures ball is falling
-                ball.verticalVelocity *= 0.4f;
-                if (ball.verticalVelocity > -1f)
+                ball.verticalVelocity *= 0.5f;
+                if (ball.verticalVelocity > -2f)
                 {
-                    ball.verticalVelocity = -1f;
+                    ball.verticalVelocity = -2f;
                 }
             }
 
