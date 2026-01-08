@@ -121,24 +121,19 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         public void CaptureAtHoop(Vector2 hoopCourtPosition, float rimHeight)
         {
-            // Ball has gone through hoop - now drop straight down
+            // Ball has gone through hoop - let it continue naturally
+            // Don't snap position or zero velocities - just ensure it's falling
 
-            // Snap to hoop position
-            courtPosition = hoopCourtPosition;
-            courtVelocity = Vector2.zero;
+            // If ball isn't falling yet, give it a slight downward push
+            if (verticalVelocity > -1f)
+            {
+                verticalVelocity = -1f;
+            }
 
-            // Keep falling (or increase downward speed)
-            // Ball is already falling, so we can just let gravity continue
-            // Or force it to fall faster:
-            //if (verticalVelocity > -2f)
-            //{
-            //    verticalVelocity = -2f; // Ensure it's falling at least this fast
-            //}
+            // Let horizontal velocity continue naturally - ball will drift as it falls
+            // This creates a more natural "dropping through net" effect
 
-            verticalVelocity = 0;
-
-            //Debug.Log("Ball captured at hoop, dropping straight down");
-            //Debug.Log($"Ball rendering at height={height}, courtPos={courtPosition}");
+            //Debug.Log("Ball passed through hoop, continuing to fall naturally");
         }
     }
 }
