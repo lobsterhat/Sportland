@@ -393,8 +393,8 @@ namespace Sportland.Sports.Basketball.Gameplay
             context.intentionalBank = Input.GetKey(KeyCode.B);
 
             // Determine shot type based on distance and movement
-            // DUNK: Very close AND jump height puts ball near/above rim
-            if (distanceToBasket < 1.5f && (jumpHeight + ballOverheadOffset) >= (hoop.RimHeight - 0.5f))
+            // DUNK: Very close AND jump height puts ball near/above rim AND dunks enabled
+            if (dunksEnabled && distanceToBasket < 1.5f && (jumpHeight + ballOverheadOffset) >= (hoop.RimHeight - 0.5f))
             {
                 context.type = ShotType.Dunk;
                 context.releaseHeight = jumpHeight + ballOverheadOffset;
