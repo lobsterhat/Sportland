@@ -60,6 +60,7 @@ namespace Sportland.Sports.Basketball.Gameplay
         public float shootingSkill = 70f;
         public float dunkSkill = 50f;  // 0-100, determines dunk ability and range
         public float dunkRange = 2.5f; // Max distance to attempt dunk
+        public bool dunksEnabled = true; // Toggle dunks on/off for testing
 
         [Header("Dunk State")]
         private bool isDunking = false;
@@ -268,6 +269,7 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private bool CanAttemptDunk()
         {
+            if (!dunksEnabled) return false; // Check if dunks are enabled
             if (targetHoop == null || dunkSkill < 10f) return false;
 
             if (!targetHoop.TryGetComponent<Hoop>(out var hoop)) return false;
