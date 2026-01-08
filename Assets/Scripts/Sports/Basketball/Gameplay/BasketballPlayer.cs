@@ -62,6 +62,12 @@ namespace Sportland.Sports.Basketball.Gameplay
         public float dunkRange = 2.5f; // Max distance to attempt dunk
         public bool dunksEnabled = true; // Toggle dunks on/off for testing
 
+        [Header("Debug Controls")]
+        public bool debugModeEnabled = false;
+        public ShotType forcedShotType = ShotType.StandardJumpShot;
+        public ShotResult forcedOutcome = ShotResult.Swish;
+        public RimContact forcedMissLocation = RimContact.FrontRim;
+
         [Header("Dunk State")]
         private bool isDunking = false;
         private Vector2 dunkDriftVelocity;
@@ -95,6 +101,37 @@ namespace Sportland.Sports.Basketball.Gameplay
             {
                 ResetBall();
                 return;
+            }
+
+            // Debug controls (number keys)
+            if (Input.GetKeyDown(KeyCode.Alpha1))
+            {
+                debugModeEnabled = !debugModeEnabled;
+                Debug.Log($"Debug Mode: {(debugModeEnabled ? "ON" : "OFF")}");
+            }
+
+            if (debugModeEnabled)
+            {
+                // Cycle shot type with Alpha2
+                if (Input.GetKeyDown(KeyCode.Alpha2))
+                {
+                    forcedShotType = (ShotType)(((int)forcedShotType + 1) % System.Enum.GetValues(typeof(ShotType)).Length);
+                    Debug.Log($"Forced Shot Type: {forcedShotType}");
+                }
+
+                // Cycle outcome with Alpha3
+                if (Input.GetKeyDown(KeyCode.Alpha3))
+                {
+                    forcedOutcome = (ShotResult)(((int)forcedOutcome + 1) % System.Enum.GetValues(typeof(ShotResult)).Length);
+                    Debug.Log($"Forced Outcome: {forcedOutcome}");
+                }
+
+                // Cycle miss location with Alpha4
+                if (Input.GetKeyDown(KeyCode.Alpha4))
+                {
+                    forcedMissLocation = (RimContact)(((int)forcedMissLocation + 1) % System.Enum.GetValues(typeof(RimContact)).Length);
+                    Debug.Log($"Forced Miss Location: {forcedMissLocation}");
+                }
             }
 
             moveInput.x = Input.GetAxisRaw("Horizontal");
@@ -376,6 +413,19 @@ namespace Sportland.Sports.Basketball.Gameplay
             float distanceToBasket = toHoop.magnitude;
             context.distanceToBasket = distanceToBasket;
 
+            // DEBUG MODE: Use forced shot type
+            if (debugModeEnabled)
+            {
+                context.type = forcedShotType;
+                context.releaseHeight = jumpHeight + ballOverheadOffset;
+                context.releaseExtension = GetExtensionForShotType(forcedShotType);
+                context.intentionalBank = (forcedShotType == ShotType.BankShot || forcedShotType == ShotType.Layup);
+                context.isMoving = jumpMomentum.magnitude > 0.1f;
+                context.movingTowardBasket = true;
+                context.movingAwayFromBasket = false;
+                return context;
+            }
+
             // Determine movement state
             context.isMoving = jumpMomentum.magnitude > 0.1f || !isStationaryJump;
 
@@ -562,12 +612,23 @@ namespace Sportland.Sports.Basketball.Gameplay
 
     // Determine shot type
     ShotContext shotContext = DetermineShotType();
-    Debug.Log($"Shot Type: {shotContext.type} (Distance: {shotContext.distanceToBasket:F2})");
+    Debug.Log($"Shot Type: {shotContext.type} (Distance: {shotContext.distanceToBasket:F2}) {(debugModeEnabled ? "[DEBUG MODE]" : "")}");
 
-    float shotAccuracy = CalculateTotalShotChance(shotContext);
-    ShotOutcome outcome = ShotOutcomeCalculator.CalculateOutcome(courtPosition, hoop.CourtPosition, shotAccuracy);
+    ShotOutcome outcome;
 
-    Debug.Log($"Shot outcome: {outcome.result}, Rim contacts: {outcome.rimContacts.Count}");
+    // DEBUG MODE: Use forced outcome
+    if (debugModeEnabled)
+    {
+        outcome = CreateForcedOutcome();
+        Debug.Log($"[DEBUG] Forced Outcome: {outcome.result}, Rim contacts: {outcome.rimContacts.Count}");
+    }
+    else
+    {
+        float shotAccuracy = CalculateTotalShotChance(shotContext);
+        outcome = ShotOutcomeCalculator.CalculateOutcome(courtPosition, hoop.CourtPosition, shotAccuracy);
+        Debug.Log($"Shot outcome: {outcome.result}, Rim contacts: {outcome.rimContacts.Count}");
+    }
+
     foreach (var contact in outcome.rimContacts)
     {
         Debug.Log($"  - {contact}");
@@ -577,6 +638,36 @@ namespace Sportland.Sports.Basketball.Gameplay
     LaunchBallToHoop(hoop.CourtPosition, hoop.RimHeight, outcome, shotContext);
 
     Invoke("ResetBall", 5f);
+}
+
+private ShotOutcome CreateForcedOutcome()
+{
+    ShotOutcome outcome = new ShotOutcome();
+    outcome.result = forcedOutcome;
+    outcome.rimContacts = new System.Collections.Generic.List<RimContact>();
+
+    // For misses, add the forced rim contact
+    if (forcedOutcome == ShotResult.Miss)
+    {
+        outcome.rimContacts.Add(forcedMissLocation);
+    }
+
+    return outcome;
+}
+
+private float GetExtensionForShotType(ShotType shotType)
+{
+    switch (shotType)
+    {
+        case ShotType.Dunk:
+            return 0.3f;
+        case ShotType.Layup:
+            return 0.5f;
+        case ShotType.Floater:
+            return 0.2f;
+        default:
+            return 0f;
+    }
 }
 
 private float CalculateTotalShotChance(ShotContext shotContext)
