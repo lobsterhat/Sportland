@@ -111,6 +111,12 @@ namespace Sportland.Sports.Basketball.Gameplay
                 ApplyRimBounce(contact, i < currentOutcome.rimContacts.Count - 1);
 
                 Debug.Log($"Ball bounced off {contact}!");
+
+                // Small delay between contacts to make bounces visible
+                if (i < currentOutcome.rimContacts.Count - 1)
+                {
+                    yield return new WaitForSeconds(timeBetweenRimContacts);
+                }
             }
 
             // Sequence complete - determine final outcome
@@ -130,14 +136,15 @@ namespace Sportland.Sports.Basketball.Gameplay
             float timeout = 2f; // Safety timeout
             float elapsed = 0f;
 
-            // Wait until ball is near the contact point or timeout
+            // Wait until ball is near the contact point AND at rim height
             while (elapsed < timeout)
             {
                 float distanceToContact = Vector2.Distance(ball.courtPosition, contactPoint);
-                bool nearContact = distanceToContact < 0.3f;
-                bool atRimHeight = Mathf.Abs(ball.height - rimHeight) < 0.3f;
+                bool nearContact = distanceToContact < 0.4f;
+                bool atRimHeight = Mathf.Abs(ball.height - rimHeight) < 0.4f;
 
-                if (nearContact || atRimHeight)
+                // Require BOTH conditions - ball must be near the contact point and at rim height
+                if (nearContact && atRimHeight)
                 {
                     yield break;
                 }
