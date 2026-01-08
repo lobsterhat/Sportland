@@ -212,9 +212,19 @@ namespace Sportland.Sports.Basketball.Gameplay
             waitingForBall = false;
             processingRimSequence = false;
 
-            // Ball continues naturally through hoop - no need to modify physics
-            // For swishes, ball falls through cleanly
-            // For rim-ins, ball already has velocity from rim bounces
+            // Apply net physics - the net slows down the ball and affects trajectory
+            if (ball != null)
+            {
+                // Net dampens horizontal velocity significantly
+                ball.courtVelocity *= 0.3f;
+
+                // Net slows vertical velocity but ensures ball is falling
+                ball.verticalVelocity *= 0.4f;
+                if (ball.verticalVelocity > -1f)
+                {
+                    ball.verticalVelocity = -1f;
+                }
+            }
 
             BasketballGameController controller = FindAnyObjectByType<BasketballGameController>();
             if (controller != null)
