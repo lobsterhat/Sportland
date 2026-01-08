@@ -58,6 +58,12 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         [Header("Player Skills")]
         public float shootingSkill = 70f;
+        public float dunkSkill = 50f;  // 0-100, determines dunk ability and range
+        public float dunkRange = 2.5f; // Max distance to attempt dunk
+
+        [Header("Dunk State")]
+        private bool isDunking = false;
+        private Vector2 dunkDriftVelocity;
 
         private Vector2 moveInput;
 
@@ -92,9 +98,17 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             if (ball != null && ball.isHeld)
             {
-                if (Input.GetKeyDown(KeyCode.Space) && !isJumping)
+                if (Input.GetKeyDown(KeyCode.Space) && !isJumping && !isDunking)
                 {
-                    StartJump();
+                    // Check if player should attempt dunk instead of regular jump
+                    if (CanAttemptDunk())
+                    {
+                        StartDunk();
+                    }
+                    else
+                    {
+                        StartJump();
+                    }
                 }
 
                 if (Input.GetKeyUp(KeyCode.Space) && isJumping)
@@ -112,7 +126,12 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void HandleMovement()
         {
-            if (isJumping)
+            if (isDunking)
+            {
+                // Drift toward basket during dunk
+                courtPosition += dunkDriftVelocity * Time.deltaTime;
+            }
+            else if (isJumping)
             {
                 if (isStationaryJump)
                 {
@@ -150,20 +169,39 @@ namespace Sportland.Sports.Basketball.Gameplay
                 //Debug.Log($"Passed apex at height: {jumpApex:F2}");
             }
 
-            if (isStationaryJump && moveInput.magnitude > 0.1f)
+            if (isStationaryJump && moveInput.magnitude > 0.1f && !isDunking)
             {
                 driftVelocity = moveInput.normalized * maxDriftSpeed;
+            }
+
+            // Check for dunk release at rim
+            if (isDunking && targetHoop != null)
+            {
+                if (targetHoop.TryGetComponent<Hoop>(out var hoop))
+                {
+                    float distanceToRim = Vector2.Distance(courtPosition, hoop.CourtPosition);
+                    float heightAtRim = jumpHeight + ballOverheadOffset;
+
+                    // Release dunk when near rim and at/above rim height
+                    if (distanceToRim < 0.5f && heightAtRim >= hoop.RimHeight - 0.3f)
+                    {
+                        FinishDunk();
+                        return;
+                    }
+                }
             }
 
             if (jumpHeight <= 0f)
             {
                 jumpHeight = 0f;
                 isJumping = false;
+                isDunking = false;
                 passedApex = false;
                 jumpApex = 0f;
                 jumpMomentum = Vector2.zero;
                 isStationaryJump = false;
                 driftVelocity = Vector2.zero;
+                dunkDriftVelocity = Vector2.zero;
                 totalDriftDistance = 0f;
                // Debug.Log("Landed");
             }
@@ -195,6 +233,75 @@ namespace Sportland.Sports.Basketball.Gameplay
                 jumpMomentum = moveInput.normalized * moveSpeed;
                 //Debug.Log("Moving jump - momentum carried");
             }
+        }
+
+        private bool CanAttemptDunk()
+        {
+            if (targetHoop == null || dunkSkill < 10f) return false;
+
+            if (!targetHoop.TryGetComponent<Hoop>(out var hoop)) return false;
+
+            float distanceToBasket = Vector2.Distance(courtPosition, hoop.CourtPosition);
+
+            // Can attempt dunk if within range (skill affects range)
+            float effectiveDunkRange = dunkRange * (dunkSkill / 100f);
+            return distanceToBasket <= effectiveDunkRange;
+        }
+
+        private void StartDunk()
+        {
+            CancelInvoke("ResetBall");
+
+            Debug.Log("DUNK ATTEMPT!");
+
+            isDunking = true;
+            isJumping = true;
+            isStationaryJump = false;
+            passedApex = false;
+            jumpApex = 0f;
+            jumpHeight = 0f;
+
+            // Dunk jump is higher/more explosive
+            float dunkJumpHeight = baseJumpHeight + (jumpSkill * jumpSkillModifier) + 0.3f;
+            jumpVelocity = Mathf.Sqrt(2f * Mathf.Abs(jumpGravity) * dunkJumpHeight);
+
+            // Calculate drift toward basket
+            if (targetHoop.TryGetComponent<Hoop>(out var hoop))
+            {
+                Vector2 toHoop = (hoop.CourtPosition - courtPosition).normalized;
+                dunkDriftVelocity = toHoop * moveSpeed * 1.2f; // Slightly faster than regular movement
+            }
+        }
+
+        private void FinishDunk()
+        {
+            Debug.Log("DUNK FINISHED!");
+
+            // Force dunk to always go in
+            if (ball == null || targetHoop == null) return;
+
+            Hoop hoop = targetHoop.GetComponent<Hoop>();
+            if (hoop == null) return;
+
+            // Create guaranteed make outcome
+            ShotOutcome outcome = new ShotOutcome
+            {
+                result = ShotResult.Make,
+                rimContacts = new System.Collections.Generic.List<RimContact>()
+            };
+
+            hoop.SetShotOutcome(outcome);
+
+            // Slam ball down through rim
+            Vector2 startPos = courtPosition;
+            float startHeight = jumpHeight + ballOverheadOffset;
+
+            // Dunk aims DOWN through the rim
+            ball.Launch(startPos, startHeight, Vector2.zero, -5f); // Negative velocity = downward
+
+            isDunking = false;
+
+            Invoke("ResetBall", 5f);
         }
 
         private void ReleaseShot()
