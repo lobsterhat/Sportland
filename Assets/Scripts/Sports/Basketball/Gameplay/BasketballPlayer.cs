@@ -404,6 +404,7 @@ namespace Sportland.Sports.Basketball.Gameplay
                 context.type = ShotType.Layup;
                 context.releaseHeight = jumpHeight + ballOverheadOffset;
                 context.releaseExtension = 0.5f; // Extend arm toward basket
+                context.intentionalBank = true; // Layups always use backboard
             }
             // FLOATER: Mid-range, moving toward, released before apex
             else if (distanceToBasket >= 3.0f && distanceToBasket < 8.0f &&
@@ -435,10 +436,10 @@ namespace Sportland.Sports.Basketball.Gameplay
                 context.releaseExtension = 0f;
             }
 
-            // Override with bank shot if player requested it
+            // Override with bank shot if player requested it (but not for dunks)
             if (context.intentionalBank && context.type != ShotType.Dunk)
             {
-                context.type = ShotType.BankShot;
+                context.type = context.type == ShotType.Layup ? ShotType.Layup : ShotType.BankShot;
             }
 
             return context;
@@ -605,7 +606,7 @@ private float GetShotTypeModifier(ShotContext shotContext)
             return 0.4f; // Dunks are nearly guaranteed
 
         case ShotType.Layup:
-            return 0.15f; // Close shots easier
+            return 0.25f; // Layups are high percentage shots
 
         case ShotType.Floater:
             return -0.05f; // Slightly harder (touch shot)
@@ -644,7 +645,35 @@ private void LaunchBallToHoop(Vector2 hoopPos, float rimHeight, ShotOutcome outc
     if (peakHeight < startHeight + 0.5f)
         peakHeight = startHeight + 0.5f;
 
-    LaunchBallAtTarget(startPos, startHeight, hoopPos, targetHeight, peakHeight);
+    // For layups, aim at backboard instead of hoop directly
+    Vector2 targetPos = hoopPos;
+    if (shotContext.type == ShotType.Layup)
+    {
+        targetPos = CalculateLayupBackboardTarget(hoopPos, rimHeight);
+        targetHeight = rimHeight + 0.8f; // Aim higher on backboard for layups
+        Debug.Log($"LAYUP - Aiming at backboard: {targetPos} at height {targetHeight:F2}");
+    }
+
+    LaunchBallAtTarget(startPos, startHeight, targetPos, targetHeight, peakHeight);
+}
+
+private Vector2 CalculateLayupBackboardTarget(Vector2 hoopPos, float rimHeight)
+{
+    // Find backboard position
+    Backboard backboard = FindAnyObjectByType<Backboard>();
+    if (backboard != null)
+    {
+        // Aim at a point on the backboard above and slightly to the side of the rim
+        // The backboard is at courtPosition.x, so use that
+        Vector2 backboardPos = new Vector2(backboard.transform.position.x, hoopPos.y);
+
+        // Offset slightly toward the side player is approaching from
+        float sideOffset = (courtPosition.y < hoopPos.y) ? 0.15f : -0.15f;
+        return new Vector2(backboardPos.x, hoopPos.y + sideOffset);
+    }
+
+    // Fallback: estimate backboard is ~0.6 units beyond hoop
+    return new Vector2(hoopPos.x + 0.6f, hoopPos.y);
 }
 
 private float GetPeakHeightForShotType(ShotContext shotContext, float rimHeight, float startHeight)
