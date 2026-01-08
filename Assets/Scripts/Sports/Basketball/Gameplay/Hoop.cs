@@ -212,8 +212,9 @@ namespace Sportland.Sports.Basketball.Gameplay
             waitingForBall = false;
             processingRimSequence = false;
 
-            if (ball != null)
-                ball.CaptureAtHoop(courtPosition, rimHeight);
+            // Ball continues naturally through hoop - no need to modify physics
+            // For swishes, ball falls through cleanly
+            // For rim-ins, ball already has velocity from rim bounces
 
             BasketballGameController controller = FindAnyObjectByType<BasketballGameController>();
             if (controller != null)
