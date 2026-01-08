@@ -206,6 +206,90 @@ namespace Sportland.Sports.Basketball.Gameplay
             ShootBall();
         }
 
+        private ShotContext DetermineShotType()
+        {
+            ShotContext context = new ShotContext();
+
+            if (!targetHoop.TryGetComponent<Hoop>(out var hoop))
+            {
+                context.type = ShotType.StandardJumpShot;
+                return context;
+            }
+
+            Vector2 toHoop = hoop.CourtPosition - courtPosition;
+            float distanceToBasket = toHoop.magnitude;
+            context.distanceToBasket = distanceToBasket;
+
+            // Determine movement state
+            context.isMoving = jumpMomentum.magnitude > 0.1f || !isStationaryJump;
+
+            if (context.isMoving)
+            {
+                Vector2 moveDir = jumpMomentum.normalized;
+                Vector2 toHoopDir = toHoop.normalized;
+                float dot = Vector2.Dot(moveDir, toHoopDir);
+
+                context.movingTowardBasket = dot > 0.5f;
+                context.movingAwayFromBasket = dot < -0.5f;
+            }
+
+            // Check for bank shot input (B key)
+            context.intentionalBank = Input.GetKey(KeyCode.B);
+
+            // Determine shot type based on distance and movement
+            // DUNK: Very close AND jump height puts ball near/above rim
+            if (distanceToBasket < 1.5f && (jumpHeight + ballOverheadOffset) >= (hoop.RimHeight - 0.5f))
+            {
+                context.type = ShotType.Dunk;
+                context.releaseHeight = jumpHeight + ballOverheadOffset;
+                context.releaseExtension = 0.3f; // Reach toward rim
+            }
+            // LAYUP: Close range while moving toward basket
+            else if (distanceToBasket < 4.0f && context.movingTowardBasket)
+            {
+                context.type = ShotType.Layup;
+                context.releaseHeight = jumpHeight + ballOverheadOffset;
+                context.releaseExtension = 0.5f; // Extend arm toward basket
+            }
+            // FLOATER: Mid-range, moving toward, released before apex
+            else if (distanceToBasket >= 3.0f && distanceToBasket < 8.0f &&
+                     context.movingTowardBasket && !passedApex && jumpHeight < jumpApex * 0.7f)
+            {
+                context.type = ShotType.Floater;
+                context.releaseHeight = jumpHeight + ballOverheadOffset;
+                context.releaseExtension = 0.2f;
+            }
+            // FADEAWAY: Moving away from basket
+            else if (context.movingAwayFromBasket)
+            {
+                context.type = ShotType.FadeawayJumpShot;
+                context.releaseHeight = jumpHeight + ballOverheadOffset;
+                context.releaseExtension = 0f;
+            }
+            // RUNNING JUMP SHOT: Moving with momentum
+            else if (context.isMoving)
+            {
+                context.type = ShotType.RunningJumpShot;
+                context.releaseHeight = jumpHeight + ballOverheadOffset;
+                context.releaseExtension = 0f;
+            }
+            // STANDARD JUMP SHOT: Stationary
+            else
+            {
+                context.type = ShotType.StandardJumpShot;
+                context.releaseHeight = jumpHeight + ballOverheadOffset;
+                context.releaseExtension = 0f;
+            }
+
+            // Override with bank shot if player requested it
+            if (context.intentionalBank && context.type != ShotType.Dunk)
+            {
+                context.type = ShotType.BankShot;
+            }
+
+            return context;
+        }
+
         private void HandleBallPickup()
         {
             if (ball != null && !ball.isHeld && !isJumping)
@@ -319,7 +403,11 @@ namespace Sportland.Sports.Basketball.Gameplay
     Hoop hoop = targetHoop.GetComponent<Hoop>();
     if (hoop == null) return;
 
-    float shotAccuracy = CalculateTotalShotChance();
+    // Determine shot type
+    ShotContext shotContext = DetermineShotType();
+    Debug.Log($"Shot Type: {shotContext.type} (Distance: {shotContext.distanceToBasket:F2})");
+
+    float shotAccuracy = CalculateTotalShotChance(shotContext);
     ShotOutcome outcome = ShotOutcomeCalculator.CalculateOutcome(courtPosition, hoop.CourtPosition, shotAccuracy);
 
     Debug.Log($"Shot outcome: {outcome.result}, Rim contacts: {outcome.rimContacts.Count}");
@@ -329,12 +417,12 @@ namespace Sportland.Sports.Basketball.Gameplay
     }
 
     hoop.SetShotOutcome(outcome);
-    LaunchBallToHoop(hoop.CourtPosition, hoop.RimHeight, outcome);
+    LaunchBallToHoop(hoop.CourtPosition, hoop.RimHeight, outcome, shotContext);
 
     Invoke("ResetBall", 5f);
 }
 
-private float CalculateTotalShotChance()
+private float CalculateTotalShotChance(ShotContext shotContext)
 {
     float baseChance = GetShootingSkill() / 100f;
     float jumpMod = CalculateJumpAccuracyModifier();
@@ -348,23 +436,106 @@ private float CalculateTotalShotChance()
         distanceMod = CalculateDistanceModifier(Vector2.Distance(courtPosition, hoop.CourtPosition)) / 100f;
     }
 
-    float total = baseChance + jumpMod + driftMod + movingMod + distanceMod;
+    // Shot type modifiers
+    float shotTypeMod = GetShotTypeModifier(shotContext);
+
+    float total = baseChance + jumpMod + driftMod + movingMod + distanceMod + shotTypeMod;
     return Mathf.Clamp(total, 0.05f, 0.95f);
 }
 
-private void LaunchBallToHoop(Vector2 hoopPos, float rimHeight, ShotOutcome outcome)
+private float GetShotTypeModifier(ShotContext shotContext)
 {
-    Vector2 startPos = courtPosition;
-    float startHeight = jumpHeight + ballOverheadOffset;
-    float peakHeight = rimHeight + 2.5f;  // Increased from 1.5f for higher arc
+    switch (shotContext.type)
+    {
+        case ShotType.Dunk:
+            return 0.4f; // Dunks are nearly guaranteed
 
-    // Aim slightly above rim for clean entry through hoop center
-    float targetHeight = rimHeight + 0.3f;
+        case ShotType.Layup:
+            return 0.15f; // Close shots easier
+
+        case ShotType.Floater:
+            return -0.05f; // Slightly harder (touch shot)
+
+        case ShotType.HookShot:
+            return -0.1f; // Harder to aim
+
+        case ShotType.FadeawayJumpShot:
+            // Already handled by movingMod
+            return 0f;
+
+        case ShotType.BankShot:
+            return 0.05f; // Intentional bank shot bonus
+
+        case ShotType.FreeThrow:
+            return 0.2f; // Uncontested, practice shot
+
+        case ShotType.RunningJumpShot:
+        case ShotType.StandardJumpShot:
+        default:
+            return 0f;
+    }
+}
+
+private void LaunchBallToHoop(Vector2 hoopPos, float rimHeight, ShotOutcome outcome, ShotContext shotContext)
+{
+    // Calculate release position based on shot type
+    Vector2 toHoop = (hoopPos - courtPosition).normalized;
+    Vector2 startPos = courtPosition + (toHoop * shotContext.releaseExtension);
+    float startHeight = shotContext.releaseHeight;
+
+    // Adjust arc based on shot type
+    float peakHeight = GetPeakHeightForShotType(shotContext, rimHeight, startHeight);
+    float targetHeight = GetTargetHeightForShotType(shotContext, rimHeight);
 
     if (peakHeight < startHeight + 0.5f)
         peakHeight = startHeight + 0.5f;
 
     LaunchBallAtTarget(startPos, startHeight, hoopPos, targetHeight, peakHeight);
+}
+
+private float GetPeakHeightForShotType(ShotContext shotContext, float rimHeight, float startHeight)
+{
+    switch (shotContext.type)
+    {
+        case ShotType.Dunk:
+            return rimHeight + 0.5f; // Low arc, slam down
+
+        case ShotType.Layup:
+            return rimHeight + 1.5f; // Medium arc over rim
+
+        case ShotType.Floater:
+            return rimHeight + 2.0f; // Higher arc to get over defender
+
+        case ShotType.HookShot:
+            return rimHeight + 2.5f; // High arc
+
+        case ShotType.BankShot:
+            return rimHeight + 2.0f; // Medium-high arc for bank
+
+        case ShotType.StandardJumpShot:
+        case ShotType.RunningJumpShot:
+        case ShotType.FadeawayJumpShot:
+        default:
+            return rimHeight + 2.5f; // Standard high arc
+    }
+}
+
+private float GetTargetHeightForShotType(ShotContext shotContext, float rimHeight)
+{
+    switch (shotContext.type)
+    {
+        case ShotType.Dunk:
+            return rimHeight - 0.5f; // Aim below rim, force through
+
+        case ShotType.Layup:
+            return rimHeight + 0.5f; // Soft touch over rim
+
+        case ShotType.BankShot:
+            return rimHeight + 0.3f; // Aim for backboard, then drop through
+
+        default:
+            return rimHeight + 0.3f; // Standard aim slightly above rim
+    }
 }
 
         private float GetShootingSkill()
