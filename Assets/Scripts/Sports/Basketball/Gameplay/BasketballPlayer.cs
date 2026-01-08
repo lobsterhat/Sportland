@@ -646,11 +646,24 @@ private ShotOutcome CreateForcedOutcome()
     outcome.result = forcedOutcome;
     outcome.rimContacts = new System.Collections.Generic.List<RimContact>();
 
-    // For misses, add the forced rim contact
     if (forcedOutcome == ShotResult.Miss)
     {
+        // For misses, add the forced rim contact
         outcome.rimContacts.Add(forcedMissLocation);
     }
+    else if (forcedOutcome == ShotResult.RimAndIn)
+    {
+        // RimAndIn needs at least one rim contact
+        outcome.rimContacts.Add(RimContact.FrontRim);
+        outcome.rimContacts.Add(RimContact.BackRim);
+    }
+    else if (forcedOutcome == ShotResult.BackboardAndIn)
+    {
+        // BackboardAndIn hits backboard, then possibly rim
+        outcome.rimContacts.Add(RimContact.Backboard);
+        outcome.rimContacts.Add(RimContact.FrontRim);
+    }
+    // Swish has no contacts (empty list is correct)
 
     return outcome;
 }
