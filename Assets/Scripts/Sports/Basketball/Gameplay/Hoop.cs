@@ -108,7 +108,8 @@ namespace Sportland.Sports.Basketball.Gameplay
                 yield return StartCoroutine(WaitForRimContact(contact));
 
                 // Apply bounce at this contact
-                ApplyRimBounce(contact, i < currentOutcome.rimContacts.Count - 1);
+                bool isMake = (currentOutcome.result == ShotResult.RimAndIn || currentOutcome.result == ShotResult.BackboardAndIn);
+                ApplyRimBounce(contact, i < currentOutcome.rimContacts.Count - 1, isMake);
 
                 Debug.Log($"Ball bounced off {contact}!");
 
@@ -154,9 +155,9 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
         }
 
-        private void ApplyRimBounce(RimContact contact, bool hasMoreContacts)
+        private void ApplyRimBounce(RimContact contact, bool hasMoreContacts, bool isMake)
         {
-            Vector2 bounceDir = GetBounceDirection(contact);
+            Vector2 bounceDir = GetBounceDirection(contact, isMake);
 
             // Energy loss per bounce
             float energyRetention = 0.7f;
@@ -165,7 +166,7 @@ namespace Sportland.Sports.Basketball.Gameplay
             ball.courtVelocity = bounceDir * rimBounceHorizontal * energyRetention;
             ball.verticalVelocity = rimBounceVertical * energyRetention;
 
-            // Nudge ball slightly away from rim to prevent getting stuck
+            // Nudge ball slightly in bounce direction
             ball.courtPosition += bounceDir * 0.1f;
         }
 
@@ -191,24 +192,47 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
         }
 
-        private Vector2 GetBounceDirection(RimContact contact)
+        private Vector2 GetBounceDirection(RimContact contact, bool isMake)
         {
             float variance = Random.Range(-0.3f, 0.3f);
 
-            switch (contact)
+            if (isMake)
             {
-                case RimContact.FrontRim:
-                    return new Vector2(variance, -1f).normalized;
-                case RimContact.BackRim:
-                    return new Vector2(variance, 1f).normalized;
-                case RimContact.LeftRim:
-                    return new Vector2(-1f, variance).normalized;
-                case RimContact.RightRim:
-                    return new Vector2(1f, variance).normalized;
-                case RimContact.Backboard:
-                    return new Vector2(variance, -0.5f).normalized;
-                default:
-                    return Vector2.down;
+                // For makes, bounce TOWARD hoop center (opposite of miss direction)
+                switch (contact)
+                {
+                    case RimContact.FrontRim:
+                        return new Vector2(variance, 0.3f).normalized; // Bounce slightly toward back/center
+                    case RimContact.BackRim:
+                        return new Vector2(variance, -0.3f).normalized; // Bounce toward front/center
+                    case RimContact.LeftRim:
+                        return new Vector2(0.3f, variance).normalized; // Bounce toward right/center
+                    case RimContact.RightRim:
+                        return new Vector2(-0.3f, variance).normalized; // Bounce toward left/center
+                    case RimContact.Backboard:
+                        return new Vector2(variance, -0.5f).normalized; // Bounce toward front
+                    default:
+                        return Vector2.down;
+                }
+            }
+            else
+            {
+                // For misses, bounce AWAY from hoop (original behavior)
+                switch (contact)
+                {
+                    case RimContact.FrontRim:
+                        return new Vector2(variance, -1f).normalized;
+                    case RimContact.BackRim:
+                        return new Vector2(variance, 1f).normalized;
+                    case RimContact.LeftRim:
+                        return new Vector2(-1f, variance).normalized;
+                    case RimContact.RightRim:
+                        return new Vector2(1f, variance).normalized;
+                    case RimContact.Backboard:
+                        return new Vector2(variance, -0.5f).normalized;
+                    default:
+                        return Vector2.down;
+                }
             }
         }
 
