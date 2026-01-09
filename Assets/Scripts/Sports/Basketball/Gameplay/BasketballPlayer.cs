@@ -107,7 +107,6 @@ namespace Sportland.Sports.Basketball.Gameplay
             if (Input.GetKeyDown(KeyCode.Alpha1))
             {
                 debugModeEnabled = !debugModeEnabled;
-                Debug.Log($"Debug Mode: {(debugModeEnabled ? "ON" : "OFF")}");
             }
 
             if (debugModeEnabled)
@@ -116,21 +115,18 @@ namespace Sportland.Sports.Basketball.Gameplay
                 if (Input.GetKeyDown(KeyCode.Alpha2))
                 {
                     forcedShotType = (ShotType)(((int)forcedShotType + 1) % System.Enum.GetValues(typeof(ShotType)).Length);
-                    Debug.Log($"Forced Shot Type: {forcedShotType}");
                 }
 
                 // Cycle outcome with Alpha3
                 if (Input.GetKeyDown(KeyCode.Alpha3))
                 {
                     forcedOutcome = (ShotResult)(((int)forcedOutcome + 1) % System.Enum.GetValues(typeof(ShotResult)).Length);
-                    Debug.Log($"Forced Outcome: {forcedOutcome}");
                 }
 
                 // Cycle miss location with Alpha4
                 if (Input.GetKeyDown(KeyCode.Alpha4))
                 {
                     forcedMissLocation = (RimContact)(((int)forcedMissLocation + 1) % System.Enum.GetValues(typeof(RimContact)).Length);
-                    Debug.Log($"Forced Miss Location: {forcedMissLocation}");
                 }
             }
 
@@ -322,8 +318,6 @@ namespace Sportland.Sports.Basketball.Gameplay
         {
             CancelInvoke("ResetBall");
 
-            Debug.Log("DUNK ATTEMPT!");
-
             isDunking = true;
             isJumping = true;
             isStationaryJump = false;
@@ -348,14 +342,11 @@ namespace Sportland.Sports.Basketball.Gameplay
                 // But leave a small gap so we don't overshoot
                 float targetDistance = Mathf.Max(0f, distanceToRim - 0.3f);
                 dunkDriftVelocity = toHoop.normalized * (targetDistance / timeToApex);
-
-                Debug.Log($"Dunk: Distance={distanceToRim:F2}, TimeToApex={timeToApex:F2}, DriftSpeed={dunkDriftVelocity.magnitude:F2}");
             }
         }
 
         private void FinishDunk()
         {
-            Debug.Log("DUNK FINISHED! Hanging on rim...");
 
             // Force dunk to always go in
             if (ball == null || targetHoop == null) return;
@@ -612,7 +603,6 @@ namespace Sportland.Sports.Basketball.Gameplay
 
     // Determine shot type
     ShotContext shotContext = DetermineShotType();
-    Debug.Log($"Shot Type: {shotContext.type} (Distance: {shotContext.distanceToBasket:F2}) {(debugModeEnabled ? "[DEBUG MODE]" : "")}");
 
     ShotOutcome outcome;
 
@@ -620,19 +610,19 @@ namespace Sportland.Sports.Basketball.Gameplay
     if (debugModeEnabled)
     {
         outcome = CreateForcedOutcome();
-        Debug.Log($"[DEBUG] Forced Outcome: {outcome.result}, Rim contacts: {outcome.rimContacts.Count}");
     }
     else
     {
         float shotAccuracy = CalculateTotalShotChance(shotContext);
         outcome = ShotOutcomeCalculator.CalculateOutcome(courtPosition, hoop.CourtPosition, shotAccuracy);
-        Debug.Log($"Shot outcome: {outcome.result}, Rim contacts: {outcome.rimContacts.Count}");
     }
 
-    foreach (var contact in outcome.rimContacts)
-    {
-        Debug.Log($"  - {contact}");
-    }
+    // Consolidated shot info log
+    string contactsList = outcome.rimContacts.Count > 0
+        ? string.Join(", ", outcome.rimContacts)
+        : "None";
+    string debugFlag = debugModeEnabled ? " [DEBUG MODE]" : "";
+    Debug.Log($"SHOT: Type={shotContext.type}, Outcome={outcome.result}, Contacts=[{contactsList}]{debugFlag}");
 
     hoop.SetShotOutcome(outcome);
     LaunchBallToHoop(hoop.CourtPosition, hoop.RimHeight, outcome, shotContext);
@@ -759,26 +749,22 @@ private void LaunchBallToHoop(Vector2 hoopPos, float rimHeight, ShotOutcome outc
         // Layups aim at backboard
         targetPos = CalculateLayupBackboardTarget(hoopPos, rimHeight);
         targetHeight = rimHeight + 0.8f;
-        Debug.Log($"LAYUP - Aiming at backboard: {targetPos} at height {targetHeight:F2}");
     }
     else if (outcome.result == ShotResult.RimAndIn && outcome.rimContacts.Count > 0)
     {
         // RimAndIn aims at first rim contact point
         targetPos = GetRimContactPosition(hoopPos, outcome.rimContacts[0]);
-        Debug.Log($"RIM AND IN - Aiming at {outcome.rimContacts[0]}: {targetPos}");
     }
     else if (outcome.result == ShotResult.BackboardAndIn)
     {
         // BackboardAndIn aims at backboard
         targetPos = CalculateLayupBackboardTarget(hoopPos, rimHeight);
         targetHeight = rimHeight + 0.6f;
-        Debug.Log($"BACKBOARD AND IN - Aiming at backboard: {targetPos}");
     }
     else if (outcome.result == ShotResult.Miss && outcome.rimContacts.Count > 0)
     {
         // Misses aim at first rim contact point
         targetPos = GetRimContactPosition(hoopPos, outcome.rimContacts[0]);
-        Debug.Log($"MISS - Aiming at {outcome.rimContacts[0]}: {targetPos}");
     }
 
     LaunchBallAtTarget(startPos, startHeight, targetPos, targetHeight, peakHeight);

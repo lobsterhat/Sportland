@@ -70,8 +70,6 @@ namespace Sportland.Sports.Basketball.Gameplay
             currentOutcome = outcome;
             waitingForBall = true;
             processingRimSequence = false;
-
-            Debug.Log($"Hoop received outcome: {outcome.result} with {outcome.rimContacts.Count} contacts");
         }
 
         private void CheckBallArrival()
@@ -94,7 +92,6 @@ namespace Sportland.Sports.Basketball.Gameplay
             // Swish - ball goes straight through
             if (currentOutcome.result == ShotResult.Swish)
             {
-                Debug.Log("SWISH!");
                 Score();
                 yield break;
             }
@@ -111,7 +108,7 @@ namespace Sportland.Sports.Basketball.Gameplay
                 bool isMake = (currentOutcome.result == ShotResult.RimAndIn || currentOutcome.result == ShotResult.BackboardAndIn);
                 ApplyRimBounce(contact, i < currentOutcome.rimContacts.Count - 1, isMake);
 
-                Debug.Log($"Ball bounced off {contact}!");
+                Debug.Log($"RIM HIT: {contact} at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
 
                 // Small delay between contacts to make bounces visible
                 if (i < currentOutcome.rimContacts.Count - 1)
@@ -238,14 +235,14 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void Score()
         {
-            Debug.Log($"SCORE! +{points} points! ({currentOutcome.result})");
-
             waitingForBall = false;
             processingRimSequence = false;
 
             // Apply net physics - the net slows down the ball and affects trajectory
             if (ball != null)
             {
+                Debug.Log($"BALL THROUGH HOOP at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
+
                 // Net kills most horizontal movement - ball falls nearly straight down
                 ball.courtVelocity *= 0.1f;
 
@@ -264,7 +261,6 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void FinishMiss()
         {
-            Debug.Log("Shot missed!");
 
             waitingForBall = false;
             processingRimSequence = false;

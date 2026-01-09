@@ -55,11 +55,6 @@ namespace Sportland.Sports.Basketball.Gameplay
             bool crossedFromBehind = previousBallCourtPosition.x > courtPosition.x && ball.courtPosition.x <= courtPosition.x;
             bool crossedBackboard = crossedFromFront || crossedFromBehind;
 
-            if (crossedBackboard)
-            {
-                Debug.Log($"Ball crossed backboard plane! Ball X: {ball.courtPosition.x:F2}, Backboard X: {courtPosition.x:F2}, Ball Y: {ball.courtPosition.y:F2}, Ball Height: {ball.height:F2}");
-            }
-
             if (!crossedBackboard) return;
 
             // Check if ball is within backboard boundaries
@@ -68,14 +63,9 @@ namespace Sportland.Sports.Basketball.Gameplay
                               ball.courtPosition.y <= (courtPosition.y + halfWidth);
             bool withinHeight = ball.height >= minHeight && ball.height <= maxHeight;
 
-            Debug.Log($"Backboard bounds check - Y range: [{courtPosition.y - halfWidth:F2}, {courtPosition.y + halfWidth:F2}], Height range: [{minHeight:F2}, {maxHeight:F2}]");
-            Debug.Log($"Within width: {withinWidth}, Within height: {withinHeight}");
-
             if (withinWidth && withinHeight)
             {
-                // Ball hit backboard! Bounce it back
-                Debug.Log($"BACKBOARD HIT at height {ball.height:F2}!");
-                Debug.Log($"Before collision - Ball velocity: ({ball.courtVelocity.x:F2}, {ball.courtVelocity.y:F2}), Vertical: {ball.verticalVelocity:F2}");
+                Debug.Log($"BACKBOARD HIT at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
 
                 // Snap ball to backboard surface
                 Vector2 pos = ball.courtPosition;
@@ -90,8 +80,6 @@ namespace Sportland.Sports.Basketball.Gameplay
 
                 // Reduce vertical velocity slightly from impact
                 ball.verticalVelocity *= 0.9f;
-
-                Debug.Log($"After collision - Ball velocity: ({ball.courtVelocity.x:F2}, {ball.courtVelocity.y:F2}), Vertical: {ball.verticalVelocity:F2}");
             }
         }
 
