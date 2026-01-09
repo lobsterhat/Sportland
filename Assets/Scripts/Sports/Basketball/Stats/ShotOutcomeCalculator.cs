@@ -20,6 +20,21 @@ namespace Sportland.Sports.Basketball.Stats
         Backboard
     }
 
+    public enum ShotTarget
+    {
+        Swish,              // Aim at hoop center
+        Airball,            // Aim past rim (no contact)
+        Backboard,          // Aim at backboard
+        FrontOutside,       // Front rim, outside edge
+        FrontInside,        // Front rim, inside edge
+        BackOutside,        // Back rim, outside edge
+        BackInside,         // Back rim, inside edge
+        LeftOutside,        // Left rim, outside edge
+        LeftInside,         // Left rim, inside edge
+        RightOutside,       // Right rim, outside edge
+        RightInside         // Right rim, inside edge
+    }
+
     public class ShotOutcome
     {
         public ShotResult result;

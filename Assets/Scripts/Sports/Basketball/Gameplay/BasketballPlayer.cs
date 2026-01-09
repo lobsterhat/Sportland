@@ -66,7 +66,7 @@ namespace Sportland.Sports.Basketball.Gameplay
         public bool debugModeEnabled = false;
         public ShotType forcedShotType = ShotType.StandardJumpShot;
         public ShotResult forcedOutcome = ShotResult.Swish;
-        public RimContact forcedMissLocation = RimContact.FrontRim;
+        public ShotTarget forcedShotTarget = ShotTarget.FrontOutside;
 
         [Header("Dunk State")]
         private bool isDunking = false;
@@ -123,10 +123,10 @@ namespace Sportland.Sports.Basketball.Gameplay
                     forcedOutcome = (ShotResult)(((int)forcedOutcome + 1) % System.Enum.GetValues(typeof(ShotResult)).Length);
                 }
 
-                // Cycle miss location with Alpha4
+                // Cycle shot target with Alpha4
                 if (Input.GetKeyDown(KeyCode.Alpha4))
                 {
-                    forcedMissLocation = (RimContact)(((int)forcedMissLocation + 1) % System.Enum.GetValues(typeof(RimContact)).Length);
+                    forcedShotTarget = (ShotTarget)(((int)forcedShotTarget + 1) % System.Enum.GetValues(typeof(ShotTarget)).Length);
                 }
             }
 
@@ -621,8 +621,15 @@ namespace Sportland.Sports.Basketball.Gameplay
     string contactsList = outcome.rimContacts.Count > 0
         ? string.Join(", ", outcome.rimContacts)
         : "None";
-    string debugFlag = debugModeEnabled ? " [DEBUG MODE]" : "";
-    Debug.Log($"SHOT: Type={shotContext.type}, Outcome={outcome.result}, Contacts=[{contactsList}]{debugFlag}");
+
+    if (debugModeEnabled)
+    {
+        Debug.Log($"SHOT: Type={shotContext.type}, Target={forcedShotTarget}, Outcome={outcome.result}, Contacts=[{contactsList}] [DEBUG MODE]");
+    }
+    else
+    {
+        Debug.Log($"SHOT: Type={shotContext.type}, Outcome={outcome.result}, Contacts=[{contactsList}]");
+    }
 
     hoop.SetShotOutcome(outcome);
     LaunchBallToHoop(hoop.CourtPosition, hoop.RimHeight, outcome, shotContext);
@@ -633,27 +640,45 @@ namespace Sportland.Sports.Basketball.Gameplay
 private ShotOutcome CreateForcedOutcome()
 {
     ShotOutcome outcome = new ShotOutcome();
-    outcome.result = forcedOutcome;
     outcome.rimContacts = new System.Collections.Generic.List<RimContact>();
 
-    if (forcedOutcome == ShotResult.Miss)
+    // Some targets override the outcome
+    if (forcedShotTarget == ShotTarget.Swish)
     {
-        // For misses, add the forced rim contact
-        outcome.rimContacts.Add(forcedMissLocation);
+        outcome.result = ShotResult.Swish;
+        // No rim contacts for swish
     }
-    else if (forcedOutcome == ShotResult.RimAndIn)
+    else if (forcedShotTarget == ShotTarget.Airball)
     {
-        // RimAndIn needs at least one rim contact
-        outcome.rimContacts.Add(RimContact.FrontRim);
-        outcome.rimContacts.Add(RimContact.BackRim);
+        outcome.result = ShotResult.Miss;
+        // No rim contacts for airball
     }
-    else if (forcedOutcome == ShotResult.BackboardAndIn)
+    else if (forcedShotTarget == ShotTarget.Backboard)
     {
-        // BackboardAndIn hits backboard, then possibly rim
+        // Backboard target uses the forced outcome
+        outcome.result = forcedOutcome;
         outcome.rimContacts.Add(RimContact.Backboard);
-        outcome.rimContacts.Add(RimContact.FrontRim);
+        if (outcome.result != ShotResult.Miss)
+        {
+            // Add a rim contact for makes
+            outcome.rimContacts.Add(RimContact.FrontRim);
+        }
     }
-    // Swish has no contacts (empty list is correct)
+    else
+    {
+        // Rim target - use forced outcome
+        outcome.result = forcedOutcome;
+
+        // Add rim contact based on target
+        RimContact rimSide = GetRimContactFromTarget(forcedShotTarget);
+        outcome.rimContacts.Add(rimSide);
+
+        // For RimAndIn, add opposite rim contact for rattle effect
+        if (outcome.result == ShotResult.RimAndIn || outcome.result == ShotResult.BackboardAndIn)
+        {
+            outcome.rimContacts.Add(GetOppositeRim(rimSide));
+        }
+    }
 
     return outcome;
 }
@@ -741,10 +766,16 @@ private void LaunchBallToHoop(Vector2 hoopPos, float rimHeight, ShotOutcome outc
     if (peakHeight < startHeight + 0.5f)
         peakHeight = startHeight + 0.5f;
 
-    // Determine target position based on shot outcome
+    // Determine target position based on debug mode or shot outcome
     Vector2 targetPos = hoopPos;
 
-    if (shotContext.type == ShotType.Layup)
+    // DEBUG MODE: Use forced shot target
+    if (debugModeEnabled)
+    {
+        targetPos = GetTargetPosition(hoopPos, forcedShotTarget);
+    }
+    // NORMAL MODE: Determine target from shot outcome
+    else if (shotContext.type == ShotType.Layup)
     {
         // Layups aim at backboard
         targetPos = CalculateLayupBackboardTarget(hoopPos, rimHeight);
@@ -808,6 +839,91 @@ private Vector2 GetRimContactPosition(Vector2 hoopPos, RimContact contact)
         case RimContact.Backboard:
             // Backboard is beyond the hoop - use backboard target
             return CalculateLayupBackboardTarget(hoopPos, 0f);
+        default:
+            return hoopPos;
+    }
+}
+
+private RimContact GetRimContactFromTarget(ShotTarget target)
+{
+    switch (target)
+    {
+        case ShotTarget.FrontOutside:
+        case ShotTarget.FrontInside:
+            return RimContact.FrontRim;
+        case ShotTarget.BackOutside:
+        case ShotTarget.BackInside:
+            return RimContact.BackRim;
+        case ShotTarget.LeftOutside:
+        case ShotTarget.LeftInside:
+            return RimContact.LeftRim;
+        case ShotTarget.RightOutside:
+        case ShotTarget.RightInside:
+            return RimContact.RightRim;
+        case ShotTarget.Backboard:
+            return RimContact.Backboard;
+        default:
+            return RimContact.FrontRim;
+    }
+}
+
+private RimContact GetOppositeRim(RimContact contact)
+{
+    switch (contact)
+    {
+        case RimContact.FrontRim: return RimContact.BackRim;
+        case RimContact.BackRim: return RimContact.FrontRim;
+        case RimContact.LeftRim: return RimContact.RightRim;
+        case RimContact.RightRim: return RimContact.LeftRim;
+        default: return contact;
+    }
+}
+
+private Vector2 GetTargetPosition(Vector2 hoopPos, ShotTarget target)
+{
+    // Rim dimensions
+    float halfWidth = 0.73f / 2f;
+    float halfDepth = 0.57f / 2f;
+
+    // Offset for inside/outside edge
+    float edgeOffset = 0.15f; // How far inside/outside from rim edge
+
+    switch (target)
+    {
+        case ShotTarget.Swish:
+            return hoopPos;
+
+        case ShotTarget.Airball:
+            // Aim past the hoop
+            return hoopPos + new Vector2(0.5f, 0.3f);
+
+        case ShotTarget.Backboard:
+            return CalculateLayupBackboardTarget(hoopPos, 0f);
+
+        // Front rim targets
+        case ShotTarget.FrontOutside:
+            return hoopPos + new Vector2(0, -halfDepth - edgeOffset);
+        case ShotTarget.FrontInside:
+            return hoopPos + new Vector2(0, -halfDepth + edgeOffset);
+
+        // Back rim targets
+        case ShotTarget.BackOutside:
+            return hoopPos + new Vector2(0, halfDepth + edgeOffset);
+        case ShotTarget.BackInside:
+            return hoopPos + new Vector2(0, halfDepth - edgeOffset);
+
+        // Left rim targets
+        case ShotTarget.LeftOutside:
+            return hoopPos + new Vector2(-halfWidth - edgeOffset, 0);
+        case ShotTarget.LeftInside:
+            return hoopPos + new Vector2(-halfWidth + edgeOffset, 0);
+
+        // Right rim targets
+        case ShotTarget.RightOutside:
+            return hoopPos + new Vector2(halfWidth + edgeOffset, 0);
+        case ShotTarget.RightInside:
+            return hoopPos + new Vector2(halfWidth - edgeOffset, 0);
+
         default:
             return hoopPos;
     }
