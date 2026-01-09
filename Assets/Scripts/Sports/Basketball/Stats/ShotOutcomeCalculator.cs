@@ -47,11 +47,11 @@ namespace Sportland.Sports.Basketball.Stats
                 outcome.result = DetermineMakeType();
                 if (outcome.result == ShotResult.RimAndIn)
                 {
-                    outcome.rimContacts = GenerateRimAndInSequence();
+                    outcome.rimContacts = GenerateRimAndInSequence(shooterPos, hoopPos);
                 }
                 else if (outcome.result == ShotResult.BackboardAndIn)
                 {
-                    outcome.rimContacts = GenerateBackboardAndInSequence();
+                    outcome.rimContacts = GenerateBackboardAndInSequence(shooterPos, hoopPos);
                 }
             }
             else
@@ -89,57 +89,91 @@ namespace Sportland.Sports.Basketball.Stats
             return contacts;
         }
 
-        private static List<RimContact> GenerateRimAndInSequence()
+        private static RimContact GetApproachRimSide(Vector2 shooterPos, Vector2 hoopPos)
+        {
+            // Determine which rim edge the ball approaches from
+            Vector2 approach = hoopPos - shooterPos;
+
+            // Primary direction is front/back (Y axis in court coordinates)
+            if (Mathf.Abs(approach.y) > Mathf.Abs(approach.x) * 0.3f)
+            {
+                // Approaching primarily from front or back
+                return approach.y > 0 ? RimContact.FrontRim : RimContact.BackRim;
+            }
+            else
+            {
+                // Approaching from side angle
+                return approach.x > 0 ? RimContact.LeftRim : RimContact.RightRim;
+            }
+        }
+
+        private static RimContact GetOppositeRimSide(RimContact contact)
+        {
+            switch (contact)
+            {
+                case RimContact.FrontRim: return RimContact.BackRim;
+                case RimContact.BackRim: return RimContact.FrontRim;
+                case RimContact.LeftRim: return RimContact.RightRim;
+                case RimContact.RightRim: return RimContact.LeftRim;
+                default: return contact;
+            }
+        }
+
+        private static List<RimContact> GenerateRimAndInSequence(Vector2 shooterPos, Vector2 hoopPos)
         {
             List<RimContact> contacts = new List<RimContact>();
+            RimContact approachSide = GetApproachRimSide(shooterPos, hoopPos);
             float roll = Random.Range(0f, 1f);
 
             // 30% chance: Backboard involved before rim
             if (roll < 0.3f)
             {
                 contacts.Add(RimContact.Backboard);
-                // Ball comes off backboard and hits rim 1-2 times before going in
-                int rimHits = Random.Range(1, 3);
-                for (int i = 0; i < rimHits; i++)
+                // Ball comes off backboard and hits near rim first
+                contacts.Add(approachSide);
+
+                // 50% chance for second rim contact on opposite side before going in
+                if (Random.Range(0f, 1f) < 0.5f)
                 {
-                    contacts.Add(GetRandomRimSide());
+                    contacts.Add(GetOppositeRimSide(approachSide));
                 }
             }
             // 40% chance: Rattles around inside rim (2-3 contacts, opposite sides)
             else if (roll < 0.7f)
             {
-                // Start with front or back rim
-                RimContact firstContact = Random.Range(0f, 1f) < 0.5f ? RimContact.FrontRim : RimContact.BackRim;
-                contacts.Add(firstContact);
+                // First hit on near rim (outside edge)
+                contacts.Add(approachSide);
 
-                // Opposite side
-                contacts.Add(firstContact == RimContact.FrontRim ? RimContact.BackRim : RimContact.FrontRim);
+                // Bounces to opposite side (inside edge)
+                contacts.Add(GetOppositeRimSide(approachSide));
 
-                // 50% chance for third rattle (left or right)
+                // 50% chance for third rattle
                 if (Random.Range(0f, 1f) < 0.5f)
                 {
-                    contacts.Add(Random.Range(0f, 1f) < 0.5f ? RimContact.LeftRim : RimContact.RightRim);
+                    contacts.Add(approachSide);
                 }
             }
-            // 30% chance: Bounces on top of rim then falls in (1-2 bounces)
+            // 30% chance: Hits top of rim and pops up, then falls in
             else
             {
-                // Hit front or back rim (top), can bounce up
-                contacts.Add(Random.Range(0f, 1f) < 0.6f ? RimContact.FrontRim : RimContact.BackRim);
+                // Hit top of near rim - pops ball up
+                contacts.Add(approachSide);
 
-                // 60% chance for second bounce
+                // 60% chance to hit rim again on the way down
                 if (Random.Range(0f, 1f) < 0.6f)
                 {
-                    contacts.Add(GetRandomRimSide());
+                    // Could hit either side on the way down
+                    contacts.Add(Random.Range(0f, 1f) < 0.5f ? approachSide : GetOppositeRimSide(approachSide));
                 }
             }
 
             return contacts;
         }
 
-        private static List<RimContact> GenerateBackboardAndInSequence()
+        private static List<RimContact> GenerateBackboardAndInSequence(Vector2 shooterPos, Vector2 hoopPos)
         {
             List<RimContact> contacts = new List<RimContact>();
+            RimContact approachSide = GetApproachRimSide(shooterPos, hoopPos);
 
             // Always hits backboard first
             contacts.Add(RimContact.Backboard);
@@ -147,12 +181,13 @@ namespace Sportland.Sports.Basketball.Stats
             // 60% chance to hit rim before going in
             if (Random.Range(0f, 1f) < 0.6f)
             {
-                contacts.Add(GetRandomRimSide());
+                // After backboard, ball hits the near rim
+                contacts.Add(approachSide);
 
-                // 30% chance for second rim contact
+                // 30% chance for second rim contact on opposite side
                 if (Random.Range(0f, 1f) < 0.3f)
                 {
-                    contacts.Add(GetRandomRimSide());
+                    contacts.Add(GetOppositeRimSide(approachSide));
                 }
             }
 
@@ -162,6 +197,7 @@ namespace Sportland.Sports.Basketball.Stats
         private static List<RimContact> GenerateMissSequence(Vector2 shooterPos, Vector2 hoopPos, float shotAccuracy)
         {
             List<RimContact> contacts = new List<RimContact>();
+            RimContact approachSide = GetApproachRimSide(shooterPos, hoopPos);
 
             // Airball chance
             float distance = Vector2.Distance(shooterPos, hoopPos);
@@ -173,23 +209,26 @@ namespace Sportland.Sports.Basketball.Stats
                 return contacts;
             }
 
-            // Determine first contact
+            // Determine first contact - always hits near rim or backboard first
             float roll = Random.Range(0f, 1f);
             if (roll < 0.15f)
             {
+                // Hits backboard first
                 contacts.Add(RimContact.Backboard);
-                // After backboard, usually hits rim
+                // After backboard, usually hits near rim
                 if (Random.Range(0f, 1f) < 0.7f)
                 {
-                    contacts.Add(GetRandomRimSide());
+                    contacts.Add(approachSide);
                 }
             }
             else
             {
-                contacts.Add(GetRandomRimSide());
+                // Hits near rim (outside edge) directly
+                contacts.Add(approachSide);
             }
 
             // Chance for additional rim rattles (for misses that rattle out)
+            // These can be any side as the ball bounces around
             int maxRattles = Random.Range(0, 3);
             for (int i = 0; i < maxRattles; i++)
             {
