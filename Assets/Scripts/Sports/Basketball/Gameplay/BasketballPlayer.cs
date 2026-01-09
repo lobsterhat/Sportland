@@ -751,13 +751,34 @@ private void LaunchBallToHoop(Vector2 hoopPos, float rimHeight, ShotOutcome outc
     if (peakHeight < startHeight + 0.5f)
         peakHeight = startHeight + 0.5f;
 
-    // For layups, aim at backboard instead of hoop directly
+    // Determine target position based on shot outcome
     Vector2 targetPos = hoopPos;
+
     if (shotContext.type == ShotType.Layup)
     {
+        // Layups aim at backboard
         targetPos = CalculateLayupBackboardTarget(hoopPos, rimHeight);
-        targetHeight = rimHeight + 0.8f; // Aim higher on backboard for layups
+        targetHeight = rimHeight + 0.8f;
         Debug.Log($"LAYUP - Aiming at backboard: {targetPos} at height {targetHeight:F2}");
+    }
+    else if (outcome.result == ShotResult.RimAndIn && outcome.rimContacts.Count > 0)
+    {
+        // RimAndIn aims at first rim contact point
+        targetPos = GetRimContactPosition(hoopPos, outcome.rimContacts[0]);
+        Debug.Log($"RIM AND IN - Aiming at {outcome.rimContacts[0]}: {targetPos}");
+    }
+    else if (outcome.result == ShotResult.BackboardAndIn)
+    {
+        // BackboardAndIn aims at backboard
+        targetPos = CalculateLayupBackboardTarget(hoopPos, rimHeight);
+        targetHeight = rimHeight + 0.6f;
+        Debug.Log($"BACKBOARD AND IN - Aiming at backboard: {targetPos}");
+    }
+    else if (outcome.result == ShotResult.Miss && outcome.rimContacts.Count > 0)
+    {
+        // Misses aim at first rim contact point
+        targetPos = GetRimContactPosition(hoopPos, outcome.rimContacts[0]);
+        Debug.Log($"MISS - Aiming at {outcome.rimContacts[0]}: {targetPos}");
     }
 
     LaunchBallAtTarget(startPos, startHeight, targetPos, targetHeight, peakHeight);
@@ -780,6 +801,30 @@ private Vector2 CalculateLayupBackboardTarget(Vector2 hoopPos, float rimHeight)
 
     // Fallback: estimate backboard is ~0.6 units beyond hoop
     return new Vector2(hoopPos.x + 0.6f, hoopPos.y);
+}
+
+private Vector2 GetRimContactPosition(Vector2 hoopPos, RimContact contact)
+{
+    // Rim dimensions (should match Hoop.cs rimScale)
+    float halfWidth = 0.73f / 2f;  // X dimension
+    float halfDepth = 0.57f / 2f;  // Y dimension
+
+    switch (contact)
+    {
+        case RimContact.FrontRim:
+            return hoopPos + new Vector2(0, -halfDepth);
+        case RimContact.BackRim:
+            return hoopPos + new Vector2(0, halfDepth);
+        case RimContact.LeftRim:
+            return hoopPos + new Vector2(-halfWidth, 0);
+        case RimContact.RightRim:
+            return hoopPos + new Vector2(halfWidth, 0);
+        case RimContact.Backboard:
+            // Backboard is beyond the hoop - use backboard target
+            return CalculateLayupBackboardTarget(hoopPos, 0f);
+        default:
+            return hoopPos;
+    }
 }
 
 private float GetPeakHeightForShotType(ShotContext shotContext, float rimHeight, float startHeight)
