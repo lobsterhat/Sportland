@@ -154,17 +154,40 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void ApplyRimBounce(RimContact contact, bool hasMoreContacts, bool isMake)
         {
-            Vector2 bounceDir = GetBounceDirection(contact, isMake);
+            // Get the rim surface normal at contact point
+            Vector2 surfaceNormal = GetRimSurfaceNormal(contact);
 
-            // Energy loss per bounce
-            float energyRetention = 0.7f;
+            // Get ball's current velocity (combine court and vertical velocity)
+            Vector2 incomingVelocity = ball.courtVelocity;
 
-            // Apply bounce velocities
-            ball.courtVelocity = bounceDir * rimBounceHorizontal * energyRetention;
-            ball.verticalVelocity = rimBounceVertical * energyRetention;
+            // Physics-based bounce using coefficient of restitution
+            float restitution = 0.75f;  // Basketball coefficient of restitution
+            float friction = 0.95f;      // Tangential friction preservation
 
-            // Nudge ball slightly in bounce direction
-            ball.courtPosition += bounceDir * 0.1f;
+            // Decompose velocity into normal and tangential components
+            float normalSpeed = Vector2.Dot(incomingVelocity, surfaceNormal);
+            Vector2 normalVelocity = surfaceNormal * normalSpeed;
+            Vector2 tangentialVelocity = incomingVelocity - normalVelocity;
+
+            // Apply physics: reflect normal component with restitution, preserve tangential with friction
+            Vector2 reflectedNormal = -normalVelocity * restitution;
+            Vector2 preservedTangential = tangentialVelocity * friction;
+
+            // For makes, guide the ball slightly toward hoop center
+            if (isMake)
+            {
+                Vector2 toCenter = (courtPosition - ball.courtPosition).normalized;
+                reflectedNormal += toCenter * 0.3f;
+            }
+
+            // Combine for final bounce velocity
+            ball.courtVelocity = reflectedNormal + preservedTangential;
+
+            // Apply vertical bounce with energy retention
+            ball.verticalVelocity = Mathf.Abs(ball.verticalVelocity) * 0.7f;
+
+            // Nudge ball slightly away from rim surface to prevent sticking
+            ball.courtPosition += surfaceNormal * 0.05f;
         }
 
         private Vector2 GetRimContactPoint(RimContact contact)
@@ -189,47 +212,24 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
         }
 
-        private Vector2 GetBounceDirection(RimContact contact, bool isMake)
+        private Vector2 GetRimSurfaceNormal(RimContact contact)
         {
-            float variance = Random.Range(-0.3f, 0.3f);
-
-            if (isMake)
+            // Return the outward-facing normal vector for each rim surface
+            // These point away from the hoop center
+            switch (contact)
             {
-                // For makes, bounce TOWARD hoop center (opposite of miss direction)
-                switch (contact)
-                {
-                    case RimContact.FrontRim:
-                        return new Vector2(variance, 0.3f).normalized; // Bounce slightly toward back/center
-                    case RimContact.BackRim:
-                        return new Vector2(variance, -0.3f).normalized; // Bounce toward front/center
-                    case RimContact.LeftRim:
-                        return new Vector2(0.3f, variance).normalized; // Bounce toward right/center
-                    case RimContact.RightRim:
-                        return new Vector2(-0.3f, variance).normalized; // Bounce toward left/center
-                    case RimContact.Backboard:
-                        return new Vector2(variance, -0.5f).normalized; // Bounce toward front
-                    default:
-                        return Vector2.down;
-                }
-            }
-            else
-            {
-                // For misses, bounce AWAY from hoop (original behavior)
-                switch (contact)
-                {
-                    case RimContact.FrontRim:
-                        return new Vector2(variance, -1f).normalized;
-                    case RimContact.BackRim:
-                        return new Vector2(variance, 1f).normalized;
-                    case RimContact.LeftRim:
-                        return new Vector2(-1f, variance).normalized;
-                    case RimContact.RightRim:
-                        return new Vector2(1f, variance).normalized;
-                    case RimContact.Backboard:
-                        return new Vector2(variance, -0.5f).normalized;
-                    default:
-                        return Vector2.down;
-                }
+                case RimContact.FrontRim:
+                    return new Vector2(0, -1); // Points toward front of court
+                case RimContact.BackRim:
+                    return new Vector2(0, 1);  // Points toward back of court
+                case RimContact.LeftRim:
+                    return new Vector2(-1, 0); // Points left
+                case RimContact.RightRim:
+                    return new Vector2(1, 0);  // Points right
+                case RimContact.Backboard:
+                    return new Vector2(0, -1); // Backboard normal points toward front
+                default:
+                    return Vector2.up;
             }
         }
 
