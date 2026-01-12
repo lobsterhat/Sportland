@@ -180,27 +180,40 @@ namespace Sportland.Sports.Basketball.Gameplay
             // Apply physics: reflect normal component with restitution, preserve tangential with friction
             Vector2 reflectedNormal = -normalVelocity * restitution;
             Vector2 preservedTangential = tangentialVelocity * friction;
+            Vector2 physicsVelocity = reflectedNormal + preservedTangential;
 
-            // For makes, guide the ball toward next contact or hoop center
+            // For makes, ensure ball heads toward next contact or hoop center
             if (isMake)
             {
-                Vector2 targetDirection;
+                Vector2 targetPosition;
+                float blendStrength;
+
                 if (nextContactPoint.HasValue)
                 {
-                    // Guide toward next rim contact for rattle effect
-                    targetDirection = (nextContactPoint.Value - ball.courtPosition).normalized;
-                    reflectedNormal += targetDirection * 1.5f;  // Stronger guidance to reach next contact
+                    // Next rim contact exists - guide toward it
+                    targetPosition = nextContactPoint.Value;
+                    blendStrength = 0.7f; // Blend 70% toward target, 30% physics
                 }
                 else
                 {
                     // Last contact - guide toward hoop center
-                    targetDirection = (courtPosition - ball.courtPosition).normalized;
-                    reflectedNormal += targetDirection * 0.5f;
+                    targetPosition = courtPosition;
+                    blendStrength = 0.5f; // Blend 50% toward target, 50% physics
                 }
-            }
 
-            // Combine for final bounce velocity
-            ball.courtVelocity = reflectedNormal + preservedTangential;
+                // Calculate desired direction and speed
+                Vector2 toTarget = targetPosition - ball.courtPosition;
+                float targetSpeed = Mathf.Max(2.0f, physicsVelocity.magnitude); // At least 2 units/sec
+                Vector2 targetVelocity = toTarget.normalized * targetSpeed;
+
+                // Blend between physics and target velocity
+                ball.courtVelocity = Vector2.Lerp(physicsVelocity, targetVelocity, blendStrength);
+            }
+            else
+            {
+                // Miss - use pure physics
+                ball.courtVelocity = physicsVelocity;
+            }
 
             // Apply vertical bounce with energy retention
             ball.verticalVelocity = Mathf.Abs(ball.verticalVelocity) * 0.7f;
