@@ -67,19 +67,40 @@ namespace Sportland.Sports.Basketball.Gameplay
             {
                 Debug.Log($"BACKBOARD HIT at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
 
-                // Snap ball to backboard surface
+                // Physics-based backboard bounce using coefficient of restitution
+                // Backboard is a vertical plane with normal pointing toward front of court
+                Vector2 surfaceNormal = new Vector2(-1, 0); // Points away from backboard (toward court)
+
+                // Get ball's incoming velocity on the court plane
+                Vector2 incomingVelocity = ball.courtVelocity;
+
+                // Basketball coefficient of restitution and friction
+                float backboardRestitution = 0.75f;  // Same as rim
+                float tangentialFriction = 0.95f;    // Slight energy loss on lateral slide
+
+                // Decompose velocity into normal (X) and tangential (Y) components
+                float normalSpeed = Vector2.Dot(incomingVelocity, surfaceNormal);
+                Vector2 normalVelocity = surfaceNormal * normalSpeed;
+                Vector2 tangentialVelocity = incomingVelocity - normalVelocity;
+
+                // Apply physics: reflect normal component, preserve tangential with friction
+                Vector2 reflectedNormal = -normalVelocity * backboardRestitution;
+                Vector2 preservedTangential = tangentialVelocity * tangentialFriction;
+
+                // Combine for final bounce velocity
+                ball.courtVelocity = reflectedNormal + preservedTangential;
+
+                // Apply vertical bounce with energy retention
+                // Ball loses some vertical energy on backboard impact
+                ball.verticalVelocity *= 0.85f;
+
+                // Snap ball to backboard surface to prevent tunneling
                 Vector2 pos = ball.courtPosition;
                 pos.x = courtPosition.x;
                 ball.courtPosition = pos;
 
-                // Reflect X velocity (bounce back toward court)
-                Vector2 vel = ball.courtVelocity;
-                vel.x = -vel.x * restitution;
-                vel.y *= 0.95f;  // Dampen Y velocity slightly
-                ball.courtVelocity = vel;
-
-                // Reduce vertical velocity slightly from impact
-                ball.verticalVelocity *= 0.9f;
+                // Nudge ball slightly away from backboard
+                ball.courtPosition += surfaceNormal * 0.05f;
             }
         }
 
