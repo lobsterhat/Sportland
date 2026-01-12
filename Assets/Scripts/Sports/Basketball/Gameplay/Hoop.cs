@@ -16,8 +16,6 @@ namespace Sportland.Sports.Basketball.Gameplay
         [SerializeField] private int points = 2;
 
         [Header("Rim Physics")]
-        [SerializeField] private float rimBounceVertical = 4f;
-        [SerializeField] private float rimBounceHorizontal = 1.5f;
         [SerializeField] private float timeBetweenRimContacts = 0.15f;
 
         public Vector2 CourtPosition => courtPosition;
