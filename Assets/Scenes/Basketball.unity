@@ -410,7 +410,7 @@ MonoBehaviour:
   m_Name: 
   m_EditorClassIdentifier: 
   courtPosition: {x: 13.11, y: 0}
-  rimHeight: 2.5
+  rimHeight: 3.05
   rimScale: {x: 0.73, y: 0.57}
   points: 2
   rimBounceVertical: 4
@@ -887,6 +887,14 @@ MonoBehaviour:
   hangtimeFlagReduction: 0.5
   hasHangtimeFlag: 0
   shootingSkill: 70
+  dunkSkill: 50
+  dunkRange: 2.5
+  dunksEnabled: 0
+  debugModeEnabled: 1
+  forcedShotType: 0
+  forcedOutcome: 0
+  forcedMissLocation: 0
+  rimHangDuration: 0.5
 --- !u!4 &1187651158
 Transform:
   m_ObjectHideFlags: 0
@@ -1258,6 +1266,55 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: -8, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!1 &1861150688
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1861150690}
+  - component: {fileID: 1861150689}
+  m_Layer: 0
+  m_Name: Backboard
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!114 &1861150689
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1861150688}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 32217a38d832d744d8fda9caf56a428a, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  courtPosition: {x: 13.8, y: 0}
+  minHeight: 1.56
+  maxHeight: 5.34
+  width: 0.3
+  restitution: 0.7
+--- !u!4 &1861150690
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1861150688}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
   m_LocalScale: {x: 1, y: 1, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
@@ -1636,4 +1693,5 @@ SceneRoots:
   - {fileID: 1876681392}
   - {fileID: 543158432}
   - {fileID: 649373839}
+  - {fileID: 1861150690}
   - {fileID: 1965262924}
