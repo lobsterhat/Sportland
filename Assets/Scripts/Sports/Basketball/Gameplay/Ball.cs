@@ -17,6 +17,7 @@ namespace Sportland.Sports.Basketball.Gameplay
         public Vector2 courtVelocity;
         public float verticalVelocity;
         public float gravity = -9.8f;
+        public float radius = 0.12f; // Basketball radius in units (~4.7 inches)
 
         [Header("State")]
         public bool isHeld = true;

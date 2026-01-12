@@ -47,18 +47,26 @@ namespace Sportland.Sports.Basketball.Gameplay
                 return;
             }
 
+            // Account for ball radius when detecting collision
+            float ballRadius = ball.radius;
+
             // Check if ball crossed the backboard plane (X axis) in EITHER direction
-            bool crossedFromFront = previousBallCourtPosition.x < courtPosition.x && ball.courtPosition.x >= courtPosition.x;
-            bool crossedFromBehind = previousBallCourtPosition.x > courtPosition.x && ball.courtPosition.x <= courtPosition.x;
+            // Ball edge crosses when: (ball.x + radius) passes courtPosition.x from front
+            //                     or: (ball.x - radius) passes courtPosition.x from behind
+            bool crossedFromFront = previousBallCourtPosition.x + ballRadius < courtPosition.x &&
+                                   ball.courtPosition.x + ballRadius >= courtPosition.x;
+            bool crossedFromBehind = previousBallCourtPosition.x - ballRadius > courtPosition.x &&
+                                    ball.courtPosition.x - ballRadius <= courtPosition.x;
             bool crossedBackboard = crossedFromFront || crossedFromBehind;
 
             if (!crossedBackboard) return;
 
-            // Check if ball is within backboard boundaries
+            // Check if ball is within backboard boundaries (accounting for ball radius)
             float halfWidth = width / 2f;
-            bool withinWidth = ball.courtPosition.y >= (courtPosition.y - halfWidth) &&
-                              ball.courtPosition.y <= (courtPosition.y + halfWidth);
-            bool withinHeight = ball.height >= minHeight && ball.height <= maxHeight;
+            bool withinWidth = ball.courtPosition.y + ballRadius >= (courtPosition.y - halfWidth) &&
+                              ball.courtPosition.y - ballRadius <= (courtPosition.y + halfWidth);
+            bool withinHeight = ball.height + ballRadius >= minHeight &&
+                               ball.height - ballRadius <= maxHeight;
 
             if (withinWidth && withinHeight)
             {
@@ -92,8 +100,9 @@ namespace Sportland.Sports.Basketball.Gameplay
                 ball.verticalVelocity *= 0.85f;
 
                 // Snap ball to backboard surface to prevent tunneling
+                // Position ball so its surface (not center) is at the backboard
                 Vector2 pos = ball.courtPosition;
-                pos.x = courtPosition.x;
+                pos.x = courtPosition.x - ballRadius; // Ball center is radius away from backboard
                 ball.courtPosition = pos;
 
                 // Nudge ball slightly away from backboard
