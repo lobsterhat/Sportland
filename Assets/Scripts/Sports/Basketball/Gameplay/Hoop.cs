@@ -102,14 +102,24 @@ namespace Sportland.Sports.Basketball.Gameplay
                 // Wait for ball to naturally reach this contact point
                 yield return StartCoroutine(WaitForRimContact(contact));
 
-                // Apply bounce at this contact
+                // Determine if this is a make and if there are more contacts
                 bool isMake = (currentOutcome.result == ShotResult.RimAndIn || currentOutcome.result == ShotResult.BackboardAndIn);
-                ApplyRimBounce(contact, i < currentOutcome.rimContacts.Count - 1, isMake);
+                bool hasMoreContacts = i < currentOutcome.rimContacts.Count - 1;
+
+                // Get next contact point if available
+                Vector2? nextContactPoint = null;
+                if (hasMoreContacts)
+                {
+                    nextContactPoint = GetRimContactPoint(currentOutcome.rimContacts[i + 1]);
+                }
+
+                // Apply bounce at this contact
+                ApplyRimBounce(contact, isMake, nextContactPoint);
 
                 Debug.Log($"RIM HIT: {contact} at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
 
                 // Small delay between contacts to make bounces visible
-                if (i < currentOutcome.rimContacts.Count - 1)
+                if (hasMoreContacts)
                 {
                     yield return new WaitForSeconds(timeBetweenRimContacts);
                 }
@@ -150,7 +160,7 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
         }
 
-        private void ApplyRimBounce(RimContact contact, bool hasMoreContacts, bool isMake)
+        private void ApplyRimBounce(RimContact contact, bool isMake, Vector2? nextContactPoint)
         {
             // Get the rim surface normal at contact point
             Vector2 surfaceNormal = GetRimSurfaceNormal(contact);
@@ -171,11 +181,22 @@ namespace Sportland.Sports.Basketball.Gameplay
             Vector2 reflectedNormal = -normalVelocity * restitution;
             Vector2 preservedTangential = tangentialVelocity * friction;
 
-            // For makes, guide the ball slightly toward hoop center
+            // For makes, guide the ball toward next contact or hoop center
             if (isMake)
             {
-                Vector2 toCenter = (courtPosition - ball.courtPosition).normalized;
-                reflectedNormal += toCenter * 0.3f;
+                Vector2 targetDirection;
+                if (nextContactPoint.HasValue)
+                {
+                    // Guide toward next rim contact for rattle effect
+                    targetDirection = (nextContactPoint.Value - ball.courtPosition).normalized;
+                    reflectedNormal += targetDirection * 1.5f;  // Stronger guidance to reach next contact
+                }
+                else
+                {
+                    // Last contact - guide toward hoop center
+                    targetDirection = (courtPosition - ball.courtPosition).normalized;
+                    reflectedNormal += targetDirection * 0.5f;
+                }
             }
 
             // Combine for final bounce velocity
