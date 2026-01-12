@@ -12,9 +12,6 @@ namespace Sportland.Sports.Basketball.Gameplay
         [SerializeField] private float maxHeight = 3.8f;  // Top of backboard
         [SerializeField] private float width = 1.2f;      // Width of backboard
 
-        [Header("Physics")]
-        [SerializeField] private float restitution = 0.7f;  // Bounce dampening (0-1)
-
         private Ball ball;
         private Vector2 previousBallCourtPosition;
 
