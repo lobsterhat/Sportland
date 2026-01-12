@@ -642,42 +642,70 @@ private ShotOutcome CreateForcedOutcome()
     ShotOutcome outcome = new ShotOutcome();
     outcome.rimContacts = new System.Collections.Generic.List<RimContact>();
 
-    // Some targets override the outcome
+    // Handle special targets that override outcome
     if (forcedShotTarget == ShotTarget.Swish)
     {
         outcome.result = ShotResult.Swish;
         // No rim contacts for swish
+        return outcome;
     }
-    else if (forcedShotTarget == ShotTarget.Airball)
+
+    if (forcedShotTarget == ShotTarget.Airball)
     {
         outcome.result = ShotResult.Miss;
         // No rim contacts for airball
+        return outcome;
     }
-    else if (forcedShotTarget == ShotTarget.Backboard)
+
+    // Use the forced outcome for all other targets
+    outcome.result = forcedOutcome;
+
+    // Handle backboard target
+    if (forcedShotTarget == ShotTarget.Backboard)
     {
-        // Backboard target uses the forced outcome
-        outcome.result = forcedOutcome;
         outcome.rimContacts.Add(RimContact.Backboard);
-        if (outcome.result != ShotResult.Miss)
+
+        // Add rim contact sequence based on outcome
+        if (outcome.result == ShotResult.Miss)
         {
-            // Add a rim contact for makes
+            // Backboard then miss - ball bounces off backboard and away
+            // No additional contacts needed
+        }
+        else if (outcome.result == ShotResult.BackboardAndIn || outcome.result == ShotResult.RimAndIn)
+        {
+            // Backboard then make - add rim contacts for rattle
             outcome.rimContacts.Add(RimContact.FrontRim);
+            outcome.rimContacts.Add(RimContact.BackRim);
         }
-    }
-    else
-    {
-        // Rim target - use forced outcome
-        outcome.result = forcedOutcome;
-
-        // Add rim contact based on target
-        RimContact rimSide = GetRimContactFromTarget(forcedShotTarget);
-        outcome.rimContacts.Add(rimSide);
-
-        // For RimAndIn, add opposite rim contact for rattle effect
-        if (outcome.result == ShotResult.RimAndIn || outcome.result == ShotResult.BackboardAndIn)
+        else if (outcome.result == ShotResult.Swish)
         {
-            outcome.rimContacts.Add(GetOppositeRim(rimSide));
+            // Backboard then swish (no rim contact, just glass and in)
+            // No additional contacts
         }
+
+        return outcome;
+    }
+
+    // Handle rim targets (all inside/outside edge combinations)
+    RimContact rimSide = GetRimContactFromTarget(forcedShotTarget);
+    outcome.rimContacts.Add(rimSide);
+
+    // Add second contact based on outcome type
+    if (outcome.result == ShotResult.RimAndIn)
+    {
+        // Rattle effect - hits opposite rim then goes in
+        outcome.rimContacts.Add(GetOppositeRim(rimSide));
+    }
+    else if (outcome.result == ShotResult.BackboardAndIn)
+    {
+        // Hits rim, then backboard, then goes in
+        outcome.rimContacts.Add(RimContact.Backboard);
+        outcome.rimContacts.Add(GetOppositeRim(rimSide));
+    }
+    else if (outcome.result == ShotResult.Miss)
+    {
+        // Single rim hit then bounces out
+        // Physics will determine bounce direction
     }
 
     return outcome;
