@@ -100,7 +100,17 @@ namespace Sportland.Sports.Basketball.Gameplay
                 RimContact contact = currentOutcome.rimContacts[i];
 
                 // Wait for ball to naturally reach this contact point
-                yield return StartCoroutine(WaitForRimContact(contact));
+                IEnumerator waitCoroutine = WaitForRimContact(contact);
+                yield return StartCoroutine(waitCoroutine);
+
+                // Check if we successfully reached the contact (true) or timed out (false)
+                bool reachedContact = (bool)waitCoroutine.Current;
+
+                if (!reachedContact)
+                {
+                    // Timed out - skip this contact and continue with next one
+                    continue;
+                }
 
                 // Determine if this is a make and if there are more contacts
                 bool isMake = (currentOutcome.result == ShotResult.RimAndIn || currentOutcome.result == ShotResult.BackboardAndIn);
@@ -152,12 +162,17 @@ namespace Sportland.Sports.Basketball.Gameplay
                 // Require BOTH conditions - ball must be near the contact point and at rim height
                 if (nearContact && atRimHeight)
                 {
+                    yield return true; // Successfully reached contact
                     yield break;
                 }
 
                 elapsed += Time.deltaTime;
                 yield return null;
             }
+
+            // Timeout - ball didn't reach this contact point
+            Debug.Log($"TIMEOUT waiting for {contact} - skipping this contact");
+            yield return false; // Failed to reach contact
         }
 
         private void ApplyRimBounce(RimContact contact, bool isMake, Vector2? nextContactPoint)
