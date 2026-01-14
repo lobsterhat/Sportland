@@ -296,8 +296,9 @@ namespace Sportland.Sports.Basketball.Gameplay
                     }
                     else
                     {
-                        // High bounce (40% chance) - longer flight time for dramatic arc
-                        flightTime = Random.Range(0.25f, 0.40f);
+                        // High bounce (40% chance) - MUCH longer flight time for dramatic high arc
+                        // Can reach 4-5+ units high with these times
+                        flightTime = Random.Range(0.5f, 0.9f);
                     }
                 }
                 else
@@ -320,8 +321,8 @@ namespace Sportland.Sports.Basketball.Gameplay
                     }
                     else
                     {
-                        // High arc finish (50% chance) - ball pops up before dropping through
-                        flightTime = Random.Range(0.35f, 0.50f);
+                        // High arc finish (50% chance) - ball pops way up before dropping through
+                        flightTime = Random.Range(0.45f, 0.75f);
                     }
                 }
 
@@ -335,8 +336,8 @@ namespace Sportland.Sports.Basketball.Gameplay
                 float gravity = ball.gravity; // Should be negative
                 float requiredVerticalVelocity = (heightDisplacement - 0.5f * gravity * flightTime * flightTime) / flightTime;
 
-                // Add variation to vertical velocity for more natural arc (±10% instead of ±5%)
-                requiredVerticalVelocity *= Random.Range(0.90f, 1.10f);
+                // Add slight variation to vertical velocity for more natural arc (±5%)
+                requiredVerticalVelocity *= Random.Range(0.95f, 1.05f);
 
                 // Apply calculated velocities directly (100% override for deterministic trajectory)
                 ball.courtVelocity = requiredCourtVelocity;
