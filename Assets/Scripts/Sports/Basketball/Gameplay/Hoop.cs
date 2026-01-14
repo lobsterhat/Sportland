@@ -18,6 +18,10 @@ namespace Sportland.Sports.Basketball.Gameplay
         [Header("Rim Physics")]
         [SerializeField] private float timeBetweenRimContacts = 0.15f;
 
+        [Header("Scoring Zone")]
+        [SerializeField] private float scoringZoneHeight = 3.05f; // Height ball must pass through for makes
+        [SerializeField] private float scoringZoneWidth = 0.30f; // X tolerance (±0.15 from center)
+
         public Vector2 CourtPosition => courtPosition;
         public float RimHeight => rimHeight;
 
@@ -109,10 +113,10 @@ namespace Sportland.Sports.Basketball.Gameplay
         {
             processingRimSequence = true;
 
-            // Swish - ball goes straight through
+            // Swish - ball goes straight through scoring zone
             if (currentOutcome.result == ShotResult.Swish)
             {
-                Score();
+                yield return StartCoroutine(WaitForScoringZone());
                 yield break;
             }
 
@@ -164,21 +168,51 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
             else
             {
-                // For makes, validate ball is actually near the hoop before scoring
-                float distanceFromHoop = Vector2.Distance(ball.courtPosition, courtPosition);
-                bool nearHoop = distanceFromHoop < 0.5f; // Within half unit of hoop center
-                bool atRimHeight = Mathf.Abs(ball.height - rimHeight) < 0.6f; // Within 0.6 units of rim height
-
-                if (nearHoop && atRimHeight)
-                {
-                    Score();
-                }
-                else
-                {
-                    Debug.Log($"Ball not near hoop after rim sequence - treating as miss. Distance: {distanceFromHoop:F2}, Height diff: {Mathf.Abs(ball.height - rimHeight):F2}");
-                    FinishMiss();
-                }
+                // For makes, wait for ball to pass through the scoring zone
+                yield return StartCoroutine(WaitForScoringZone());
             }
+        }
+
+        private IEnumerator WaitForScoringZone()
+        {
+            float timeout = 2f;
+            float elapsed = 0f;
+            float previousHeight = ball.height;
+
+            // Wait for ball to pass through the scoring zone
+            while (elapsed < timeout)
+            {
+                bool isFalling = ball.verticalVelocity < 0;
+                bool crossingScoringHeight = previousHeight > scoringZoneHeight && ball.height <= scoringZoneHeight;
+
+                if (crossingScoringHeight && isFalling)
+                {
+                    // Check if ball is within the scoring zone X range
+                    float halfWidth = scoringZoneWidth / 2f;
+                    bool withinScoringX = Mathf.Abs(ball.courtPosition.x - courtPosition.x) <= halfWidth;
+
+                    if (withinScoringX)
+                    {
+                        Debug.Log($"BALL THROUGH SCORING ZONE at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
+                        Score();
+                        yield break;
+                    }
+                    else
+                    {
+                        Debug.Log($"Ball missed scoring zone X - treating as miss. X: {ball.courtPosition.x:F2}, Expected: {courtPosition.x - halfWidth:F2} to {courtPosition.x + halfWidth:F2}");
+                        FinishMiss();
+                        yield break;
+                    }
+                }
+
+                previousHeight = ball.height;
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            // Timeout - ball didn't reach scoring zone
+            Debug.Log($"TIMEOUT waiting for scoring zone - treating as miss. Ball at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
+            FinishMiss();
         }
 
         private IEnumerator WaitForRimContact(RimContact contact)
@@ -248,10 +282,13 @@ namespace Sportland.Sports.Basketball.Gameplay
                 }
                 else
                 {
-                    // Last contact - guide toward hoop center to drop in
+                    // Last contact - guide toward hoop center and up to scoring zone
                     targetPosition = courtPosition;
-                    blendStrength = 0.7f; // Blend 70% toward target, 30% physics
-                    minVerticalVelocity = 0.8f; // Gentle pop before falling through
+                    blendStrength = 0.8f; // Blend 80% toward target, 20% physics
+                    // Calculate velocity needed to reach scoring zone height
+                    float heightToReach = scoringZoneHeight - ball.height;
+                    float velocityNeeded = Mathf.Sqrt(2f * Mathf.Abs(ball.gravity) * heightToReach);
+                    minVerticalVelocity = Mathf.Max(velocityNeeded, 2.5f); // At least 2.5 to ensure reach
                 }
 
                 // Calculate desired direction and speed
