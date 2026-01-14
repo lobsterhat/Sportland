@@ -804,10 +804,24 @@ private void LaunchBallToHoop(Vector2 hoopPos, float rimHeight, ShotOutcome outc
     // Determine target position based on debug mode or shot outcome
     Vector2 targetPos = hoopPos;
 
+    // For made shots, aim at the scoring zone height (3.05) to ensure clean entry
+    bool isMake = (outcome.result == ShotResult.Swish || outcome.result == ShotResult.RimAndIn || outcome.result == ShotResult.BackboardAndIn);
+    if (isMake)
+    {
+        targetHeight = 3.05f; // Scoring zone height
+    }
+
     // DEBUG MODE: Use forced shot target
     if (debugModeEnabled)
     {
         targetPos = GetTargetPosition(hoopPos, forcedShotTarget);
+
+        // For rim/backboard targets in debug mode, use the first contact point if this is a make
+        if (isMake && outcome.rimContacts.Count > 0)
+        {
+            targetPos = GetRimContactPosition(hoopPos, outcome.rimContacts[0]);
+            targetHeight = rimHeight; // Aim at rim height for first contact
+        }
     }
     // NORMAL MODE: Determine target from shot outcome
     else if (shotContext.type == ShotType.Layup)
@@ -818,8 +832,9 @@ private void LaunchBallToHoop(Vector2 hoopPos, float rimHeight, ShotOutcome outc
     }
     else if (outcome.result == ShotResult.RimAndIn && outcome.rimContacts.Count > 0)
     {
-        // RimAndIn aims at first rim contact point
+        // RimAndIn aims at first rim contact point at rim height
         targetPos = GetRimContactPosition(hoopPos, outcome.rimContacts[0]);
+        targetHeight = rimHeight;
     }
     else if (outcome.result == ShotResult.BackboardAndIn)
     {
