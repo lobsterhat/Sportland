@@ -921,7 +921,8 @@ private Vector2 GetTargetPosition(Vector2 hoopPos, ShotTarget target)
     float halfDepth = 0.57f / 2f;
 
     // Offset for inside/outside edge
-    float edgeOffset = 0.15f; // How far inside/outside from rim edge
+    // Max 0.12 (ball radius) to allow Outside targets to pass through rim for Swish
+    float edgeOffset = 0.10f; // How far inside/outside from rim edge
 
     switch (target)
     {
