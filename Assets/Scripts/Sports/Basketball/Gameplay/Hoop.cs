@@ -282,13 +282,37 @@ namespace Sportland.Sports.Basketball.Gameplay
                 }
                 else
                 {
-                    // Last contact - guide toward hoop center and up to scoring zone
+                    // Last contact - MUST go through scoring zone, override physics almost completely
                     targetPosition = courtPosition;
-                    blendStrength = 0.8f; // Blend 80% toward target, 20% physics
-                    // Calculate velocity needed to reach scoring zone height
+                    blendStrength = 0.98f; // 98% toward target - deterministic makes
+
+                    // Ensure ball is positioned close enough to hoop center
+                    // If ball is too far away, nudge it closer to guarantee scoring zone passage
+                    Vector2 toHoopCenter = courtPosition - ball.courtPosition;
+                    float distanceFromCenter = toHoopCenter.magnitude;
+                    float maxAllowedDistance = 0.10f; // Within 0.10 units of center for guaranteed make
+
+                    if (distanceFromCenter > maxAllowedDistance)
+                    {
+                        // Nudge ball toward center
+                        ball.courtPosition += toHoopCenter.normalized * (distanceFromCenter - maxAllowedDistance);
+                        Debug.Log($"Correcting ball position for guaranteed make: moved {distanceFromCenter - maxAllowedDistance:F3} units toward center");
+                    }
+
+                    // Calculate exact velocity needed to reach scoring zone height
                     float heightToReach = scoringZoneHeight - ball.height;
-                    float velocityNeeded = Mathf.Sqrt(2f * Mathf.Abs(ball.gravity) * heightToReach);
-                    minVerticalVelocity = Mathf.Max(velocityNeeded, 2.5f); // At least 2.5 to ensure reach
+
+                    // If ball is already above scoring zone, give it downward velocity
+                    if (heightToReach <= 0)
+                    {
+                        minVerticalVelocity = 0.5f; // Just enough to fall through
+                    }
+                    else
+                    {
+                        // Calculate physics-based velocity, add buffer for reliability
+                        float velocityNeeded = Mathf.Sqrt(2f * Mathf.Abs(ball.gravity) * heightToReach);
+                        minVerticalVelocity = velocityNeeded * 1.3f; // 30% buffer to ensure reach
+                    }
                 }
 
                 // Calculate desired direction and speed
@@ -301,7 +325,7 @@ namespace Sportland.Sports.Basketball.Gameplay
                 // Blend between physics and target velocity
                 ball.courtVelocity = Vector2.Lerp(physicsVelocity, targetVelocity, blendStrength);
 
-                // Apply vertical bounce with minimum to ensure ball stays up
+                // Set vertical velocity to guarantee scoring zone is reached
                 ball.verticalVelocity = Mathf.Max(minVerticalVelocity, Mathf.Abs(ball.verticalVelocity) * 0.7f);
             }
             else
