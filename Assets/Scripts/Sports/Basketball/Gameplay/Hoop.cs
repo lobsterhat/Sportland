@@ -286,22 +286,23 @@ namespace Sportland.Sports.Basketball.Gameplay
                     // Next rim contact exists - calculate trajectory to it
                     targetCourtPos = nextContactPoint.Value;
                     targetHeight = rimHeight;
-                    flightTime = 0.15f; // Time to reach next contact
+
+                    // Vary flight time for more natural bounces (0.12-0.18s)
+                    flightTime = Random.Range(0.12f, 0.18f);
                 }
                 else
                 {
                     // Last contact - calculate trajectory to scoring zone
-                    // Target a random X within scoring zone for variety
+                    // Target random X within scoring zone for variety
                     float halfWidth = scoringZoneWidth / 2f;
-                    float targetX = courtPosition.x + Random.Range(-halfWidth * 0.5f, halfWidth * 0.5f);
+                    float targetX = courtPosition.x + Random.Range(-halfWidth * 0.7f, halfWidth * 0.7f);
                     targetCourtPos = new Vector2(targetX, courtPosition.y);
                     targetHeight = scoringZoneHeight;
 
-                    // Calculate flight time based on height difference
+                    // Vary flight time based on how high the ball needs to go (0.25-0.35s)
                     float heightDiff = targetHeight - ball.height;
-                    // Time to apex + time to fall to target height
-                    // Using t = sqrt(2*h/g) for the rise, then calculating fall time
-                    flightTime = 0.3f; // Fixed time for now, can tune
+                    float baseTime = heightDiff > 0 ? 0.30f : 0.25f;
+                    flightTime = baseTime + Random.Range(-0.05f, 0.05f);
                 }
 
                 // Calculate required velocities using projectile motion equations
@@ -313,6 +314,9 @@ namespace Sportland.Sports.Basketball.Gameplay
                 float heightDisplacement = targetHeight - ball.height;
                 float gravity = ball.gravity; // Should be negative
                 float requiredVerticalVelocity = (heightDisplacement - 0.5f * gravity * flightTime * flightTime) / flightTime;
+
+                // Add slight variation to vertical velocity for more natural arc (±5%)
+                requiredVerticalVelocity *= Random.Range(0.95f, 1.05f);
 
                 // Apply calculated velocities directly (100% override for deterministic trajectory)
                 ball.courtVelocity = requiredCourtVelocity;
