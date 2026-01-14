@@ -79,7 +79,26 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             if (crossingRimHeight && isFalling)
             {
-                StartCoroutine(ProcessRimSequence());
+                // For Swish, validate ball is within rim boundaries
+                if (currentOutcome.result == ShotResult.Swish)
+                {
+                    float halfWidth = rimScale.x / 2f;
+                    float halfDepth = rimScale.y / 2f;
+
+                    bool withinRimX = Mathf.Abs(ball.courtPosition.x - courtPosition.x) <= halfWidth;
+                    bool withinRimY = Mathf.Abs(ball.courtPosition.y - courtPosition.y) <= halfDepth;
+
+                    if (withinRimX && withinRimY)
+                    {
+                        StartCoroutine(ProcessRimSequence());
+                    }
+                    // else: ball missed the rim - wait for next frame
+                }
+                else
+                {
+                    // Not a swish - process rim contacts regardless of position
+                    StartCoroutine(ProcessRimSequence());
+                }
             }
         }
 

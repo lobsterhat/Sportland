@@ -688,6 +688,13 @@ private ShotOutcome CreateForcedOutcome()
 
     // Handle rim targets (all inside/outside edge combinations)
     RimContact rimSide = GetRimContactFromTarget(forcedShotTarget);
+
+    // For Swish, don't add any rim contacts - ball goes straight through
+    if (outcome.result == ShotResult.Swish)
+    {
+        return outcome;
+    }
+
     outcome.rimContacts.Add(rimSide);
 
     // Add second contact based on outcome type
