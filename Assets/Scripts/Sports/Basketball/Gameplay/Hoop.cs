@@ -287,18 +287,40 @@ namespace Sportland.Sports.Basketball.Gameplay
                     targetCourtPos = nextContactPoint.Value;
                     targetHeight = rimHeight;
 
-                    // Randomly choose between quick bounce and high bounce
-                    float bounceStyle = Random.Range(0f, 1f);
-                    if (bounceStyle < 0.6f)
+                    // Determine if this is an "outside" contact (closer to where ball came from)
+                    // Outside contacts should bounce higher more often
+                    bool isOutsideContact = IsOutsideRimContact(contact, ball.courtPosition);
+
+                    float highBounceChance;
+                    float minHighFlightTime;
+                    float maxHighFlightTime;
+
+                    if (isOutsideContact)
                     {
-                        // Quick bounce (60% chance) - shorter flight time
-                        flightTime = Random.Range(0.12f, 0.18f);
+                        // Outside edge (closer to shooter) - bounces high frequently
+                        highBounceChance = 0.7f; // 70% chance of high bounce
+                        minHighFlightTime = 0.6f;
+                        maxHighFlightTime = 0.9f;
                     }
                     else
                     {
-                        // High bounce (40% chance) - MUCH longer flight time for dramatic high arc
-                        // Can reach 4-5+ units high with these times
-                        flightTime = Random.Range(0.5f, 0.9f);
+                        // Inside edge (farther from shooter) - mostly quick bounces
+                        highBounceChance = 0.25f; // 25% chance of high bounce
+                        minHighFlightTime = 0.4f;
+                        maxHighFlightTime = 0.6f;
+                    }
+
+                    // Randomly choose between quick bounce and high bounce
+                    float bounceStyle = Random.Range(0f, 1f);
+                    if (bounceStyle < highBounceChance)
+                    {
+                        // High bounce - longer flight time for dramatic arc
+                        flightTime = Random.Range(minHighFlightTime, maxHighFlightTime);
+                    }
+                    else
+                    {
+                        // Quick bounce - shorter flight time
+                        flightTime = Random.Range(0.12f, 0.18f);
                     }
                 }
                 else
@@ -360,6 +382,37 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             // Nudge ball slightly away from rim surface to prevent sticking
             ball.courtPosition += surfaceNormal * 0.05f;
+        }
+
+        private bool IsOutsideRimContact(RimContact contact, Vector2 ballPosition)
+        {
+            // Determine if the ball hit the "outside" edge (closer to approach direction)
+            // vs "inside" edge (farther from approach direction)
+
+            Vector2 approachDirection = (courtPosition - ballPosition).normalized;
+
+            // Check which side the ball is approaching from
+            switch (contact)
+            {
+                case RimContact.FrontRim:
+                    // Ball approaching from front (negative Y) hits outside
+                    return approachDirection.y > 0;
+
+                case RimContact.BackRim:
+                    // Ball approaching from back (positive Y) hits outside
+                    return approachDirection.y < 0;
+
+                case RimContact.LeftRim:
+                    // Ball approaching from left (negative X) hits outside
+                    return approachDirection.x > 0;
+
+                case RimContact.RightRim:
+                    // Ball approaching from right (positive X) hits outside
+                    return approachDirection.x < 0;
+
+                default:
+                    return false;
+            }
         }
 
         private Vector2 GetRimContactPoint(RimContact contact)
