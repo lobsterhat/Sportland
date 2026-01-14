@@ -85,8 +85,11 @@ namespace Sportland.Sports.Basketball.Gameplay
                     float halfWidth = rimScale.x / 2f;
                     float halfDepth = rimScale.y / 2f;
 
-                    bool withinRimX = Mathf.Abs(ball.courtPosition.x - courtPosition.x) <= halfWidth;
-                    bool withinRimY = Mathf.Abs(ball.courtPosition.y - courtPosition.y) <= halfDepth;
+                    // Account for ball radius - if ball center is within (rim + ball radius),
+                    // the ball can pass through the rim opening
+                    float ballRadius = ball.radius;
+                    bool withinRimX = Mathf.Abs(ball.courtPosition.x - courtPosition.x) <= (halfWidth + ballRadius);
+                    bool withinRimY = Mathf.Abs(ball.courtPosition.y - courtPosition.y) <= (halfDepth + ballRadius);
 
                     if (withinRimX && withinRimY)
                     {
