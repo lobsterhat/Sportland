@@ -266,67 +266,51 @@ namespace Sportland.Sports.Basketball.Gameplay
             Vector2 preservedTangential = tangentialVelocity * friction;
             Vector2 physicsVelocity = reflectedNormal + preservedTangential;
 
-            // For makes, ensure ball heads toward next contact or hoop center
+            // For makes, calculate exact trajectory to next target
             if (isMake)
             {
-                Vector2 targetPosition;
-                float blendStrength;
-                float minVerticalVelocity;
+                Vector2 targetCourtPos;
+                float targetHeight;
+                float flightTime;
 
                 if (nextContactPoint.HasValue)
                 {
-                    // Next rim contact exists - guide strongly toward it
-                    targetPosition = nextContactPoint.Value;
-                    blendStrength = 0.85f; // Blend 85% toward target, 15% physics
-                    minVerticalVelocity = 1.5f; // Pop up to give time to reach next contact
+                    // Next rim contact exists - calculate trajectory to it
+                    targetCourtPos = nextContactPoint.Value;
+                    targetHeight = rimHeight;
+                    flightTime = 0.15f; // Time to reach next contact
                 }
                 else
                 {
-                    // Last contact - MUST go through scoring zone, override physics almost completely
-                    targetPosition = courtPosition;
-                    blendStrength = 0.98f; // 98% toward target - deterministic makes
+                    // Last contact - calculate trajectory to scoring zone
+                    // Target a random X within scoring zone for variety
+                    float halfWidth = scoringZoneWidth / 2f;
+                    float targetX = courtPosition.x + Random.Range(-halfWidth * 0.5f, halfWidth * 0.5f);
+                    targetCourtPos = new Vector2(targetX, courtPosition.y);
+                    targetHeight = scoringZoneHeight;
 
-                    // Ensure ball is positioned close enough to hoop center
-                    // If ball is too far away, nudge it closer to guarantee scoring zone passage
-                    Vector2 toHoopCenter = courtPosition - ball.courtPosition;
-                    float distanceFromCenter = toHoopCenter.magnitude;
-                    float maxAllowedDistance = 0.10f; // Within 0.10 units of center for guaranteed make
-
-                    if (distanceFromCenter > maxAllowedDistance)
-                    {
-                        // Nudge ball toward center
-                        ball.courtPosition += toHoopCenter.normalized * (distanceFromCenter - maxAllowedDistance);
-                        Debug.Log($"Correcting ball position for guaranteed make: moved {distanceFromCenter - maxAllowedDistance:F3} units toward center");
-                    }
-
-                    // Calculate exact velocity needed to reach scoring zone height
-                    float heightToReach = scoringZoneHeight - ball.height;
-
-                    // If ball is already above scoring zone, give it downward velocity
-                    if (heightToReach <= 0)
-                    {
-                        minVerticalVelocity = 0.5f; // Just enough to fall through
-                    }
-                    else
-                    {
-                        // Calculate physics-based velocity, add buffer for reliability
-                        float velocityNeeded = Mathf.Sqrt(2f * Mathf.Abs(ball.gravity) * heightToReach);
-                        minVerticalVelocity = velocityNeeded * 1.3f; // 30% buffer to ensure reach
-                    }
+                    // Calculate flight time based on height difference
+                    float heightDiff = targetHeight - ball.height;
+                    // Time to apex + time to fall to target height
+                    // Using t = sqrt(2*h/g) for the rise, then calculating fall time
+                    flightTime = 0.3f; // Fixed time for now, can tune
                 }
 
-                // Calculate desired direction and speed
-                Vector2 toTarget = targetPosition - ball.courtPosition;
-                float distance = toTarget.magnitude;
-                // Speed based on distance - closer targets need slower approach
-                float targetSpeed = Mathf.Max(1.5f, Mathf.Min(3.0f, distance * 2.0f));
-                Vector2 targetVelocity = toTarget.normalized * targetSpeed;
+                // Calculate required velocities using projectile motion equations
+                // Court velocity: distance / time
+                Vector2 courtDisplacement = targetCourtPos - ball.courtPosition;
+                Vector2 requiredCourtVelocity = courtDisplacement / flightTime;
 
-                // Blend between physics and target velocity
-                ball.courtVelocity = Vector2.Lerp(physicsVelocity, targetVelocity, blendStrength);
+                // Vertical velocity: (h_final - h_initial + 0.5*g*t^2) / t
+                float heightDisplacement = targetHeight - ball.height;
+                float gravity = ball.gravity; // Should be negative
+                float requiredVerticalVelocity = (heightDisplacement - 0.5f * gravity * flightTime * flightTime) / flightTime;
 
-                // Set vertical velocity to guarantee scoring zone is reached
-                ball.verticalVelocity = Mathf.Max(minVerticalVelocity, Mathf.Abs(ball.verticalVelocity) * 0.7f);
+                // Apply calculated velocities directly (100% override for deterministic trajectory)
+                ball.courtVelocity = requiredCourtVelocity;
+                ball.verticalVelocity = requiredVerticalVelocity;
+
+                Debug.Log($"Trajectory calculated: court velocity=({ball.courtVelocity.x:F2}, {ball.courtVelocity.y:F2}), vertical={ball.verticalVelocity:F2}, time={flightTime:F2}s to ({targetCourtPos.x:F2}, {targetCourtPos.y:F2}, h:{targetHeight:F2})");
             }
             else
             {
