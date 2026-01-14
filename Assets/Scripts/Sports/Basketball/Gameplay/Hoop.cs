@@ -164,7 +164,20 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
             else
             {
-                Score();
+                // For makes, validate ball is actually near the hoop before scoring
+                float distanceFromHoop = Vector2.Distance(ball.courtPosition, courtPosition);
+                bool nearHoop = distanceFromHoop < 0.5f; // Within half unit of hoop center
+                bool atRimHeight = Mathf.Abs(ball.height - rimHeight) < 0.6f; // Within 0.6 units of rim height
+
+                if (nearHoop && atRimHeight)
+                {
+                    Score();
+                }
+                else
+                {
+                    Debug.Log($"Ball not near hoop after rim sequence - treating as miss. Distance: {distanceFromHoop:F2}, Height diff: {Mathf.Abs(ball.height - rimHeight):F2}");
+                    FinishMiss();
+                }
             }
         }
 
@@ -224,36 +237,44 @@ namespace Sportland.Sports.Basketball.Gameplay
             {
                 Vector2 targetPosition;
                 float blendStrength;
+                float minVerticalVelocity;
 
                 if (nextContactPoint.HasValue)
                 {
-                    // Next rim contact exists - guide toward it
+                    // Next rim contact exists - guide strongly toward it
                     targetPosition = nextContactPoint.Value;
-                    blendStrength = 0.7f; // Blend 70% toward target, 30% physics
+                    blendStrength = 0.85f; // Blend 85% toward target, 15% physics
+                    minVerticalVelocity = 1.5f; // Pop up to give time to reach next contact
                 }
                 else
                 {
-                    // Last contact - guide toward hoop center
+                    // Last contact - guide toward hoop center to drop in
                     targetPosition = courtPosition;
-                    blendStrength = 0.5f; // Blend 50% toward target, 50% physics
+                    blendStrength = 0.7f; // Blend 70% toward target, 30% physics
+                    minVerticalVelocity = 0.8f; // Gentle pop before falling through
                 }
 
                 // Calculate desired direction and speed
                 Vector2 toTarget = targetPosition - ball.courtPosition;
-                float targetSpeed = Mathf.Max(2.0f, physicsVelocity.magnitude); // At least 2 units/sec
+                float distance = toTarget.magnitude;
+                // Speed based on distance - closer targets need slower approach
+                float targetSpeed = Mathf.Max(1.5f, Mathf.Min(3.0f, distance * 2.0f));
                 Vector2 targetVelocity = toTarget.normalized * targetSpeed;
 
                 // Blend between physics and target velocity
                 ball.courtVelocity = Vector2.Lerp(physicsVelocity, targetVelocity, blendStrength);
+
+                // Apply vertical bounce with minimum to ensure ball stays up
+                ball.verticalVelocity = Mathf.Max(minVerticalVelocity, Mathf.Abs(ball.verticalVelocity) * 0.7f);
             }
             else
             {
                 // Miss - use pure physics
                 ball.courtVelocity = physicsVelocity;
-            }
 
-            // Apply vertical bounce with energy retention
-            ball.verticalVelocity = Mathf.Abs(ball.verticalVelocity) * 0.7f;
+                // Apply vertical bounce with energy retention
+                ball.verticalVelocity = Mathf.Abs(ball.verticalVelocity) * 0.7f;
+            }
 
             // Nudge ball slightly away from rim surface to prevent sticking
             ball.courtPosition += surfaceNormal * 0.05f;
