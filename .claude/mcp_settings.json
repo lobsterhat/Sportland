@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "pixellab": {
+      "url": "https://api.pixellab.ai/mcp",
+      "transport": "http",
+      "headers": {
+        "Authorization": "Bearer f7314cad-9a00-42d8-bb57-7eaf0a9b1b6e"
+      }
+    }
+  }
+}
