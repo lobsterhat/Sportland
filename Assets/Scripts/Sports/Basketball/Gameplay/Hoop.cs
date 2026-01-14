@@ -287,8 +287,18 @@ namespace Sportland.Sports.Basketball.Gameplay
                     targetCourtPos = nextContactPoint.Value;
                     targetHeight = rimHeight;
 
-                    // Vary flight time for more natural bounces (0.12-0.18s)
-                    flightTime = Random.Range(0.12f, 0.18f);
+                    // Randomly choose between quick bounce and high bounce
+                    float bounceStyle = Random.Range(0f, 1f);
+                    if (bounceStyle < 0.6f)
+                    {
+                        // Quick bounce (60% chance) - shorter flight time
+                        flightTime = Random.Range(0.12f, 0.18f);
+                    }
+                    else
+                    {
+                        // High bounce (40% chance) - longer flight time for dramatic arc
+                        flightTime = Random.Range(0.25f, 0.40f);
+                    }
                 }
                 else
                 {
@@ -299,10 +309,20 @@ namespace Sportland.Sports.Basketball.Gameplay
                     targetCourtPos = new Vector2(targetX, courtPosition.y);
                     targetHeight = scoringZoneHeight;
 
-                    // Vary flight time based on how high the ball needs to go (0.25-0.35s)
-                    float heightDiff = targetHeight - ball.height;
-                    float baseTime = heightDiff > 0 ? 0.30f : 0.25f;
-                    flightTime = baseTime + Random.Range(-0.05f, 0.05f);
+                    // Random bounce style for final bounce too
+                    float bounceStyle = Random.Range(0f, 1f);
+                    if (bounceStyle < 0.5f)
+                    {
+                        // Standard drop (50% chance)
+                        float heightDiff = targetHeight - ball.height;
+                        float baseTime = heightDiff > 0 ? 0.30f : 0.25f;
+                        flightTime = baseTime + Random.Range(-0.05f, 0.05f);
+                    }
+                    else
+                    {
+                        // High arc finish (50% chance) - ball pops up before dropping through
+                        flightTime = Random.Range(0.35f, 0.50f);
+                    }
                 }
 
                 // Calculate required velocities using projectile motion equations
@@ -315,14 +335,18 @@ namespace Sportland.Sports.Basketball.Gameplay
                 float gravity = ball.gravity; // Should be negative
                 float requiredVerticalVelocity = (heightDisplacement - 0.5f * gravity * flightTime * flightTime) / flightTime;
 
-                // Add slight variation to vertical velocity for more natural arc (±5%)
-                requiredVerticalVelocity *= Random.Range(0.95f, 1.05f);
+                // Add variation to vertical velocity for more natural arc (±10% instead of ±5%)
+                requiredVerticalVelocity *= Random.Range(0.90f, 1.10f);
 
                 // Apply calculated velocities directly (100% override for deterministic trajectory)
                 ball.courtVelocity = requiredCourtVelocity;
                 ball.verticalVelocity = requiredVerticalVelocity;
 
-                Debug.Log($"Trajectory calculated: court velocity=({ball.courtVelocity.x:F2}, {ball.courtVelocity.y:F2}), vertical={ball.verticalVelocity:F2}, time={flightTime:F2}s to ({targetCourtPos.x:F2}, {targetCourtPos.y:F2}, h:{targetHeight:F2})");
+                // Calculate and log peak height for debugging
+                float timeToApex = requiredVerticalVelocity / Mathf.Abs(gravity);
+                float peakHeight = ball.height + requiredVerticalVelocity * timeToApex + 0.5f * gravity * timeToApex * timeToApex;
+
+                Debug.Log($"Trajectory calculated: court velocity=({ball.courtVelocity.x:F2}, {ball.courtVelocity.y:F2}), vertical={ball.verticalVelocity:F2}, time={flightTime:F2}s, peak={peakHeight:F2} to ({targetCourtPos.x:F2}, {targetCourtPos.y:F2}, h:{targetHeight:F2})");
             }
             else
             {
