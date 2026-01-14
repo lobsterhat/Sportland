@@ -79,12 +79,13 @@ namespace Sportland.Sports.Basketball.Gameplay
             if (currentOutcome == null) return;
 
             bool isFalling = ball.verticalVelocity < 0;
-            bool crossingRimHeight = ballPreviousHeight > rimHeight && ball.height <= rimHeight;
 
-            if (crossingRimHeight && isFalling)
+            // For Swish, wait for scoring zone height, not rim height
+            if (currentOutcome.result == ShotResult.Swish)
             {
-                // For Swish, validate ball is within rim boundaries
-                if (currentOutcome.result == ShotResult.Swish)
+                bool crossingScoringHeight = ballPreviousHeight > scoringZoneHeight && ball.height <= scoringZoneHeight;
+
+                if (crossingScoringHeight && isFalling)
                 {
                     float halfWidth = rimScale.x / 2f;
                     float halfDepth = rimScale.y / 2f;
@@ -101,9 +102,15 @@ namespace Sportland.Sports.Basketball.Gameplay
                     }
                     // else: ball missed the rim - wait for next frame
                 }
-                else
+            }
+            else
+            {
+                // For shots with rim contacts, wait for rim height
+                bool crossingRimHeight = ballPreviousHeight > rimHeight && ball.height <= rimHeight;
+
+                if (crossingRimHeight && isFalling)
                 {
-                    // Not a swish - process rim contacts regardless of position
+                    // Process rim contacts regardless of position
                     StartCoroutine(ProcessRimSequence());
                 }
             }
@@ -113,10 +120,11 @@ namespace Sportland.Sports.Basketball.Gameplay
         {
             processingRimSequence = true;
 
-            // Swish - ball goes straight through scoring zone
+            // Swish - ball already validated at scoring zone, score immediately
             if (currentOutcome.result == ShotResult.Swish)
             {
-                yield return StartCoroutine(WaitForScoringZone());
+                Debug.Log($"BALL THROUGH SCORING ZONE at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
+                Score();
                 yield break;
             }
 
