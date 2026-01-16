@@ -18,6 +18,7 @@ namespace Sportland.Core.Athletes
         public string lastName;
 
         [Header("Universal Physical Stats")]
+        public float height = 1.830f; // Height in units (default: 6'0")
         [Range(0, 100)] public float speed = 50f;
         [Range(0, 100)] public float strength = 50f;
         [Range(0, 100)] public float agility = 50f;
@@ -127,5 +128,39 @@ namespace Sportland.Core.Athletes
         B = 3,
         A = 4,
         S = 5
+    }
+
+    /// <summary>
+    /// Height constants in units (1 ft = 0.305 units, based on hoop height of 10' = 3.05 units)
+    /// </summary>
+    public static class HeightConstants
+    {
+        public const float Height_5_0 = 1.525f;  // 5'0"
+        public const float Height_5_3 = 1.601f;  // 5'3"
+        public const float Height_5_9 = 1.754f;  // 5'9"
+        public const float Height_6_0 = 1.830f;  // 6'0"
+        public const float Height_6_3 = 1.906f;  // 6'3"
+        public const float Height_6_6 = 1.983f;  // 6'6"
+        public const float Height_6_9 = 2.059f;  // 6'9"
+        public const float Height_7_0 = 2.135f;  // 7'0"
+
+        /// <summary>
+        /// Convert feet and inches to units
+        /// </summary>
+        public static float FeetInchesToUnits(int feet, int inches)
+        {
+            return (feet + inches / 12f) * 0.305f;
+        }
+
+        /// <summary>
+        /// Convert units to feet and inches
+        /// </summary>
+        public static (int feet, int inches) UnitsToFeetInches(float units)
+        {
+            float totalFeet = units / 0.305f;
+            int feet = (int)totalFeet;
+            int inches = Mathf.RoundToInt((totalFeet - feet) * 12f);
+            return (feet, inches);
+        }
     }
 }

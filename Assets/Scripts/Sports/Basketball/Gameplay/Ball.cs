@@ -17,20 +17,11 @@ namespace Sportland.Sports.Basketball.Gameplay
         public Vector2 courtVelocity;
         public float verticalVelocity;
         public float gravity = -9.8f;
+        public float radius = 0.12f; // Basketball radius in units (~4.7 inches)
 
         [Header("State")]
         public bool isHeld = true;
         public Transform holder;
-
-        [Header("Backboard Collision")]
-        public float backboardY = 0.5f;  // How far behind hoop (positive = away from shooter)
-        public float backboardMinHeight = 2.0f;  // Bottom of backboard
-        public float backboardMaxHeight = 4.5f;  // Top of backboard
-        public float backboardWidth = 1.2f;  // Width of backboard
-        public float backboardRestitution = 0.7f;  // Bounce dampening (0-1)
-
-        private Hoop targetHoop;  // Reference to the hoop we're shooting at
-
 
         private void Awake()
         {
@@ -38,9 +29,6 @@ namespace Sportland.Sports.Basketball.Gameplay
             {
                 courtPosition = new Vector2(transform.position.x, transform.position.y);
             }
-
-            // Find the hoop for backboard position reference
-            targetHoop = FindAnyObjectByType<Hoop>();
         }
 
         private void Update()
@@ -58,16 +46,10 @@ namespace Sportland.Sports.Basketball.Gameplay
             else
             {
                 // Ball in flight
-                Vector2 previousPosition = courtPosition;
-                float previousHeight = height;
-
                 courtPosition += courtVelocity * Time.deltaTime;
 
                 verticalVelocity += gravity * Time.deltaTime;
                 height += verticalVelocity * Time.deltaTime;
-
-                // Check backboard collision
-                CheckBackboardCollision(previousPosition, previousHeight);
 
                 // Bounce on ground
                 if (height <= 0f)
@@ -91,18 +73,21 @@ namespace Sportland.Sports.Basketball.Gameplay
         {
             if (shadowSprite != null)
             {
+                // Shadow stays at ground level
                 shadowSprite.transform.position = new Vector3(
                     courtPosition.x,
-                    courtPosition.y + (height * heightVisualScale),
+                    courtPosition.y,  // No height offset - shadow on ground
                     0
                 );
 
+                // Shadow gets smaller as ball goes higher
                 float shadowScale = Mathf.Lerp(0.3f, 0.15f, height / 5f);
                 shadowSprite.transform.localScale = Vector3.one * shadowScale;
             }
 
             if (ballSprite != null)
             {
+                // Ball sprite elevated by height
                 ballSprite.transform.position = new Vector3(
                     courtPosition.x,
                     courtPosition.y + (height * heightVisualScale),
@@ -110,46 +95,6 @@ namespace Sportland.Sports.Basketball.Gameplay
                 );
 
                 ballSprite.sortingOrder = 1000 - (int)(courtPosition.y * 100);
-            }
-        }
-
-        private void CheckBackboardCollision(Vector2 previousPosition, float previousHeight)
-        {
-            if (targetHoop == null) return;
-
-            // Calculate backboard Y position (behind the hoop)
-            float backboardYPos = targetHoop.CourtPosition.y + backboardY;
-
-            // Check if ball crossed the backboard plane this frame
-            bool wasInFront = previousPosition.y < backboardYPos;
-            bool isNowBehind = courtPosition.y >= backboardYPos;
-            bool crossedBackboard = wasInFront && isNowBehind;
-
-            if (!crossedBackboard) return;
-
-            // Check if ball is within backboard boundaries
-            float hoopX = targetHoop.CourtPosition.x;
-            float halfWidth = backboardWidth / 2f;
-
-            bool withinWidth = courtPosition.x >= (hoopX - halfWidth) && courtPosition.x <= (hoopX + halfWidth);
-            bool withinHeight = height >= backboardMinHeight && height <= backboardMaxHeight;
-
-            if (withinWidth && withinHeight)
-            {
-                // Ball hit backboard! Reflect it back
-                Debug.Log($"BACKBOARD HIT at height {height:F2}!");
-
-                // Snap ball to backboard surface
-                courtPosition.y = backboardYPos;
-
-                // Reflect Y velocity (bounce back toward shooter)
-                courtVelocity.y = -courtVelocity.y * backboardRestitution;
-
-                // Dampen X velocity slightly
-                courtVelocity.x *= 0.95f;
-
-                // Reduce vertical velocity slightly from impact
-                verticalVelocity *= 0.9f;
             }
         }
 
@@ -177,24 +122,19 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         public void CaptureAtHoop(Vector2 hoopCourtPosition, float rimHeight)
         {
-            // Ball has gone through hoop - now drop straight down
+            // Ball has gone through hoop - let it continue naturally
+            // Don't snap position or zero velocities - just ensure it's falling
 
-            // Snap to hoop position
-            courtPosition = hoopCourtPosition;
-            courtVelocity = Vector2.zero;
+            // If ball isn't falling yet, give it a slight downward push
+            if (verticalVelocity > -1f)
+            {
+                verticalVelocity = -1f;
+            }
 
-            // Keep falling (or increase downward speed)
-            // Ball is already falling, so we can just let gravity continue
-            // Or force it to fall faster:
-            //if (verticalVelocity > -2f)
-            //{
-            //    verticalVelocity = -2f; // Ensure it's falling at least this fast
-            //}
+            // Let horizontal velocity continue naturally - ball will drift as it falls
+            // This creates a more natural "dropping through net" effect
 
-            verticalVelocity = 0;
-
-            //Debug.Log("Ball captured at hoop, dropping straight down");
-            //Debug.Log($"Ball rendering at height={height}, courtPos={courtPosition}");
+            //Debug.Log("Ball passed through hoop, continuing to fall naturally");
         }
     }
 }

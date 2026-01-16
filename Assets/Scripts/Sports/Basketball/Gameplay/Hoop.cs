@@ -16,9 +16,11 @@ namespace Sportland.Sports.Basketball.Gameplay
         [SerializeField] private int points = 2;
 
         [Header("Rim Physics")]
-        [SerializeField] private float rimBounceVertical = 4f;
-        [SerializeField] private float rimBounceHorizontal = 1.5f;
         [SerializeField] private float timeBetweenRimContacts = 0.15f;
+
+        [Header("Scoring Zone")]
+        [SerializeField] private float scoringZoneHeight = 3.05f; // Height ball must pass through for makes
+        [SerializeField] private float scoringZoneWidth = 0.30f; // X tolerance (±0.15 from center)
 
         public Vector2 CourtPosition => courtPosition;
         public float RimHeight => rimHeight;
@@ -70,8 +72,6 @@ namespace Sportland.Sports.Basketball.Gameplay
             currentOutcome = outcome;
             waitingForBall = true;
             processingRimSequence = false;
-
-            Debug.Log($"Hoop received outcome: {outcome.result} with {outcome.rimContacts.Count} contacts");
         }
 
         private void CheckBallArrival()
@@ -79,11 +79,40 @@ namespace Sportland.Sports.Basketball.Gameplay
             if (currentOutcome == null) return;
 
             bool isFalling = ball.verticalVelocity < 0;
-            bool crossingRimHeight = ballPreviousHeight > rimHeight && ball.height <= rimHeight;
 
-            if (crossingRimHeight && isFalling)
+            // For Swish, wait for scoring zone height, not rim height
+            if (currentOutcome.result == ShotResult.Swish)
             {
-                StartCoroutine(ProcessRimSequence());
+                bool crossingScoringHeight = ballPreviousHeight > scoringZoneHeight && ball.height <= scoringZoneHeight;
+
+                if (crossingScoringHeight && isFalling)
+                {
+                    float halfWidth = rimScale.x / 2f;
+                    float halfDepth = rimScale.y / 2f;
+
+                    // Account for ball radius - if ball center is within (rim + ball radius),
+                    // the ball can pass through the rim opening
+                    float ballRadius = ball.radius;
+                    bool withinRimX = Mathf.Abs(ball.courtPosition.x - courtPosition.x) <= (halfWidth + ballRadius);
+                    bool withinRimY = Mathf.Abs(ball.courtPosition.y - courtPosition.y) <= (halfDepth + ballRadius);
+
+                    if (withinRimX && withinRimY)
+                    {
+                        StartCoroutine(ProcessRimSequence());
+                    }
+                    // else: ball missed the rim - wait for next frame
+                }
+            }
+            else
+            {
+                // For shots with rim contacts, wait for rim height
+                bool crossingRimHeight = ballPreviousHeight > rimHeight && ball.height <= rimHeight;
+
+                if (crossingRimHeight && isFalling)
+                {
+                    // Process rim contacts regardless of position
+                    StartCoroutine(ProcessRimSequence());
+                }
             }
         }
 
@@ -91,30 +120,53 @@ namespace Sportland.Sports.Basketball.Gameplay
         {
             processingRimSequence = true;
 
-            // Stop ball movement during rim sequence
-            ball.courtVelocity = Vector2.zero;
-            ball.verticalVelocity = 0f;
-
-            // Swish - ball goes straight through
+            // Swish - ball already validated at scoring zone, score immediately
             if (currentOutcome.result == ShotResult.Swish)
             {
-                Debug.Log("SWISH!");
+                Debug.Log($"BALL THROUGH SCORING ZONE at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
                 Score();
                 yield break;
             }
 
-            // Process each rim contact
+            // Process each rim contact - apply bounces instead of teleporting
             for (int i = 0; i < currentOutcome.rimContacts.Count; i++)
             {
                 RimContact contact = currentOutcome.rimContacts[i];
-                Debug.Log($"Ball hit {contact}!");
 
-                // Move ball to contact point on rim
-                Vector2 contactPoint = GetRimContactPoint(contact);
-                ball.courtPosition = contactPoint;
-                ball.height = rimHeight;
+                // Wait for ball to naturally reach this contact point
+                IEnumerator waitCoroutine = WaitForRimContact(contact);
+                yield return StartCoroutine(waitCoroutine);
 
-                yield return new WaitForSeconds(timeBetweenRimContacts);
+                // Check if we successfully reached the contact (true) or timed out (false)
+                bool reachedContact = (bool)waitCoroutine.Current;
+
+                if (!reachedContact)
+                {
+                    // Timed out - skip this contact and continue with next one
+                    continue;
+                }
+
+                // Determine if this is a make and if there are more contacts
+                bool isMake = (currentOutcome.result == ShotResult.RimAndIn || currentOutcome.result == ShotResult.BackboardAndIn);
+                bool hasMoreContacts = i < currentOutcome.rimContacts.Count - 1;
+
+                // Get next contact point if available
+                Vector2? nextContactPoint = null;
+                if (hasMoreContacts)
+                {
+                    nextContactPoint = GetRimContactPoint(currentOutcome.rimContacts[i + 1]);
+                }
+
+                // Apply bounce at this contact
+                ApplyRimBounce(contact, isMake, nextContactPoint);
+
+                Debug.Log($"RIM HIT: {contact} at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
+
+                // Small delay between contacts to make bounces visible
+                if (hasMoreContacts)
+                {
+                    yield return new WaitForSeconds(timeBetweenRimContacts);
+                }
             }
 
             // Sequence complete - determine final outcome
@@ -124,7 +176,242 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
             else
             {
-                Score();
+                // For makes, wait for ball to pass through the scoring zone
+                yield return StartCoroutine(WaitForScoringZone());
+            }
+        }
+
+        private IEnumerator WaitForScoringZone()
+        {
+            float timeout = 2f;
+            float elapsed = 0f;
+            float previousHeight = ball.height;
+
+            // Wait for ball to pass through the scoring zone
+            while (elapsed < timeout)
+            {
+                bool isFalling = ball.verticalVelocity < 0;
+                bool crossingScoringHeight = previousHeight > scoringZoneHeight && ball.height <= scoringZoneHeight;
+
+                if (crossingScoringHeight && isFalling)
+                {
+                    // Check if ball is within the scoring zone X range
+                    float halfWidth = scoringZoneWidth / 2f;
+                    bool withinScoringX = Mathf.Abs(ball.courtPosition.x - courtPosition.x) <= halfWidth;
+
+                    if (withinScoringX)
+                    {
+                        Debug.Log($"BALL THROUGH SCORING ZONE at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
+                        Score();
+                        yield break;
+                    }
+                    else
+                    {
+                        Debug.Log($"Ball missed scoring zone X - treating as miss. X: {ball.courtPosition.x:F2}, Expected: {courtPosition.x - halfWidth:F2} to {courtPosition.x + halfWidth:F2}");
+                        FinishMiss();
+                        yield break;
+                    }
+                }
+
+                previousHeight = ball.height;
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            // Timeout - ball didn't reach scoring zone
+            Debug.Log($"TIMEOUT waiting for scoring zone - treating as miss. Ball at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
+            FinishMiss();
+        }
+
+        private IEnumerator WaitForRimContact(RimContact contact)
+        {
+            Vector2 contactPoint = GetRimContactPoint(contact);
+            float timeout = 2f; // Safety timeout
+            float elapsed = 0f;
+
+            // Wait until ball is near the contact point AND at rim height
+            while (elapsed < timeout)
+            {
+                float distanceToContact = Vector2.Distance(ball.courtPosition, contactPoint);
+                bool nearContact = distanceToContact < 0.4f;
+                bool atRimHeight = Mathf.Abs(ball.height - rimHeight) < 0.4f;
+
+                // Require BOTH conditions - ball must be near the contact point and at rim height
+                if (nearContact && atRimHeight)
+                {
+                    yield return true; // Successfully reached contact
+                    yield break;
+                }
+
+                elapsed += Time.deltaTime;
+                yield return null;
+            }
+
+            // Timeout - ball didn't reach this contact point
+            Debug.Log($"TIMEOUT waiting for {contact} - skipping this contact");
+            yield return false; // Failed to reach contact
+        }
+
+        private void ApplyRimBounce(RimContact contact, bool isMake, Vector2? nextContactPoint)
+        {
+            // Get the rim surface normal at contact point
+            Vector2 surfaceNormal = GetRimSurfaceNormal(contact);
+
+            // Get ball's current velocity (combine court and vertical velocity)
+            Vector2 incomingVelocity = ball.courtVelocity;
+
+            // Physics-based bounce using coefficient of restitution
+            float restitution = 0.75f;  // Basketball coefficient of restitution
+            float friction = 0.95f;      // Tangential friction preservation
+
+            // Decompose velocity into normal and tangential components
+            float normalSpeed = Vector2.Dot(incomingVelocity, surfaceNormal);
+            Vector2 normalVelocity = surfaceNormal * normalSpeed;
+            Vector2 tangentialVelocity = incomingVelocity - normalVelocity;
+
+            // Apply physics: reflect normal component with restitution, preserve tangential with friction
+            Vector2 reflectedNormal = -normalVelocity * restitution;
+            Vector2 preservedTangential = tangentialVelocity * friction;
+            Vector2 physicsVelocity = reflectedNormal + preservedTangential;
+
+            // For makes, calculate exact trajectory to next target
+            if (isMake)
+            {
+                Vector2 targetCourtPos;
+                float targetHeight;
+                float flightTime;
+
+                if (nextContactPoint.HasValue)
+                {
+                    // Next rim contact exists - calculate trajectory to it
+                    targetCourtPos = nextContactPoint.Value;
+                    targetHeight = rimHeight;
+
+                    // Determine if this is an "outside" contact (closer to where ball came from)
+                    // Outside contacts should bounce higher more often
+                    bool isOutsideContact = IsOutsideRimContact(contact, ball.courtPosition);
+
+                    float highBounceChance;
+                    float minHighFlightTime;
+                    float maxHighFlightTime;
+
+                    if (isOutsideContact)
+                    {
+                        // Outside edge (closer to shooter) - bounces high frequently
+                        highBounceChance = 0.7f; // 70% chance of high bounce
+                        minHighFlightTime = 0.6f;
+                        maxHighFlightTime = 0.9f;
+                    }
+                    else
+                    {
+                        // Inside edge (farther from shooter) - mostly quick bounces
+                        highBounceChance = 0.25f; // 25% chance of high bounce
+                        minHighFlightTime = 0.4f;
+                        maxHighFlightTime = 0.6f;
+                    }
+
+                    // Randomly choose between quick bounce and high bounce
+                    float bounceStyle = Random.Range(0f, 1f);
+                    if (bounceStyle < highBounceChance)
+                    {
+                        // High bounce - longer flight time for dramatic arc
+                        flightTime = Random.Range(minHighFlightTime, maxHighFlightTime);
+                    }
+                    else
+                    {
+                        // Quick bounce - shorter flight time
+                        flightTime = Random.Range(0.12f, 0.18f);
+                    }
+                }
+                else
+                {
+                    // Last contact - calculate trajectory to scoring zone
+                    // Target random X within scoring zone for variety
+                    float halfWidth = scoringZoneWidth / 2f;
+                    float targetX = courtPosition.x + Random.Range(-halfWidth * 0.7f, halfWidth * 0.7f);
+                    targetCourtPos = new Vector2(targetX, courtPosition.y);
+                    targetHeight = scoringZoneHeight;
+
+                    // Random bounce style for final bounce too
+                    float bounceStyle = Random.Range(0f, 1f);
+                    if (bounceStyle < 0.5f)
+                    {
+                        // Standard drop (50% chance)
+                        float heightDiff = targetHeight - ball.height;
+                        float baseTime = heightDiff > 0 ? 0.30f : 0.25f;
+                        flightTime = baseTime + Random.Range(-0.05f, 0.05f);
+                    }
+                    else
+                    {
+                        // High arc finish (50% chance) - ball pops way up before dropping through
+                        flightTime = Random.Range(0.45f, 0.75f);
+                    }
+                }
+
+                // Calculate required velocities using projectile motion equations
+                // Court velocity: distance / time
+                Vector2 courtDisplacement = targetCourtPos - ball.courtPosition;
+                Vector2 requiredCourtVelocity = courtDisplacement / flightTime;
+
+                // Vertical velocity: (h_final - h_initial + 0.5*g*t^2) / t
+                float heightDisplacement = targetHeight - ball.height;
+                float gravity = ball.gravity; // Should be negative
+                float requiredVerticalVelocity = (heightDisplacement - 0.5f * gravity * flightTime * flightTime) / flightTime;
+
+                // Add slight variation to vertical velocity for more natural arc (±5%)
+                requiredVerticalVelocity *= Random.Range(0.95f, 1.05f);
+
+                // Apply calculated velocities directly (100% override for deterministic trajectory)
+                ball.courtVelocity = requiredCourtVelocity;
+                ball.verticalVelocity = requiredVerticalVelocity;
+
+                // Calculate and log peak height for debugging
+                float timeToApex = requiredVerticalVelocity / Mathf.Abs(gravity);
+                float peakHeight = ball.height + requiredVerticalVelocity * timeToApex + 0.5f * gravity * timeToApex * timeToApex;
+
+                Debug.Log($"Trajectory calculated: court velocity=({ball.courtVelocity.x:F2}, {ball.courtVelocity.y:F2}), vertical={ball.verticalVelocity:F2}, time={flightTime:F2}s, peak={peakHeight:F2} to ({targetCourtPos.x:F2}, {targetCourtPos.y:F2}, h:{targetHeight:F2})");
+            }
+            else
+            {
+                // Miss - use pure physics
+                ball.courtVelocity = physicsVelocity;
+
+                // Apply vertical bounce with energy retention
+                ball.verticalVelocity = Mathf.Abs(ball.verticalVelocity) * 0.7f;
+            }
+
+            // Nudge ball slightly away from rim surface to prevent sticking
+            ball.courtPosition += surfaceNormal * 0.05f;
+        }
+
+        private bool IsOutsideRimContact(RimContact contact, Vector2 ballPosition)
+        {
+            // Determine if the ball hit the "outside" edge (closer to approach direction)
+            // vs "inside" edge (farther from approach direction)
+
+            Vector2 approachDirection = (courtPosition - ballPosition).normalized;
+
+            // Check which side the ball is approaching from
+            switch (contact)
+            {
+                case RimContact.FrontRim:
+                    // Ball approaching from front (negative Y) hits outside
+                    return approachDirection.y > 0;
+
+                case RimContact.BackRim:
+                    // Ball approaching from back (positive Y) hits outside
+                    return approachDirection.y < 0;
+
+                case RimContact.LeftRim:
+                    // Ball approaching from left (negative X) hits outside
+                    return approachDirection.x > 0;
+
+                case RimContact.RightRim:
+                    // Ball approaching from right (positive X) hits outside
+                    return approachDirection.x < 0;
+
+                default:
+                    return false;
             }
         }
 
@@ -150,36 +437,47 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
         }
 
-        private Vector2 GetBounceDirection(RimContact contact)
+        private Vector2 GetRimSurfaceNormal(RimContact contact)
         {
-            float variance = Random.Range(-0.3f, 0.3f);
-
+            // Return the outward-facing normal vector for each rim surface
+            // These point away from the hoop center
             switch (contact)
             {
                 case RimContact.FrontRim:
-                    return new Vector2(variance, -1f).normalized;
+                    return new Vector2(0, -1); // Points toward front of court
                 case RimContact.BackRim:
-                    return new Vector2(variance, 1f).normalized;
+                    return new Vector2(0, 1);  // Points toward back of court
                 case RimContact.LeftRim:
-                    return new Vector2(-1f, variance).normalized;
+                    return new Vector2(-1, 0); // Points left
                 case RimContact.RightRim:
-                    return new Vector2(1f, variance).normalized;
+                    return new Vector2(1, 0);  // Points right
                 case RimContact.Backboard:
-                    return new Vector2(variance, -0.5f).normalized;
+                    return new Vector2(0, -1); // Backboard normal points toward front
                 default:
-                    return Vector2.down;
+                    return Vector2.up;
             }
         }
 
         private void Score()
         {
-            Debug.Log($"SCORE! +{points} points! ({currentOutcome.result})");
-
             waitingForBall = false;
             processingRimSequence = false;
 
+            // Apply net physics - the net slows down the ball and affects trajectory
             if (ball != null)
-                ball.CaptureAtHoop(courtPosition, rimHeight);
+            {
+                Debug.Log($"BALL THROUGH HOOP at ({ball.courtPosition.x:F2}, {ball.courtPosition.y:F2}, h:{ball.height:F2})");
+
+                // Net kills most horizontal movement - ball falls nearly straight down
+                ball.courtVelocity *= 0.1f;
+
+                // Net slows vertical velocity but ensures ball is falling
+                ball.verticalVelocity *= 0.5f;
+                if (ball.verticalVelocity > -2f)
+                {
+                    ball.verticalVelocity = -2f;
+                }
+            }
 
             BasketballGameController controller = FindAnyObjectByType<BasketballGameController>();
             if (controller != null)
@@ -188,24 +486,13 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void FinishMiss()
         {
-            Debug.Log("Shot missed!");
 
             waitingForBall = false;
             processingRimSequence = false;
 
-            // Get final bounce direction from last contact
-            RimContact lastContact = currentOutcome.rimContacts.Count > 0
-                ? currentOutcome.rimContacts[currentOutcome.rimContacts.Count - 1]
-                : RimContact.FrontRim;
-
-            Vector2 bounceDir = GetBounceDirection(lastContact);
-
-            float energyMultiplier = Mathf.Pow(0.7f, currentOutcome.rimContacts.Count);
-            float horizontalSpeed = rimBounceHorizontal * energyMultiplier * Random.Range(0.8f, 1.2f);
-            float verticalSpeed = rimBounceVertical * energyMultiplier * Random.Range(0.8f, 1.2f);
-
-            ball.courtVelocity = bounceDir * horizontalSpeed;
-            ball.verticalVelocity = verticalSpeed;
+            // Ball already has velocity from the last rim bounce (ApplyRimBounce)
+            // Don't override it - let physics continue naturally
+            // This allows backboard collisions to work correctly on rebounds
         }
 
         private void OnDrawGizmos()
