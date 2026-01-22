@@ -52,8 +52,16 @@ namespace Sportland.Sports.Basketball.Gameplay
         [Header("Passing")]
         public BasketballPlayer teammate;
         public bool isActivePlayer = true;
-        public float passSpeed = 15f;
-        public float passHeight = 1.5f;
+        public PassType currentPassType = PassType.Direct;
+        public PassLocation currentPassLocation = PassLocation.Chest;
+
+        [Header("Pass Type Settings")]
+        public float directPassSpeed = 20f;
+        public float bouncePassSpeed = 18f;
+        public float lobPassSpeed = 12f;
+        public float alleyOopPassSpeed = 14f;
+        public float chestPassHeight = 1.2f;
+        public float overheadPassHeight = 1.8f;
 
         [Header("Shot Accuracy")]
         public float apexWindow = 0.1f;
@@ -115,6 +123,23 @@ namespace Sportland.Sports.Basketball.Gameplay
             {
                 moveInput = Vector2.zero;
                 return;
+            }
+
+            // Pass type controls (Tab to cycle pass type, Shift+Tab for pass location)
+            if (Input.GetKeyDown(KeyCode.Tab))
+            {
+                if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+                {
+                    // Cycle pass location
+                    currentPassLocation = (PassLocation)(((int)currentPassLocation + 1) % System.Enum.GetValues(typeof(PassLocation)).Length);
+                    Debug.Log($"Pass Location: {currentPassLocation}");
+                }
+                else
+                {
+                    // Cycle pass type
+                    currentPassType = (PassType)(((int)currentPassType + 1) % System.Enum.GetValues(typeof(PassType)).Length);
+                    Debug.Log($"Pass Type: {currentPassType}");
+                }
             }
 
             // Debug controls (number keys)
@@ -411,30 +436,154 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             CancelInvoke("ResetBall");  // Cancel any pending reset
 
-            Debug.Log($"Passing ball to teammate at {teammate.courtPosition}");
+            PassContext passContext = CreatePassContext();
 
-            // Calculate pass trajectory - straight line to teammate
+            Debug.Log($"Pass: {passContext.type} ({passContext.location}) to teammate at {teammate.courtPosition}");
+
             Vector2 toTeammate = teammate.courtPosition - courtPosition;
             float distance = toTeammate.magnitude;
 
-            // Calculate time to reach teammate based on pass speed
-            float passTime = distance / passSpeed;
+            switch (passContext.type)
+            {
+                case PassType.Direct:
+                    ExecuteDirectPass(toTeammate, distance, passContext);
+                    break;
+                case PassType.Bounce:
+                    ExecuteBouncePass(toTeammate, distance, passContext);
+                    break;
+                case PassType.Lob:
+                    ExecuteLobPass(toTeammate, distance, passContext);
+                    break;
+                case PassType.AlleyOop:
+                    ExecuteAlleyOopPass(toTeammate, distance, passContext);
+                    break;
+            }
+        }
 
-            // Calculate horizontal velocity to reach teammate
+        private PassContext CreatePassContext()
+        {
+            PassContext context = new PassContext
+            {
+                type = currentPassType,
+                location = currentPassLocation
+            };
+
+            // Set release height based on pass location
+            if (currentPassLocation == PassLocation.Chest)
+            {
+                context.releaseHeight = jumpHeight + chestPassHeight;
+            }
+            else // Overhead
+            {
+                context.releaseHeight = jumpHeight + overheadPassHeight;
+            }
+
+            // Set speed based on pass type
+            switch (currentPassType)
+            {
+                case PassType.Direct:
+                    context.speed = directPassSpeed;
+                    context.targetHeight = chestPassHeight;
+                    break;
+                case PassType.Bounce:
+                    context.speed = bouncePassSpeed;
+                    context.targetHeight = chestPassHeight;
+                    break;
+                case PassType.Lob:
+                    context.speed = lobPassSpeed;
+                    context.targetHeight = overheadPassHeight;
+                    break;
+                case PassType.AlleyOop:
+                    context.speed = alleyOopPassSpeed;
+                    context.targetHeight = 3.2f; // High catch point for dunk
+                    break;
+            }
+
+            return context;
+        }
+
+        private void ExecuteDirectPass(Vector2 toTeammate, float distance, PassContext context)
+        {
+            // Fast, straight line pass with minimal arc
+            float passTime = distance / context.speed;
             Vector2 horizontalVelocity = toTeammate / passTime;
 
-            // Launch ball at chest height, aiming for teammate's chest height
-            float startHeight = jumpHeight + ballOverheadOffset;
-            float targetHeight = passHeight;
-
-            // Calculate vertical velocity for the pass arc
-            // Using projectile motion: h = h0 + v0*t + 0.5*g*t^2
-            // Solve for v0: v0 = (h - h0 - 0.5*g*t^2) / t
             float gravity = Mathf.Abs(ball.gravity);
-            float verticalVelocity = (targetHeight - startHeight + 0.5f * gravity * passTime * passTime) / passTime;
+            float verticalVelocity = (context.targetHeight - context.releaseHeight + 0.5f * gravity * passTime * passTime) / passTime;
 
-            // Launch the ball
-            ball.Launch(courtPosition, startHeight, horizontalVelocity, verticalVelocity);
+            ball.Launch(courtPosition, context.releaseHeight, horizontalVelocity, verticalVelocity);
+        }
+
+        private void ExecuteBouncePass(Vector2 toTeammate, float distance, PassContext context)
+        {
+            // Pass bounces on the ground approximately 2/3 of the way to teammate
+            float bounceDistance = distance * 0.67f;
+            Vector2 bouncePosition = courtPosition + toTeammate.normalized * bounceDistance;
+
+            // First phase: Ball to bounce point
+            float passTime = distance / context.speed;
+            Vector2 horizontalVelocity = toTeammate / passTime;
+
+            // Calculate velocity to hit the ground at bounce point
+            // We want the ball to hit ground (height = 0) at the bounce position
+            float gravity = Mathf.Abs(ball.gravity);
+
+            // For a bounce pass, we aim to hit the ground with some downward velocity
+            // Time to reach bounce point
+            float timeToBounce = bounceDistance / context.speed;
+
+            // Solve for initial vertical velocity to reach height=0 at timeToBounce
+            // 0 = h0 + v0*t - 0.5*g*t^2
+            // v0 = (0.5*g*t^2 - h0) / t
+            float verticalVelocity = (0.5f * gravity * timeToBounce * timeToBounce - context.releaseHeight) / timeToBounce;
+
+            ball.Launch(courtPosition, context.releaseHeight, horizontalVelocity, verticalVelocity);
+        }
+
+        private void ExecuteLobPass(Vector2 toTeammate, float distance, PassContext context)
+        {
+            // High arcing pass that goes over defenders
+            float passTime = distance / context.speed;
+            Vector2 horizontalVelocity = toTeammate / passTime;
+
+            // Lob has a high arc - peak is much higher than normal passes
+            float peakHeight = Mathf.Max(context.releaseHeight, context.targetHeight) + 3.0f; // 3 units above start/target
+
+            float gravity = Mathf.Abs(ball.gravity);
+
+            // Calculate upward velocity to reach peak
+            float heightToReach = peakHeight - context.releaseHeight;
+            float verticalVelocity = Mathf.Sqrt(2f * gravity * heightToReach);
+
+            ball.Launch(courtPosition, context.releaseHeight, horizontalVelocity, verticalVelocity);
+        }
+
+        private void ExecuteAlleyOopPass(Vector2 toTeammate, float distance, PassContext context)
+        {
+            // High pass timed for teammate to catch in the air near the hoop
+            // Similar to lob but aims higher and expects teammate to jump
+            float passTime = distance / context.speed;
+            Vector2 horizontalVelocity = toTeammate / passTime;
+
+            // Alley-oop aims high for a jumping catch
+            float peakHeight = context.targetHeight + 1.5f; // High arc for dramatic catch
+
+            float gravity = Mathf.Abs(ball.gravity);
+
+            // Calculate to reach peak then descend to target height
+            float upDistance = peakHeight - context.releaseHeight;
+            float downDistance = peakHeight - context.targetHeight;
+
+            float timeUp = Mathf.Sqrt(2f * upDistance / gravity);
+            float timeDown = Mathf.Sqrt(2f * downDistance / gravity);
+
+            // Adjust horizontal velocity for actual flight time
+            float actualTime = timeUp + timeDown;
+            horizontalVelocity = toTeammate / actualTime;
+
+            float verticalVelocity = gravity * timeUp;
+
+            ball.Launch(courtPosition, context.releaseHeight, horizontalVelocity, verticalVelocity);
         }
 
         private ShotContext DetermineShotType()
