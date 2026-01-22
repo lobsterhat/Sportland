@@ -49,6 +49,12 @@ namespace Sportland.Sports.Basketball.Gameplay
         [Header("Ball Position")]
         public float ballOverheadOffset = 1.8f;
 
+        [Header("Passing")]
+        public BasketballPlayer teammate;
+        public bool isActivePlayer = true;
+        public float passSpeed = 15f;
+        public float passHeight = 1.5f;
+
         [Header("Shot Accuracy")]
         public float apexWindow = 0.1f;
         public float risingPenalty = 0.1f;
@@ -97,9 +103,17 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void HandleInput()
         {
+            // Ball reset available to all players
             if (Input.GetKeyDown(KeyCode.R) && ball != null && !ball.isHeld)
             {
                 ResetBall();
+                return;
+            }
+
+            // Only active player can control movement and actions
+            if (!isActivePlayer)
+            {
+                moveInput = Vector2.zero;
                 return;
             }
 
@@ -135,6 +149,13 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             if (ball != null && ball.isHeld)
             {
+                // Pass to teammate with P key
+                if (Input.GetKeyDown(KeyCode.P) && teammate != null)
+                {
+                    PassBall();
+                    return;
+                }
+
                 if (Input.GetKeyDown(KeyCode.Space) && !isJumping && !isDunking)
                 {
                     // Check if player should attempt dunk instead of regular jump
@@ -151,12 +172,6 @@ namespace Sportland.Sports.Basketball.Gameplay
                 if (Input.GetKeyUp(KeyCode.Space) && isJumping)
                 {
                     ReleaseShot();
-                }
-
-                if (isJumping && Input.GetKey(KeyCode.Space) && Input.GetKeyDown(KeyCode.F))
-                {
-                    // TODO: Implement pass
-                    Debug.Log("Pass while jumping!");
                 }
             }
         }
@@ -390,6 +405,38 @@ namespace Sportland.Sports.Basketball.Gameplay
             ShootBall();
         }
 
+        private void PassBall()
+        {
+            if (ball == null || !ball.isHeld || teammate == null) return;
+
+            CancelInvoke("ResetBall");  // Cancel any pending reset
+
+            Debug.Log($"Passing ball to teammate at {teammate.courtPosition}");
+
+            // Calculate pass trajectory - straight line to teammate
+            Vector2 toTeammate = teammate.courtPosition - courtPosition;
+            float distance = toTeammate.magnitude;
+
+            // Calculate time to reach teammate based on pass speed
+            float passTime = distance / passSpeed;
+
+            // Calculate horizontal velocity to reach teammate
+            Vector2 horizontalVelocity = toTeammate / passTime;
+
+            // Launch ball at chest height, aiming for teammate's chest height
+            float startHeight = jumpHeight + ballOverheadOffset;
+            float targetHeight = passHeight;
+
+            // Calculate vertical velocity for the pass arc
+            // Using projectile motion: h = h0 + v0*t + 0.5*g*t^2
+            // Solve for v0: v0 = (h - h0 - 0.5*g*t^2) / t
+            float gravity = Mathf.Abs(ball.gravity);
+            float verticalVelocity = (targetHeight - startHeight + 0.5f * gravity * passTime * passTime) / passTime;
+
+            // Launch the ball
+            ball.Launch(courtPosition, startHeight, horizontalVelocity, verticalVelocity);
+        }
+
         private ShotContext DetermineShotType()
         {
             ShotContext context = new ShotContext();
@@ -496,8 +543,21 @@ namespace Sportland.Sports.Basketball.Gameplay
                 if (distanceToBall < 1.0f && ball.height < 0.5f)
                 {
                     ball.SetHolder(transform);
-                    //Debug.Log("Picked up ball!");
+                    SwitchControlToThisPlayer();
+                    Debug.Log($"Player picked up ball! Control switched.");
                 }
+            }
+        }
+
+        private void SwitchControlToThisPlayer()
+        {
+            // Make this player active
+            isActivePlayer = true;
+
+            // Deactivate teammate
+            if (teammate != null)
+            {
+                teammate.isActivePlayer = false;
             }
         }
 
