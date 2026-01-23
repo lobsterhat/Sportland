@@ -62,7 +62,7 @@ namespace Sportland.Sports.Basketball.Gameplay
         public float alleyOopPassSpeed = 6f;
         public float chestPassHeight = 1.2f;
         public float overheadPassHeight = 1.8f;
-        public float passPickupRadius = 0.8f;
+        public float passPickupRadius = 0.5f;
         public float passPickupHeight = 2.0f;
         public float ballReleaseCooldown = 0.5f; // Time after releasing ball before you can catch again
 
@@ -710,6 +710,20 @@ namespace Sportland.Sports.Basketball.Gameplay
                 // Check if ball is within horizontal pickup radius
                 if (distanceToBall < passPickupRadius)
                 {
+                    // Check if ball is moving toward the player (prevents catching balls passing by)
+                    Vector2 toBall = ball.courtPosition - courtPosition;
+                    Vector2 ballVelocity = ball.courtVelocity;
+
+                    // Only catch if ball is moving toward player (dot product < 0)
+                    // or if ball is nearly stationary (very slow)
+                    float dot = Vector2.Dot(toBall.normalized, ballVelocity.normalized);
+                    bool ballMovingTowardPlayer = dot < 0.3f || ballVelocity.magnitude < 1f;
+
+                    if (!ballMovingTowardPlayer)
+                    {
+                        return; // Ball is moving away or past the player
+                    }
+
                     // Calculate the height difference between player and ball
                     float playerCatchHeight = jumpHeight + chestPassHeight;
                     float heightDifference = Mathf.Abs(ball.height - playerCatchHeight);
