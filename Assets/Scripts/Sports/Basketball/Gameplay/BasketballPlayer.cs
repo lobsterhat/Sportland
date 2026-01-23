@@ -56,10 +56,10 @@ namespace Sportland.Sports.Basketball.Gameplay
         public PassLocation currentPassLocation = PassLocation.Chest;
 
         [Header("Pass Type Settings")]
-        public float directPassSpeed = 10f;
-        public float bouncePassSpeed = 9f;
-        public float lobPassSpeed = 7f;
-        public float alleyOopPassSpeed = 8f;
+        public float directPassSpeed = 7f;
+        public float bouncePassSpeed = 6f;
+        public float lobPassSpeed = 5f;
+        public float alleyOopPassSpeed = 6f;
         public float chestPassHeight = 1.2f;
         public float overheadPassHeight = 1.8f;
         public float passPickupRadius = 1.5f;
