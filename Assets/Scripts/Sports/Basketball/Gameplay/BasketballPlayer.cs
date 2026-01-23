@@ -554,17 +554,24 @@ namespace Sportland.Sports.Basketball.Gameplay
         private void ExecuteLobPass(Vector2 toTeammate, float distance, PassContext context)
         {
             // High arcing pass that goes over defenders
-            float passTime = distance / context.speed;
-            Vector2 horizontalVelocity = toTeammate / passTime;
-
             // Lob has a high arc - peak is much higher than normal passes
             float peakHeight = Mathf.Max(context.releaseHeight, context.targetHeight) + 3.0f; // 3 units above start/target
 
             float gravity = Mathf.Abs(ball.gravity);
 
-            // Calculate upward velocity to reach peak
-            float heightToReach = peakHeight - context.releaseHeight;
-            float verticalVelocity = Mathf.Sqrt(2f * gravity * heightToReach);
+            // Calculate actual flight time based on vertical motion
+            float upDistance = peakHeight - context.releaseHeight;
+            float downDistance = peakHeight - context.targetHeight;
+
+            float timeUp = Mathf.Sqrt(2f * upDistance / gravity);
+            float timeDown = Mathf.Sqrt(2f * downDistance / gravity);
+            float actualFlightTime = timeUp + timeDown;
+
+            // Calculate horizontal velocity based on actual flight time to reach teammate
+            Vector2 horizontalVelocity = toTeammate / actualFlightTime;
+
+            // Calculate vertical velocity to reach peak
+            float verticalVelocity = gravity * timeUp;
 
             ball.Launch(courtPosition, context.releaseHeight, horizontalVelocity, verticalVelocity);
         }
