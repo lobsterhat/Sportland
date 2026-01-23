@@ -515,12 +515,17 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void ExecuteDirectPass(Vector2 toTeammate, float distance, PassContext context)
         {
-            // Fast, straight line pass with minimal arc
+            // Fast, nearly flat pass with minimal arc
             float passTime = distance / context.speed;
             Vector2 horizontalVelocity = toTeammate / passTime;
 
             float gravity = Mathf.Abs(ball.gravity);
-            float verticalVelocity = (context.targetHeight - context.releaseHeight + 0.5f * gravity * passTime * passTime) / passTime;
+
+            // For direct passes, we want minimal arc - just enough upward velocity to counteract gravity
+            // so the ball arrives at the same height it was released
+            // Using: final_height = initial_height + v0*t - 0.5*g*t^2
+            // For flat trajectory: v0 = 0.5*g*t (this keeps the ball at roughly constant height)
+            float verticalVelocity = 0.5f * gravity * passTime;
 
             ball.Launch(courtPosition, context.releaseHeight, horizontalVelocity, verticalVelocity);
         }
