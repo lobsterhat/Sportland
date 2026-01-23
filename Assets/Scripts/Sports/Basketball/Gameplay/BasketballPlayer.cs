@@ -64,6 +64,9 @@ namespace Sportland.Sports.Basketball.Gameplay
         public float overheadPassHeight = 1.8f;
         public float passPickupRadius = 1.5f;
         public float passPickupHeight = 2.0f;
+        public float passCooldown = 0.5f; // Time after passing before you can catch again
+
+        private float lastPassTime = -999f;
 
         [Header("Shot Accuracy")]
         public float apexWindow = 0.1f;
@@ -445,6 +448,9 @@ namespace Sportland.Sports.Basketball.Gameplay
             Vector2 toTeammate = teammate.courtPosition - courtPosition;
             float distance = toTeammate.magnitude;
 
+            // Record pass time to prevent catching own pass
+            lastPassTime = Time.time;
+
             switch (passContext.type)
             {
                 case PassType.Direct:
@@ -690,6 +696,12 @@ namespace Sportland.Sports.Basketball.Gameplay
         {
             if (ball != null && !ball.isHeld)
             {
+                // Prevent catching own pass immediately after throwing
+                if (Time.time - lastPassTime < passCooldown)
+                {
+                    return;
+                }
+
                 float distanceToBall = Vector2.Distance(courtPosition, ball.courtPosition);
 
                 // Check if ball is within horizontal pickup radius
