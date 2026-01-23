@@ -64,9 +64,9 @@ namespace Sportland.Sports.Basketball.Gameplay
         public float overheadPassHeight = 1.8f;
         public float passPickupRadius = 1.5f;
         public float passPickupHeight = 2.0f;
-        public float passCooldown = 0.5f; // Time after passing before you can catch again
+        public float ballReleaseCooldown = 0.5f; // Time after releasing ball before you can catch again
 
-        private float lastPassTime = -999f;
+        private float lastBallReleaseTime = -999f;
 
         [Header("Shot Accuracy")]
         public float apexWindow = 0.1f;
@@ -416,6 +416,9 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             hoop.SetShotOutcome(outcome);
 
+            // Record release time to prevent catching own dunk
+            lastBallReleaseTime = Time.time;
+
             // Slam ball down through rim
             Vector2 startPos = courtPosition;
             float startHeight = jumpHeight + ballOverheadOffset;
@@ -448,8 +451,8 @@ namespace Sportland.Sports.Basketball.Gameplay
             Vector2 toTeammate = teammate.courtPosition - courtPosition;
             float distance = toTeammate.magnitude;
 
-            // Record pass time to prevent catching own pass
-            lastPassTime = Time.time;
+            // Record release time to prevent catching own pass
+            lastBallReleaseTime = Time.time;
 
             switch (passContext.type)
             {
@@ -696,8 +699,8 @@ namespace Sportland.Sports.Basketball.Gameplay
         {
             if (ball != null && !ball.isHeld)
             {
-                // Prevent catching own pass immediately after throwing
-                if (Time.time - lastPassTime < passCooldown)
+                // Prevent catching own pass or shot immediately after releasing
+                if (Time.time - lastBallReleaseTime < ballReleaseCooldown)
                 {
                     return;
                 }
@@ -879,6 +882,10 @@ namespace Sportland.Sports.Basketball.Gameplay
     }
 
     hoop.SetShotOutcome(outcome);
+
+    // Record release time to prevent catching own shot
+    lastBallReleaseTime = Time.time;
+
     LaunchBallToHoop(hoop.CourtPosition, hoop.RimHeight, outcome, shotContext);
 
     Invoke("ResetBall", 5f);
