@@ -62,7 +62,7 @@ namespace Sportland.Sports.Basketball.Gameplay
         public float alleyOopPassSpeed = 6f;
         public float chestPassHeight = 1.2f;
         public float overheadPassHeight = 1.8f;
-        public float passPickupRadius = 1.5f;
+        public float passPickupRadius = 0.8f;
         public float passPickupHeight = 2.0f;
         public float ballReleaseCooldown = 0.5f; // Time after releasing ball before you can catch again
 
