@@ -56,12 +56,14 @@ namespace Sportland.Sports.Basketball.Gameplay
         public PassLocation currentPassLocation = PassLocation.Chest;
 
         [Header("Pass Type Settings")]
-        public float directPassSpeed = 20f;
-        public float bouncePassSpeed = 18f;
-        public float lobPassSpeed = 12f;
-        public float alleyOopPassSpeed = 14f;
+        public float directPassSpeed = 10f;
+        public float bouncePassSpeed = 9f;
+        public float lobPassSpeed = 7f;
+        public float alleyOopPassSpeed = 8f;
         public float chestPassHeight = 1.2f;
         public float overheadPassHeight = 1.8f;
+        public float passPickupRadius = 1.5f;
+        public float passPickupHeight = 2.0f;
 
         [Header("Shot Accuracy")]
         public float apexWindow = 0.1f;
@@ -686,14 +688,38 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void HandleBallPickup()
         {
-            if (ball != null && !ball.isHeld && !isJumping)
+            if (ball != null && !ball.isHeld)
             {
                 float distanceToBall = Vector2.Distance(courtPosition, ball.courtPosition);
-                if (distanceToBall < 1.0f && ball.height < 0.5f)
+
+                // Check if ball is within horizontal pickup radius
+                if (distanceToBall < passPickupRadius)
                 {
-                    ball.SetHolder(transform);
-                    SwitchControlToThisPlayer();
-                    Debug.Log($"Player picked up ball! Control switched.");
+                    // Calculate the height difference between player and ball
+                    float playerCatchHeight = jumpHeight + chestPassHeight;
+                    float heightDifference = Mathf.Abs(ball.height - playerCatchHeight);
+
+                    // Can catch if ball is within catching height range (ground to overhead)
+                    bool canCatch = ball.height <= passPickupHeight;
+
+                    // For ground balls, require player to be on ground
+                    if (ball.height < 0.5f && isJumping)
+                    {
+                        canCatch = false;
+                    }
+
+                    // For passes at chest/overhead height, allow catching even when jumping
+                    if (ball.height >= 0.5f && heightDifference < 1.0f)
+                    {
+                        canCatch = true;
+                    }
+
+                    if (canCatch)
+                    {
+                        ball.SetHolder(transform);
+                        SwitchControlToThisPlayer();
+                        Debug.Log($"Player caught ball at height {ball.height:F2}! Control switched.");
+                    }
                 }
             }
         }
