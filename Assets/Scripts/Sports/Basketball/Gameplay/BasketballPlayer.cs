@@ -184,6 +184,12 @@ namespace Sportland.Sports.Basketball.Gameplay
             moveInput.x = Input.GetAxisRaw("Horizontal");
             moveInput.y = Input.GetAxisRaw("Vertical");
 
+            // Debug: Log input values to help diagnose controller issues
+            if (moveInput.magnitude > 0.1f)
+            {
+                Debug.Log($"Move Input - X: {moveInput.x}, Y: {moveInput.y}");
+            }
+
             if (ball != null && ball.isHeld)
             {
                 // Pass to teammate with P key or Y button
