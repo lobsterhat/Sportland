@@ -116,8 +116,8 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void HandleInput()
         {
-            // Ball reset available to all players (R key or Select button)
-            if ((Input.GetKeyDown(KeyCode.R) || Input.GetButtonDown("Select")) && ball != null && !ball.isHeld)
+            // Ball reset available to all players (R key)
+            if (Input.GetKeyDown(KeyCode.R) && ball != null && !ball.isHeld)
             {
                 ResetBall();
                 return;
@@ -131,11 +131,11 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
 
             // Pass type controls
-            // Tab or L shoulder: Cycle pass type
-            // Shift+Tab or R shoulder: Cycle pass location
-            if (Input.GetKeyDown(KeyCode.Tab) || Input.GetButtonDown("Fire1")) // L button mapped to Fire1
+            // Tab: Cycle pass type
+            // Shift+Tab: Cycle pass location
+            if (Input.GetKeyDown(KeyCode.Tab))
             {
-                if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift) || Input.GetButton("Fire2")) // R button mapped to Fire2
+                if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
                 {
                     // Cycle pass location
                     currentPassLocation = (PassLocation)(((int)currentPassLocation + 1) % System.Enum.GetValues(typeof(PassLocation)).Length);
@@ -147,11 +147,6 @@ namespace Sportland.Sports.Basketball.Gameplay
                     currentPassType = (PassType)(((int)currentPassType + 1) % System.Enum.GetValues(typeof(PassType)).Length);
                     Debug.Log($"Pass Type: {currentPassType}");
                 }
-            }
-            else if (Input.GetButtonDown("Fire2")) // R button alone cycles location
-            {
-                currentPassLocation = (PassLocation)(((int)currentPassLocation + 1) % System.Enum.GetValues(typeof(PassLocation)).Length);
-                Debug.Log($"Pass Location: {currentPassLocation}");
             }
 
             // Debug controls (number keys)
@@ -192,15 +187,15 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             if (ball != null && ball.isHeld)
             {
-                // Pass to teammate with P key or Y button
-                if ((Input.GetKeyDown(KeyCode.P) || Input.GetButtonDown("Fire3")) && teammate != null)
+                // Pass to teammate with P key
+                if (Input.GetKeyDown(KeyCode.P) && teammate != null)
                 {
                     PassBall();
                     return;
                 }
 
-                // Jump/Shoot with Space or A button (Jump button)
-                if ((Input.GetKeyDown(KeyCode.Space) || Input.GetButtonDown("Jump")) && !isJumping && !isDunking)
+                // Jump/Shoot with Space key
+                if (Input.GetKeyDown(KeyCode.Space) && !isJumping && !isDunking)
                 {
                     // Check if player should attempt dunk instead of regular jump
                     if (CanAttemptDunk())
@@ -213,8 +208,8 @@ namespace Sportland.Sports.Basketball.Gameplay
                     }
                 }
 
-                // Release shot with Space or A button
-                if ((Input.GetKeyUp(KeyCode.Space) || Input.GetButtonUp("Jump")) && isJumping)
+                // Release shot with Space key
+                if (Input.GetKeyUp(KeyCode.Space) && isJumping)
                 {
                     ReleaseShot();
                 }
