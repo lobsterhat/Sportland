@@ -1,10 +1,12 @@
 ﻿using UnityEngine;
+using UnityEngine.InputSystem;
 using Sportland.Sports.Basketball.Stats;
 
 namespace Sportland.Sports.Basketball.Gameplay
 {
     public class BasketballPlayer : MonoBehaviour
     {
+        private BasketballControls controls;
         [Header("Court Position")]
         public Vector2 courtPosition;
 
@@ -102,6 +104,19 @@ namespace Sportland.Sports.Basketball.Gameplay
             {
                 courtPosition = new Vector2(transform.position.x, transform.position.y);
             }
+
+            // Initialize input actions
+            controls = new BasketballControls();
+        }
+
+        private void OnEnable()
+        {
+            controls.Gameplay.Enable();
+        }
+
+        private void OnDisable()
+        {
+            controls.Gameplay.Disable();
         }
 
         private void Update()
@@ -116,11 +131,8 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void HandleInput()
         {
-            // Ball reset available to all players (R key or Options button)
-            bool resetPressed = Input.GetKeyDown(KeyCode.R);
-            try { resetPressed |= Input.GetButtonDown("Cancel"); } catch { } // Options button
-
-            if (resetPressed && ball != null && !ball.isHeld)
+            // Ball reset available to all players
+            if (controls.Gameplay.ResetBall.WasPressedThisFrame() && ball != null && !ball.isHeld)
             {
                 ResetBall();
                 return;
@@ -133,122 +145,52 @@ namespace Sportland.Sports.Basketball.Gameplay
                 return;
             }
 
-            // Pass type controls
-            // Tab key or Triangle button: Cycle pass type
-            // Shift+Tab or Circle button: Cycle pass location
-            bool cyclePassTypePressed = Input.GetKeyDown(KeyCode.Tab);
-            bool cyclePassLocationPressed = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
-
-            try { cyclePassLocationPressed |= Input.GetButtonDown("Fire2"); } catch { } // Circle button
-
-            if (Input.GetKeyDown(KeyCode.Tab))
+            // Pass type controls - Triangle/Tab: Cycle pass type
+            if (controls.Gameplay.CyclePassType.WasPressedThisFrame())
             {
-                if (cyclePassLocationPressed)
-                {
-                    // Cycle pass location
-                    currentPassLocation = (PassLocation)(((int)currentPassLocation + 1) % System.Enum.GetValues(typeof(PassLocation)).Length);
-                    Debug.Log($"Pass Location: {currentPassLocation}");
-                }
-                else
-                {
-                    // Cycle pass type
-                    currentPassType = (PassType)(((int)currentPassType + 1) % System.Enum.GetValues(typeof(PassType)).Length);
-                    Debug.Log($"Pass Type: {currentPassType}");
-                }
-            }
-            else
-            {
-                // Check for controller button presses
-                try
-                {
-                    if (Input.GetButtonDown("Fire2")) // Circle - cycle pass location
-                    {
-                        currentPassLocation = (PassLocation)(((int)currentPassLocation + 1) % System.Enum.GetValues(typeof(PassLocation)).Length);
-                        Debug.Log($"Pass Location: {currentPassLocation}");
-                    }
-                }
-                catch { }
-
-                // Try Triangle button for pass type (may not be mapped by default)
-                try
-                {
-                    if (Input.GetKeyDown(KeyCode.JoystickButton3)) // Triangle
-                    {
-                        currentPassType = (PassType)(((int)currentPassType + 1) % System.Enum.GetValues(typeof(PassType)).Length);
-                        Debug.Log($"Pass Type: {currentPassType}");
-                    }
-                }
-                catch { }
+                currentPassType = (PassType)(((int)currentPassType + 1) % System.Enum.GetValues(typeof(PassType)).Length);
+                Debug.Log($"Pass Type: {currentPassType}");
             }
 
-            // Debug controls (number keys)
-            if (Input.GetKeyDown(KeyCode.Alpha1))
+            // Pass location controls - Circle/Shift+Tab: Cycle pass location
+            if (controls.Gameplay.CyclePassLocation.WasPressedThisFrame())
+            {
+                currentPassLocation = (PassLocation)(((int)currentPassLocation + 1) % System.Enum.GetValues(typeof(PassLocation)).Length);
+                Debug.Log($"Pass Location: {currentPassLocation}");
+            }
+
+            // Debug controls (number keys) - keep using old Input for dev tools
+            if (Keyboard.current != null && Keyboard.current.digit1Key.wasPressedThisFrame)
             {
                 debugModeEnabled = !debugModeEnabled;
             }
 
-            if (debugModeEnabled)
+            if (debugModeEnabled && Keyboard.current != null)
             {
                 // Cycle shot type with Alpha2
-                if (Input.GetKeyDown(KeyCode.Alpha2))
+                if (Keyboard.current.digit2Key.wasPressedThisFrame)
                 {
                     forcedShotType = (ShotType)(((int)forcedShotType + 1) % System.Enum.GetValues(typeof(ShotType)).Length);
                 }
 
                 // Cycle outcome with Alpha3
-                if (Input.GetKeyDown(KeyCode.Alpha3))
+                if (Keyboard.current.digit3Key.wasPressedThisFrame)
                 {
                     forcedOutcome = (ShotResult)(((int)forcedOutcome + 1) % System.Enum.GetValues(typeof(ShotResult)).Length);
                 }
 
                 // Cycle shot target with Alpha4
-                if (Input.GetKeyDown(KeyCode.Alpha4))
+                if (Keyboard.current.digit4Key.wasPressedThisFrame)
                 {
                     forcedShotTarget = (ShotTarget)(((int)forcedShotTarget + 1) % System.Enum.GetValues(typeof(ShotTarget)).Length);
                 }
             }
 
-            moveInput.x = Input.GetAxisRaw("Horizontal");
-            moveInput.y = Input.GetAxisRaw("Vertical");
+            // Read movement input from new Input System
+            Vector2 moveValue = controls.Gameplay.Move.ReadValue<Vector2>();
+            moveInput = moveValue;
 
-            // DIAGNOSTIC: Test all joystick axes to find vertical
-            // Press Alpha9 to enable axis detection
-            if (Input.GetKey(KeyCode.Alpha9))
-            {
-                string axisReport = "AXIS SCAN:\n";
-
-                // Try common Unity axis naming conventions
-                string[] axisNames = new string[] {
-                    "Horizontal", "Vertical",
-                    "Joy1 Axis 1", "Joy1 Axis 2", "Joy1 Axis 3", "Joy1 Axis 4", "Joy1 Axis 5", "Joy1 Axis 6",
-                    "Joy Axis 1", "Joy Axis 2", "Joy Axis 3", "Joy Axis 4", "Joy Axis 5", "Joy Axis 6",
-                    "Axis 1", "Axis 2", "Axis 3", "Axis 4", "Axis 5", "Axis 6", "Axis 7", "Axis 8", "Axis 9", "Axis 10"
-                };
-
-                foreach (string axisName in axisNames)
-                {
-                    try
-                    {
-                        float axisValue = Input.GetAxis(axisName);
-                        if (Mathf.Abs(axisValue) > 0.1f)
-                        {
-                            axisReport += $"{axisName}={axisValue:F2} ";
-                        }
-                    }
-                    catch { }
-                }
-
-                if (axisReport != "AXIS SCAN:\n")
-                {
-                    Debug.Log(axisReport);
-                }
-                else
-                {
-                    Debug.Log("AXIS SCAN: No active axes detected. Make sure controller is connected and you're moving the stick.");
-                }
-            }
-
-            // Debug: Log input values to help diagnose controller issues
+            // Debug: Log input values if needed
             if (moveInput.magnitude > 0.1f)
             {
                 Debug.Log($"Player {gameObject.name} - Active: {isActivePlayer}, Move Input - X: {moveInput.x}, Y: {moveInput.y}");
@@ -256,23 +198,15 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             if (ball != null && ball.isHeld)
             {
-                // Pass to teammate with P key or Square button
-                bool passPressed = Input.GetKeyDown(KeyCode.P);
-                try { passPressed |= Input.GetButtonDown("Fire3"); } catch { } // Square button
-
-                if (passPressed && teammate != null)
+                // Pass to teammate with Square button or P key
+                if (controls.Gameplay.Pass.WasPressedThisFrame() && teammate != null)
                 {
                     PassBall();
                     return;
                 }
 
-                // Jump/Shoot with Space key or X button
-                bool jumpPressed = Input.GetKeyDown(KeyCode.Space);
-                bool jumpReleased = Input.GetKeyUp(KeyCode.Space);
-                try { jumpPressed |= Input.GetButtonDown("Jump"); } catch { } // X button
-                try { jumpReleased |= Input.GetButtonUp("Jump"); } catch { } // X button
-
-                if (jumpPressed && !isJumping && !isDunking)
+                // Jump/Shoot with X button or Space key
+                if (controls.Gameplay.Jump.WasPressedThisFrame() && !isJumping && !isDunking)
                 {
                     // Check if player should attempt dunk instead of regular jump
                     if (CanAttemptDunk())
@@ -286,7 +220,7 @@ namespace Sportland.Sports.Basketball.Gameplay
                 }
 
                 // Release shot
-                if (jumpReleased && isJumping)
+                if (controls.Gameplay.Jump.WasReleasedThisFrame() && isJumping)
                 {
                     ReleaseShot();
                 }
