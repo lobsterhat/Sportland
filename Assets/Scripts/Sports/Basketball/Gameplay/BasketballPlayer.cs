@@ -214,7 +214,23 @@ namespace Sportland.Sports.Basketball.Gameplay
             // Debug: Log input values to help diagnose controller issues
             if (moveInput.magnitude > 0.1f)
             {
-                Debug.Log($"Move Input - X: {moveInput.x}, Y: {moveInput.y}");
+                Debug.Log($"Player {gameObject.name} - Active: {isActivePlayer}, Move Input - X: {moveInput.x}, Y: {moveInput.y}");
+            }
+
+            // Try alternate vertical axis for controllers
+            if (Mathf.Abs(moveInput.y) < 0.1f)
+            {
+                // Some controllers use different axis indices
+                try
+                {
+                    float altVertical = Input.GetAxis("Vertical");
+                    if (Mathf.Abs(altVertical) > 0.1f)
+                    {
+                        moveInput.y = altVertical;
+                        Debug.Log($"Using alternate vertical axis: {altVertical}");
+                    }
+                }
+                catch { }
             }
 
             if (ball != null && ball.isHeld)
