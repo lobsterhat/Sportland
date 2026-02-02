@@ -116,8 +116,11 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void HandleInput()
         {
-            // Ball reset available to all players (R key)
-            if (Input.GetKeyDown(KeyCode.R) && ball != null && !ball.isHeld)
+            // Ball reset available to all players (R key or Options button)
+            bool resetPressed = Input.GetKeyDown(KeyCode.R);
+            try { resetPressed |= Input.GetButtonDown("Cancel"); } catch { } // Options button
+
+            if (resetPressed && ball != null && !ball.isHeld)
             {
                 ResetBall();
                 return;
@@ -131,11 +134,16 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
 
             // Pass type controls
-            // Tab: Cycle pass type
-            // Shift+Tab: Cycle pass location
+            // Tab key or Triangle button: Cycle pass type
+            // Shift+Tab or Circle button: Cycle pass location
+            bool cyclePassTypePressed = Input.GetKeyDown(KeyCode.Tab);
+            bool cyclePassLocationPressed = Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift);
+
+            try { cyclePassLocationPressed |= Input.GetButtonDown("Fire2"); } catch { } // Circle button
+
             if (Input.GetKeyDown(KeyCode.Tab))
             {
-                if (Input.GetKey(KeyCode.LeftShift) || Input.GetKey(KeyCode.RightShift))
+                if (cyclePassLocationPressed)
                 {
                     // Cycle pass location
                     currentPassLocation = (PassLocation)(((int)currentPassLocation + 1) % System.Enum.GetValues(typeof(PassLocation)).Length);
@@ -147,6 +155,30 @@ namespace Sportland.Sports.Basketball.Gameplay
                     currentPassType = (PassType)(((int)currentPassType + 1) % System.Enum.GetValues(typeof(PassType)).Length);
                     Debug.Log($"Pass Type: {currentPassType}");
                 }
+            }
+            else
+            {
+                // Check for controller button presses
+                try
+                {
+                    if (Input.GetButtonDown("Fire2")) // Circle - cycle pass location
+                    {
+                        currentPassLocation = (PassLocation)(((int)currentPassLocation + 1) % System.Enum.GetValues(typeof(PassLocation)).Length);
+                        Debug.Log($"Pass Location: {currentPassLocation}");
+                    }
+                }
+                catch { }
+
+                // Try Triangle button for pass type (may not be mapped by default)
+                try
+                {
+                    if (Input.GetKeyDown(KeyCode.JoystickButton3)) // Triangle
+                    {
+                        currentPassType = (PassType)(((int)currentPassType + 1) % System.Enum.GetValues(typeof(PassType)).Length);
+                        Debug.Log($"Pass Type: {currentPassType}");
+                    }
+                }
+                catch { }
             }
 
             // Debug controls (number keys)
@@ -187,15 +219,23 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             if (ball != null && ball.isHeld)
             {
-                // Pass to teammate with P key
-                if (Input.GetKeyDown(KeyCode.P) && teammate != null)
+                // Pass to teammate with P key or Square button
+                bool passPressed = Input.GetKeyDown(KeyCode.P);
+                try { passPressed |= Input.GetButtonDown("Fire3"); } catch { } // Square button
+
+                if (passPressed && teammate != null)
                 {
                     PassBall();
                     return;
                 }
 
-                // Jump/Shoot with Space key
-                if (Input.GetKeyDown(KeyCode.Space) && !isJumping && !isDunking)
+                // Jump/Shoot with Space key or X button
+                bool jumpPressed = Input.GetKeyDown(KeyCode.Space);
+                bool jumpReleased = Input.GetKeyUp(KeyCode.Space);
+                try { jumpPressed |= Input.GetButtonDown("Jump"); } catch { } // X button
+                try { jumpReleased |= Input.GetButtonUp("Jump"); } catch { } // X button
+
+                if (jumpPressed && !isJumping && !isDunking)
                 {
                     // Check if player should attempt dunk instead of regular jump
                     if (CanAttemptDunk())
@@ -208,8 +248,8 @@ namespace Sportland.Sports.Basketball.Gameplay
                     }
                 }
 
-                // Release shot with Space key
-                if (Input.GetKeyUp(KeyCode.Space) && isJumping)
+                // Release shot
+                if (jumpReleased && isJumping)
                 {
                     ReleaseShot();
                 }
