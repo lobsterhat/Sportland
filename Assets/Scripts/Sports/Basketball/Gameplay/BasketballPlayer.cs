@@ -215,22 +215,36 @@ namespace Sportland.Sports.Basketball.Gameplay
             // Press Alpha9 to enable axis detection
             if (Input.GetKey(KeyCode.Alpha9))
             {
-                string axisReport = "AXIS SCAN: ";
-                for (int i = 0; i < 10; i++)
+                string axisReport = "AXIS SCAN:\n";
+
+                // Try common Unity axis naming conventions
+                string[] axisNames = new string[] {
+                    "Horizontal", "Vertical",
+                    "Joy1 Axis 1", "Joy1 Axis 2", "Joy1 Axis 3", "Joy1 Axis 4", "Joy1 Axis 5", "Joy1 Axis 6",
+                    "Joy Axis 1", "Joy Axis 2", "Joy Axis 3", "Joy Axis 4", "Joy Axis 5", "Joy Axis 6",
+                    "Axis 1", "Axis 2", "Axis 3", "Axis 4", "Axis 5", "Axis 6", "Axis 7", "Axis 8", "Axis 9", "Axis 10"
+                };
+
+                foreach (string axisName in axisNames)
                 {
                     try
                     {
-                        float axisValue = Input.GetAxis($"Axis {i}");
+                        float axisValue = Input.GetAxis(axisName);
                         if (Mathf.Abs(axisValue) > 0.1f)
                         {
-                            axisReport += $"Axis{i}={axisValue:F2} ";
+                            axisReport += $"{axisName}={axisValue:F2} ";
                         }
                     }
                     catch { }
                 }
-                if (axisReport != "AXIS SCAN: ")
+
+                if (axisReport != "AXIS SCAN:\n")
                 {
                     Debug.Log(axisReport);
+                }
+                else
+                {
+                    Debug.Log("AXIS SCAN: No active axes detected. Make sure controller is connected and you're moving the stick.");
                 }
             }
 
