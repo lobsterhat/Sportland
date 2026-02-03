@@ -1372,13 +1372,13 @@ private float GetTargetHeightForShotType(ShotContext shotContext, float rimHeigh
         {
             if (ball == null) return;
 
-            //Debug.Log("Ball returned to player!");
+            // Only the active player should reset the ball to themselves
+            if (!isActivePlayer) return;
 
-            ball.SetHolder(transform);
-            ball.courtPosition = courtPosition;
-            ball.height = ballOverheadOffset;
-            ball.courtVelocity = Vector2.zero;
-            ball.verticalVelocity = 0f;
+            Debug.Log($"Ball reset to {gameObject.name}");
+
+            // Use immediate version to skip smooth catch animation
+            ball.SetHolderImmediate(transform);
 
             Invoke(nameof(ResetBall), 5f);
         }

@@ -138,6 +138,22 @@ namespace Sportland.Sports.Basketball.Gameplay
             catchTransitionTimer = 0f; // Reset transition timer for smooth catch
         }
 
+        public void SetHolderImmediate(Transform newHolder)
+        {
+            isHeld = true;
+            holder = newHolder;
+            courtVelocity = Vector2.zero;
+            verticalVelocity = 0f;
+            catchTransitionTimer = catchSmoothTime; // Skip smooth transition, snap immediately
+
+            // Immediately set position
+            if (newHolder.TryGetComponent<BasketballPlayer>(out var player))
+            {
+                courtPosition = player.courtPosition;
+                height = heldBallHeight;
+            }
+        }
+
         public void CaptureAtHoop(Vector2 hoopCourtPosition, float rimHeight)
         {
             // Ball has gone through hoop - let it continue naturally
