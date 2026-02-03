@@ -107,19 +107,16 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             // Initialize input actions
             controls = new BasketballControls();
-            Debug.Log($"{gameObject.name}: BasketballControls initialized");
         }
 
         private void OnEnable()
         {
             controls.Gameplay.Enable();
-            Debug.Log($"{gameObject.name}: Input Actions enabled");
         }
 
         private void OnDisable()
         {
             controls.Gameplay.Disable();
-            Debug.Log($"{gameObject.name}: Input Actions disabled");
         }
 
         private void Update()
@@ -192,12 +189,6 @@ namespace Sportland.Sports.Basketball.Gameplay
             // Read movement input from new Input System
             Vector2 moveValue = controls.Gameplay.Move.ReadValue<Vector2>();
             moveInput = moveValue;
-
-            // Debug: Always log input values to diagnose control issues
-            if (isActivePlayer)
-            {
-                Debug.Log($"Player {gameObject.name} - Active: {isActivePlayer}, Move Input - X: {moveInput.x:F2}, Y: {moveInput.y:F2}");
-            }
 
             if (ball != null && ball.isHeld)
             {
