@@ -64,7 +64,7 @@
                 {
                     "name": "",
                     "id": "3fdffa70-ca10-48f7-8844-41299daf6771",
-                    "path": "<Gamepad>/dpad",
+                    "path": "<DualShockGamepad>/dpad",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Gamepad",
@@ -75,7 +75,7 @@
                 {
                     "name": "",
                     "id": "cd1bbbca-6dbf-402c-9f36-8e6e2a26474b",
-                    "path": "<Gamepad>/buttonWest",
+                    "path": "<Gamepad>/buttonSouth",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Gamepad",
@@ -86,7 +86,7 @@
                 {
                     "name": "",
                     "id": "3764e374-4a1d-4e91-813f-e371b944c4b3",
-                    "path": "<Gamepad>/buttonNorth",
+                    "path": "<Gamepad>/buttonWest",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Gamepad",
@@ -97,7 +97,7 @@
                 {
                     "name": "",
                     "id": "a43d65ee-ace9-413c-b304-2b3f834871ce",
-                    "path": "<Gamepad>/leftShoulder",
+                    "path": "<Gamepad>/buttonNorth",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Gamepad",
@@ -108,7 +108,7 @@
                 {
                     "name": "",
                     "id": "d6e6ff48-9289-450d-b564-c88f3a013337",
-                    "path": "<Gamepad>/rightShoulder",
+                    "path": "<Gamepad>/buttonEast",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Gamepad",
@@ -119,7 +119,7 @@
                 {
                     "name": "",
                     "id": "5853c1a3-bce2-4b15-9fcc-809cab6233e8",
-                    "path": "<Gamepad>/buttonEast",
+                    "path": "<DualShockGamepad>/start",
                     "interactions": "",
                     "processors": "",
                     "groups": ";Gamepad",
