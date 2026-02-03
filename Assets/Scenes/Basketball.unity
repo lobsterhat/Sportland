@@ -657,7 +657,12 @@ MonoBehaviour:
   movingLateralPenalty: 0.15
   movingAwayPenalty: 0.35
   ballOverheadOffset: 1.8
-  teammate: {fileID: 0}
+  teammates:
+  - {fileID: 1187651157}
+  - {fileID: 1216119795}
+  - {fileID: 1189585311}
+  - {fileID: 999360300}
+  selectedTeammateIndex: 0
   isActivePlayer: 0
   currentPassType: 0
   currentPassLocation: 0
@@ -1376,7 +1381,12 @@ MonoBehaviour:
   movingLateralPenalty: 0.15
   movingAwayPenalty: 0.35
   ballOverheadOffset: 1.8
-  teammate: {fileID: 0}
+  teammates:
+  - {fileID: 1187651157}
+  - {fileID: 1216119795}
+  - {fileID: 1189585311}
+  - {fileID: 647691701}
+  selectedTeammateIndex: 0
   isActivePlayer: 0
   currentPassType: 0
   currentPassLocation: 0
@@ -1678,7 +1688,12 @@ MonoBehaviour:
   movingLateralPenalty: 0.15
   movingAwayPenalty: 0.35
   ballOverheadOffset: 1.8
-  teammate: {fileID: 0}
+  teammates:
+  - {fileID: 1216119795}
+  - {fileID: 1189585311}
+  - {fileID: 647691701}
+  - {fileID: 999360300}
+  selectedTeammateIndex: 0
   isActivePlayer: 1
   currentPassType: 0
   currentPassLocation: 0
@@ -1772,7 +1787,12 @@ MonoBehaviour:
   movingLateralPenalty: 0.15
   movingAwayPenalty: 0.35
   ballOverheadOffset: 1.8
-  teammate: {fileID: 0}
+  teammates:
+  - {fileID: 1187651157}
+  - {fileID: 1216119795}
+  - {fileID: 647691701}
+  - {fileID: 999360300}
+  selectedTeammateIndex: 0
   isActivePlayer: 0
   currentPassType: 0
   currentPassLocation: 0
@@ -1866,7 +1886,12 @@ MonoBehaviour:
   movingLateralPenalty: 0.15
   movingAwayPenalty: 0.35
   ballOverheadOffset: 1.8
-  teammate: {fileID: 0}
+  teammates:
+  - {fileID: 1187651157}
+  - {fileID: 1189585311}
+  - {fileID: 647691701}
+  - {fileID: 999360300}
+  selectedTeammateIndex: 0
   isActivePlayer: 0
   currentPassType: 0
   currentPassLocation: 0
@@ -2859,9 +2884,6 @@ SceneRoots:
   - {fileID: 817091927}
   - {fileID: 1240492697}
   - {fileID: 1899985019}
-  - {fileID: 1187651158}
-  - {fileID: 414268715}
-  - {fileID: 90269372}
   - {fileID: 1716409014}
   - {fileID: 819934413}
   - {fileID: 1876681392}
@@ -2870,6 +2892,9 @@ SceneRoots:
   - {fileID: 1861150690}
   - {fileID: 1965262924}
   - {fileID: 1873600760}
+  - {fileID: 1187651158}
+  - {fileID: 414268715}
+  - {fileID: 90269372}
   - {fileID: 1216119796}
   - {fileID: 713945796}
   - {fileID: 937526189}
