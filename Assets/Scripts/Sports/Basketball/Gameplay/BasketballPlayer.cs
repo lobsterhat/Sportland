@@ -15,6 +15,14 @@ namespace Sportland.Sports.Basketball.Gameplay
         public SpriteRenderer shadowSprite;
         public float spriteHeightOffset = 0.6f;
 
+        [Header("Pass Target UI")]
+        public SpriteRenderer buttonIconRenderer; // Renderer to show button icon above head
+        public Sprite triangleButtonSprite;
+        public Sprite circleButtonSprite;
+        public Sprite xButtonSprite;
+        public Sprite squareButtonSprite;
+        public float iconHeightOffset = 2.5f; // How high above player to show icon
+
         [Header("Movement")]
         public float moveSpeed = 5f;
 
@@ -191,10 +199,14 @@ namespace Sportland.Sports.Basketball.Gameplay
             Vector2 moveValue = controls.Gameplay.Move.ReadValue<Vector2>();
             moveInput = moveValue;
 
+            // Update button icon visibility based on pass mode
             if (ball != null && ball.isHeld)
             {
                 // Check if in pass mode (L2 trigger held)
                 bool inPassMode = Gamepad.current != null && Gamepad.current.leftTrigger.isPressed;
+
+                // Update button icon visibility for all teammates
+                UpdateTeammateButtonIcons(inPassMode);
 
                 if (inPassMode)
                 {
@@ -262,6 +274,11 @@ namespace Sportland.Sports.Basketball.Gameplay
                         ReleaseShot();
                     }
                 }
+            }
+            else
+            {
+                // Hide all icons when not holding ball
+                UpdateTeammateButtonIcons(false);
             }
         }
 
@@ -911,6 +928,49 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
         }
 
+        private void UpdateTeammateButtonIcons(bool showIcons)
+        {
+            if (teammates == null) return;
+
+            // Show/hide button icons for each teammate
+            for (int i = 0; i < teammates.Length; i++)
+            {
+                if (teammates[i] == null || teammates[i].buttonIconRenderer == null) continue;
+
+                if (showIcons)
+                {
+                    // Show icon and set appropriate sprite
+                    teammates[i].buttonIconRenderer.enabled = true;
+
+                    // Assign sprite based on teammate index
+                    switch (i)
+                    {
+                        case 0: // Triangle
+                            if (triangleButtonSprite != null)
+                                teammates[i].buttonIconRenderer.sprite = triangleButtonSprite;
+                            break;
+                        case 1: // Circle
+                            if (circleButtonSprite != null)
+                                teammates[i].buttonIconRenderer.sprite = circleButtonSprite;
+                            break;
+                        case 2: // X
+                            if (xButtonSprite != null)
+                                teammates[i].buttonIconRenderer.sprite = xButtonSprite;
+                            break;
+                        case 3: // Square
+                            if (squareButtonSprite != null)
+                                teammates[i].buttonIconRenderer.sprite = squareButtonSprite;
+                            break;
+                    }
+                }
+                else
+                {
+                    // Hide icon
+                    teammates[i].buttonIconRenderer.enabled = false;
+                }
+            }
+        }
+
         private void UpdateBallPosition()
         {
             if (ball == null || !ball.isHeld) return;
@@ -1516,6 +1576,19 @@ private float GetTargetHeightForShotType(ShotContext shotContext, float rimHeigh
                 );
 
                 playerSprite.sortingOrder = 1000 - (int)(courtPosition.y * 100);
+            }
+
+            // Update button icon position above player's head
+            if (buttonIconRenderer != null)
+            {
+                buttonIconRenderer.transform.position = new Vector3(
+                    courtPosition.x,
+                    courtPosition.y + iconHeightOffset + jumpHeight,
+                    0
+                );
+
+                // Keep icon above player in render order
+                buttonIconRenderer.sortingOrder = playerSprite != null ? playerSprite.sortingOrder + 1 : 1001;
             }
         }
     }
