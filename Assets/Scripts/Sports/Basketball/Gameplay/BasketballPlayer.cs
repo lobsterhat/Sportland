@@ -1558,35 +1558,23 @@ private float GetTargetHeightForShotType(ShotContext shotContext, float rimHeigh
 
         private void UpdateRendering()
         {
-            if (shadowSprite != null)
-            {
-                shadowSprite.transform.position = new Vector3(
-                    courtPosition.x,
-                    courtPosition.y,
-                    0
-                );
-            }
+            // Update parent GameObject position to match court position
+            transform.position = new Vector3(courtPosition.x, courtPosition.y, 0);
 
+            // Shadow stays at local origin (ground level) - no updates needed
+            // If shadowSprite is nested, it automatically stays at (0, 0, 0) local
+
+            // Update player sprite local position for jump height
             if (playerSprite != null)
             {
-                playerSprite.transform.position = new Vector3(
-                    courtPosition.x,
-                    courtPosition.y + spriteHeightOffset + jumpHeight,
-                    0
-                );
-
+                playerSprite.transform.localPosition = new Vector3(0, spriteHeightOffset + jumpHeight, 0);
                 playerSprite.sortingOrder = 1000 - (int)(courtPosition.y * 100);
             }
 
-            // Update button icon position above player's head
+            // Update button icon local position above player's head
             if (buttonIconRenderer != null)
             {
-                buttonIconRenderer.transform.position = new Vector3(
-                    courtPosition.x,
-                    courtPosition.y + iconHeightOffset + jumpHeight,
-                    0
-                );
-
+                buttonIconRenderer.transform.localPosition = new Vector3(0, iconHeightOffset + jumpHeight, 0);
                 // Keep icon above player in render order
                 buttonIconRenderer.sortingOrder = playerSprite != null ? playerSprite.sortingOrder + 1 : 1001;
             }
