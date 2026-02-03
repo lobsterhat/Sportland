@@ -52,7 +52,8 @@ namespace Sportland.Sports.Basketball.Gameplay
         public float ballOverheadOffset = 1.8f;
 
         [Header("Passing")]
-        public BasketballPlayer teammate;
+        public BasketballPlayer[] teammates; // All teammates on the court
+        public int selectedTeammateIndex = 0; // Currently selected teammate for cycling
         public bool isActivePlayer = true;
         public PassType currentPassType = PassType.Direct;
         public PassLocation currentPassLocation = PassLocation.Chest;
@@ -192,31 +193,74 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             if (ball != null && ball.isHeld)
             {
-                // Pass to teammate with Square button or P key
-                if (controls.Gameplay.Pass.WasPressedThisFrame() && teammate != null)
-                {
-                    PassBall();
-                    return;
-                }
+                // Check if in pass mode (L2 trigger held)
+                bool inPassMode = Gamepad.current != null && Gamepad.current.leftTrigger.isPressed;
 
-                // Jump/Shoot with X button or Space key
-                if (controls.Gameplay.Jump.WasPressedThisFrame() && !isJumping && !isDunking)
+                if (inPassMode)
                 {
-                    // Check if player should attempt dunk instead of regular jump
-                    if (CanAttemptDunk())
+                    // Pass Mode: Face buttons select specific teammates
+                    if (Gamepad.current.buttonNorth.wasPressedThisFrame) // Triangle
                     {
-                        StartDunk();
+                        PassToTeammateByIndex(0);
+                        return;
                     }
-                    else
+                    else if (Gamepad.current.buttonEast.wasPressedThisFrame) // Circle
                     {
-                        StartJump();
+                        PassToTeammateByIndex(1);
+                        return;
+                    }
+                    else if (Gamepad.current.buttonSouth.wasPressedThisFrame) // X
+                    {
+                        PassToTeammateByIndex(2);
+                        return;
+                    }
+                    else if (Gamepad.current.buttonWest.wasPressedThisFrame) // Square
+                    {
+                        PassToTeammateByIndex(3);
+                        return;
                     }
                 }
-
-                // Release shot
-                if (controls.Gameplay.Jump.WasReleasedThisFrame() && isJumping)
+                else
                 {
-                    ReleaseShot();
+                    // Cycle through teammates with shoulder buttons (L1/R1)
+                    if (Gamepad.current != null)
+                    {
+                        if (Gamepad.current.leftShoulder.wasPressedThisFrame)
+                        {
+                            CyclePreviousTeammate();
+                        }
+                        else if (Gamepad.current.rightShoulder.wasPressedThisFrame)
+                        {
+                            CycleNextTeammate();
+                        }
+                    }
+
+                    // Pass to selected/closest teammate with Square button or P key
+                    if (controls.Gameplay.Pass.WasPressedThisFrame() && teammates != null && teammates.Length > 0)
+                    {
+                        PassToClosestTeammateInDirection();
+                        return;
+                    }
+
+                    // Jump/Shoot with X button or Space key
+                    if (controls.Gameplay.Jump.WasPressedThisFrame() && !isJumping && !isDunking)
+                    {
+                        // Check if player should attempt dunk instead of regular jump
+                        if (CanAttemptDunk())
+                        {
+                            StartDunk();
+                        }
+                        else
+                        {
+                            StartJump();
+                        }
+                    }
+
+                    // Release shot
+                    if (controls.Gameplay.Jump.WasReleasedThisFrame() && isJumping)
+                    {
+                        ReleaseShot();
+                    }
                 }
             }
         }
@@ -453,17 +497,86 @@ namespace Sportland.Sports.Basketball.Gameplay
             ShootBall();
         }
 
-        private void PassBall()
+        private void CycleNextTeammate()
         {
-            if (ball == null || !ball.isHeld || teammate == null) return;
+            if (teammates == null || teammates.Length == 0) return;
+
+            selectedTeammateIndex = (selectedTeammateIndex + 1) % teammates.Length;
+            Debug.Log($"Selected teammate: {teammates[selectedTeammateIndex].gameObject.name}");
+        }
+
+        private void CyclePreviousTeammate()
+        {
+            if (teammates == null || teammates.Length == 0) return;
+
+            selectedTeammateIndex--;
+            if (selectedTeammateIndex < 0)
+                selectedTeammateIndex = teammates.Length - 1;
+
+            Debug.Log($"Selected teammate: {teammates[selectedTeammateIndex].gameObject.name}");
+        }
+
+        private void PassToTeammateByIndex(int index)
+        {
+            if (teammates == null || index >= teammates.Length || teammates[index] == null)
+            {
+                Debug.LogWarning($"Cannot pass to teammate index {index}");
+                return;
+            }
+
+            Debug.Log($"Direct pass to {teammates[index].gameObject.name} (button {index})");
+            PassBall(teammates[index]);
+        }
+
+        private void PassToClosestTeammateInDirection()
+        {
+            if (teammates == null || teammates.Length == 0) return;
+
+            // Determine facing direction from movement input
+            Vector2 facingDir = moveInput.magnitude > 0.1f ? moveInput.normalized : Vector2.right;
+
+            BasketballPlayer closestTeammate = null;
+            float closestScore = float.MaxValue;
+
+            foreach (var teammate in teammates)
+            {
+                if (teammate == null || teammate == this) continue;
+
+                Vector2 toTeammate = teammate.courtPosition - courtPosition;
+                float distance = toTeammate.magnitude;
+
+                // Calculate dot product to see if teammate is in facing direction
+                float dot = Vector2.Dot(facingDir, toTeammate.normalized);
+
+                // Prioritize teammates in front (positive dot product)
+                // Score = distance / (1 + dot) -- lower score is better, forward teammates preferred
+                float score = dot > 0 ? distance / (1 + dot) : distance * 2; // Penalize backwards passes
+
+                if (score < closestScore)
+                {
+                    closestScore = score;
+                    closestTeammate = teammate;
+                }
+            }
+
+            if (closestTeammate != null)
+            {
+                Debug.Log($"Auto-passing to closest teammate: {closestTeammate.gameObject.name}");
+                PassBall(closestTeammate);
+            }
+        }
+
+        private void PassBall(BasketballPlayer targetTeammate)
+        {
+            if (ball == null || !ball.isHeld || targetTeammate == null) return;
 
             CancelInvoke("ResetBall");  // Cancel any pending reset
 
             PassContext passContext = CreatePassContext();
 
-            Debug.Log($"Pass: {passContext.type} ({passContext.location}) to teammate at {teammate.courtPosition}");
+            Debug.Log($"Pass: {passContext.type} ({passContext.location}) to {targetTeammate.gameObject.name} at {targetTeammate.courtPosition}");
 
-            Vector2 toTeammate = teammate.courtPosition - courtPosition;
+            Vector2 toTeammate = targetTeammate.courtPosition - courtPosition;
             float distance = toTeammate.magnitude;
 
             // Record release time to prevent catching own pass
@@ -785,10 +898,16 @@ namespace Sportland.Sports.Basketball.Gameplay
             // Make this player active
             isActivePlayer = true;
 
-            // Deactivate teammate
-            if (teammate != null)
+            // Deactivate all teammates
+            if (teammates != null)
             {
-                teammate.isActivePlayer = false;
+                foreach (var teammate in teammates)
+                {
+                    if (teammate != null && teammate != this)
+                    {
+                        teammate.isActivePlayer = false;
+                    }
+                }
             }
         }
 
