@@ -78,6 +78,7 @@ namespace Sportland.Sports.Basketball.Gameplay
         public float ballReleaseCooldown = 0.5f; // Time after releasing ball before you can catch again
 
         private float lastBallReleaseTime = -999f;
+        private bool wasInPassModeLastFrame = false; // Track pass mode state changes
 
         [Header("Shot Accuracy")]
         public float apexWindow = 0.1f;
@@ -208,16 +209,14 @@ namespace Sportland.Sports.Basketball.Gameplay
                 {
                     float triggerValue = Gamepad.current.leftTrigger.ReadValue();
                     inPassMode = triggerValue > 0.5f; // Trigger pressed more than halfway
-
-                    // Debug logging
-                    if (triggerValue > 0.1f)
-                    {
-                        Debug.Log($"L2 Trigger: {triggerValue:F2}, Pass Mode: {inPassMode}");
-                    }
                 }
 
-                // Update button icon visibility for all teammates
-                UpdateTeammateButtonIcons(inPassMode);
+                // Only update icons when pass mode state changes (not every frame)
+                if (inPassMode != wasInPassModeLastFrame)
+                {
+                    UpdateTeammateButtonIcons(inPassMode);
+                    wasInPassModeLastFrame = inPassMode;
+                }
 
                 if (inPassMode)
                 {
@@ -288,8 +287,12 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
             else
             {
-                // Hide all icons when not holding ball
-                UpdateTeammateButtonIcons(false);
+                // Hide all icons when not holding ball (only if state changed)
+                if (wasInPassModeLastFrame)
+                {
+                    UpdateTeammateButtonIcons(false);
+                    wasInPassModeLastFrame = false;
+                }
             }
         }
 
@@ -941,28 +944,12 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void UpdateTeammateButtonIcons(bool showIcons)
         {
-            if (teammates == null)
-            {
-                Debug.LogWarning("Teammates array is null!");
-                return;
-            }
-
-            Debug.Log($"UpdateTeammateButtonIcons: showIcons={showIcons}, teammates.Length={teammates.Length}");
+            if (teammates == null) return;
 
             // Show/hide button icons for each teammate
             for (int i = 0; i < teammates.Length; i++)
             {
-                if (teammates[i] == null)
-                {
-                    Debug.LogWarning($"Teammate {i} is null!");
-                    continue;
-                }
-
-                if (teammates[i].buttonIconRenderer == null)
-                {
-                    Debug.LogWarning($"Teammate {i} ({teammates[i].gameObject.name}) has null buttonIconRenderer!");
-                    continue;
-                }
+                if (teammates[i] == null || teammates[i].buttonIconRenderer == null) continue;
 
                 if (showIcons)
                 {
@@ -990,11 +977,6 @@ namespace Sportland.Sports.Basketball.Gameplay
                     if (spriteToAssign != null)
                     {
                         teammates[i].buttonIconRenderer.sprite = spriteToAssign;
-                        Debug.Log($"Assigned {spriteToAssign.name} icon to teammate {i} ({teammates[i].gameObject.name})");
-                    }
-                    else
-                    {
-                        Debug.LogWarning($"No sprite assigned for button index {i}!");
                     }
                 }
                 else
