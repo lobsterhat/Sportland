@@ -941,12 +941,28 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void UpdateTeammateButtonIcons(bool showIcons)
         {
-            if (teammates == null) return;
+            if (teammates == null)
+            {
+                Debug.LogWarning("Teammates array is null!");
+                return;
+            }
+
+            Debug.Log($"UpdateTeammateButtonIcons: showIcons={showIcons}, teammates.Length={teammates.Length}");
 
             // Show/hide button icons for each teammate
             for (int i = 0; i < teammates.Length; i++)
             {
-                if (teammates[i] == null || teammates[i].buttonIconRenderer == null) continue;
+                if (teammates[i] == null)
+                {
+                    Debug.LogWarning($"Teammate {i} is null!");
+                    continue;
+                }
+
+                if (teammates[i].buttonIconRenderer == null)
+                {
+                    Debug.LogWarning($"Teammate {i} ({teammates[i].gameObject.name}) has null buttonIconRenderer!");
+                    continue;
+                }
 
                 if (showIcons)
                 {
@@ -954,24 +970,31 @@ namespace Sportland.Sports.Basketball.Gameplay
                     teammates[i].buttonIconRenderer.enabled = true;
 
                     // Assign sprite based on teammate index
+                    Sprite spriteToAssign = null;
                     switch (i)
                     {
                         case 0: // Triangle
-                            if (triangleButtonSprite != null)
-                                teammates[i].buttonIconRenderer.sprite = triangleButtonSprite;
+                            spriteToAssign = triangleButtonSprite;
                             break;
                         case 1: // Circle
-                            if (circleButtonSprite != null)
-                                teammates[i].buttonIconRenderer.sprite = circleButtonSprite;
+                            spriteToAssign = circleButtonSprite;
                             break;
                         case 2: // X
-                            if (xButtonSprite != null)
-                                teammates[i].buttonIconRenderer.sprite = xButtonSprite;
+                            spriteToAssign = xButtonSprite;
                             break;
                         case 3: // Square
-                            if (squareButtonSprite != null)
-                                teammates[i].buttonIconRenderer.sprite = squareButtonSprite;
+                            spriteToAssign = squareButtonSprite;
                             break;
+                    }
+
+                    if (spriteToAssign != null)
+                    {
+                        teammates[i].buttonIconRenderer.sprite = spriteToAssign;
+                        Debug.Log($"Assigned {spriteToAssign.name} icon to teammate {i} ({teammates[i].gameObject.name})");
+                    }
+                    else
+                    {
+                        Debug.LogWarning($"No sprite assigned for button index {i}!");
                     }
                 }
                 else
