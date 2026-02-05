@@ -203,7 +203,18 @@ namespace Sportland.Sports.Basketball.Gameplay
             if (ball != null && ball.isHeld)
             {
                 // Check if in pass mode (L2 trigger held)
-                bool inPassMode = Gamepad.current != null && Gamepad.current.leftTrigger.isPressed;
+                bool inPassMode = false;
+                if (Gamepad.current != null)
+                {
+                    float triggerValue = Gamepad.current.leftTrigger.ReadValue();
+                    inPassMode = triggerValue > 0.5f; // Trigger pressed more than halfway
+
+                    // Debug logging
+                    if (triggerValue > 0.1f)
+                    {
+                        Debug.Log($"L2 Trigger: {triggerValue:F2}, Pass Mode: {inPassMode}");
+                    }
+                }
 
                 // Update button icon visibility for all teammates
                 UpdateTeammateButtonIcons(inPassMode);
