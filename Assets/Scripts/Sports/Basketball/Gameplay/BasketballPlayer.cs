@@ -110,10 +110,9 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void Awake()
         {
-            if (courtPosition == Vector2.zero)
-            {
-                courtPosition = new Vector2(transform.position.x, transform.position.y);
-            }
+            // Always initialize courtPosition from actual GameObject position
+            // This ensures no "jump" on scene start
+            courtPosition = new Vector2(transform.position.x, transform.position.y);
 
             // Initialize input actions
             controls = new BasketballControls();
