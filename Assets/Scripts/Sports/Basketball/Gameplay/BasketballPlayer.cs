@@ -1,10 +1,12 @@
 ﻿using UnityEngine;
+using UnityEngine.InputSystem;
 using Sportland.Sports.Basketball.Stats;
 
 namespace Sportland.Sports.Basketball.Gameplay
 {
     public class BasketballPlayer : MonoBehaviour
     {
+        private BasketballControls controls;
         [Header("Court Position")]
         public Vector2 courtPosition;
 
@@ -12,6 +14,14 @@ namespace Sportland.Sports.Basketball.Gameplay
         public SpriteRenderer playerSprite;
         public SpriteRenderer shadowSprite;
         public float spriteHeightOffset = 0.6f;
+
+        [Header("Pass Target UI")]
+        public SpriteRenderer buttonIconRenderer; // Renderer to show button icon above head
+        public Sprite triangleButtonSprite;
+        public Sprite circleButtonSprite;
+        public Sprite xButtonSprite;
+        public Sprite squareButtonSprite;
+        public float iconHeightOffset = 2.5f; // How high above player to show icon
 
         [Header("Movement")]
         public float moveSpeed = 5f;
@@ -49,6 +59,27 @@ namespace Sportland.Sports.Basketball.Gameplay
         [Header("Ball Position")]
         public float ballOverheadOffset = 1.8f;
 
+        [Header("Passing")]
+        public BasketballPlayer[] teammates; // All teammates on the court
+        public int selectedTeammateIndex = 0; // Currently selected teammate for cycling
+        public bool isActivePlayer = true;
+        public PassType currentPassType = PassType.Direct;
+        public PassLocation currentPassLocation = PassLocation.Chest;
+
+        [Header("Pass Type Settings")]
+        public float directPassSpeed = 7f;
+        public float bouncePassSpeed = 6f;
+        public float lobPassSpeed = 5f;
+        public float alleyOopPassSpeed = 6f;
+        public float chestPassHeight = 1.2f;
+        public float overheadPassHeight = 1.8f;
+        public float passPickupRadius = 0.5f;
+        public float passPickupHeight = 2.0f;
+        public float ballReleaseCooldown = 0.5f; // Time after releasing ball before you can catch again
+
+        private float lastBallReleaseTime = -999f;
+        private bool wasInPassModeLastFrame = false; // Track pass mode state changes
+
         [Header("Shot Accuracy")]
         public float apexWindow = 0.1f;
         public float risingPenalty = 0.1f;
@@ -79,10 +110,22 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void Awake()
         {
-            if (courtPosition == Vector2.zero)
-            {
-                courtPosition = new Vector2(transform.position.x, transform.position.y);
-            }
+            // Always initialize courtPosition from actual GameObject position
+            // This ensures no "jump" on scene start
+            courtPosition = new Vector2(transform.position.x, transform.position.y);
+
+            // Initialize input actions
+            controls = new BasketballControls();
+        }
+
+        private void OnEnable()
+        {
+            controls.Gameplay.Enable();
+        }
+
+        private void OnDisable()
+        {
+            controls.Gameplay.Disable();
         }
 
         private void Update()
@@ -97,66 +140,157 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void HandleInput()
         {
-            if (Input.GetKeyDown(KeyCode.R) && ball != null && !ball.isHeld)
+            // Ball reset available to all players
+            if (controls.Gameplay.ResetBall.WasPressedThisFrame() && ball != null && !ball.isHeld)
             {
                 ResetBall();
                 return;
             }
 
-            // Debug controls (number keys)
-            if (Input.GetKeyDown(KeyCode.Alpha1))
+            // Only active player can control movement and actions
+            if (!isActivePlayer)
+            {
+                moveInput = Vector2.zero;
+                return;
+            }
+
+            // Pass type controls - Triangle/Tab: Cycle pass type
+            if (controls.Gameplay.CyclePassType.WasPressedThisFrame())
+            {
+                currentPassType = (PassType)(((int)currentPassType + 1) % System.Enum.GetValues(typeof(PassType)).Length);
+                Debug.Log($"Pass Type: {currentPassType}");
+            }
+
+            // Pass location controls - Circle/Shift+Tab: Cycle pass location
+            if (controls.Gameplay.CyclePassLocation.WasPressedThisFrame())
+            {
+                currentPassLocation = (PassLocation)(((int)currentPassLocation + 1) % System.Enum.GetValues(typeof(PassLocation)).Length);
+                Debug.Log($"Pass Location: {currentPassLocation}");
+            }
+
+            // Debug controls (number keys) - keep using old Input for dev tools
+            if (Keyboard.current != null && Keyboard.current.digit1Key.wasPressedThisFrame)
             {
                 debugModeEnabled = !debugModeEnabled;
             }
 
-            if (debugModeEnabled)
+            if (debugModeEnabled && Keyboard.current != null)
             {
                 // Cycle shot type with Alpha2
-                if (Input.GetKeyDown(KeyCode.Alpha2))
+                if (Keyboard.current.digit2Key.wasPressedThisFrame)
                 {
                     forcedShotType = (ShotType)(((int)forcedShotType + 1) % System.Enum.GetValues(typeof(ShotType)).Length);
                 }
 
                 // Cycle outcome with Alpha3
-                if (Input.GetKeyDown(KeyCode.Alpha3))
+                if (Keyboard.current.digit3Key.wasPressedThisFrame)
                 {
                     forcedOutcome = (ShotResult)(((int)forcedOutcome + 1) % System.Enum.GetValues(typeof(ShotResult)).Length);
                 }
 
                 // Cycle shot target with Alpha4
-                if (Input.GetKeyDown(KeyCode.Alpha4))
+                if (Keyboard.current.digit4Key.wasPressedThisFrame)
                 {
                     forcedShotTarget = (ShotTarget)(((int)forcedShotTarget + 1) % System.Enum.GetValues(typeof(ShotTarget)).Length);
                 }
             }
 
-            moveInput.x = Input.GetAxisRaw("Horizontal");
-            moveInput.y = Input.GetAxisRaw("Vertical");
+            // Read movement input from new Input System
+            Vector2 moveValue = controls.Gameplay.Move.ReadValue<Vector2>();
+            moveInput = moveValue;
 
+            // Update button icon visibility based on pass mode
             if (ball != null && ball.isHeld)
             {
-                if (Input.GetKeyDown(KeyCode.Space) && !isJumping && !isDunking)
+                // Check if in pass mode (L2 trigger held)
+                bool inPassMode = false;
+                if (Gamepad.current != null)
                 {
-                    // Check if player should attempt dunk instead of regular jump
-                    if (CanAttemptDunk())
-                    {
-                        StartDunk();
-                    }
-                    else
-                    {
-                        StartJump();
-                    }
+                    float triggerValue = Gamepad.current.leftTrigger.ReadValue();
+                    inPassMode = triggerValue > 0.5f; // Trigger pressed more than halfway
                 }
 
-                if (Input.GetKeyUp(KeyCode.Space) && isJumping)
+                // Only update icons when pass mode state changes (not every frame)
+                if (inPassMode != wasInPassModeLastFrame)
                 {
-                    ReleaseShot();
+                    UpdateTeammateButtonIcons(inPassMode);
+                    wasInPassModeLastFrame = inPassMode;
                 }
 
-                if (isJumping && Input.GetKey(KeyCode.Space) && Input.GetKeyDown(KeyCode.F))
+                if (inPassMode)
                 {
-                    // TODO: Implement pass
-                    Debug.Log("Pass while jumping!");
+                    // Pass Mode: Face buttons select specific teammates
+                    if (Gamepad.current.buttonNorth.wasPressedThisFrame) // Triangle
+                    {
+                        PassToTeammateByIndex(0);
+                        return;
+                    }
+                    else if (Gamepad.current.buttonEast.wasPressedThisFrame) // Circle
+                    {
+                        PassToTeammateByIndex(1);
+                        return;
+                    }
+                    else if (Gamepad.current.buttonSouth.wasPressedThisFrame) // X
+                    {
+                        PassToTeammateByIndex(2);
+                        return;
+                    }
+                    else if (Gamepad.current.buttonWest.wasPressedThisFrame) // Square
+                    {
+                        PassToTeammateByIndex(3);
+                        return;
+                    }
+                }
+                else
+                {
+                    // Cycle through teammates with shoulder buttons (L1/R1)
+                    if (Gamepad.current != null)
+                    {
+                        if (Gamepad.current.leftShoulder.wasPressedThisFrame)
+                        {
+                            CyclePreviousTeammate();
+                        }
+                        else if (Gamepad.current.rightShoulder.wasPressedThisFrame)
+                        {
+                            CycleNextTeammate();
+                        }
+                    }
+
+                    // Pass to selected/closest teammate with Square button or P key
+                    if (controls.Gameplay.Pass.WasPressedThisFrame() && teammates != null && teammates.Length > 0)
+                    {
+                        PassToClosestTeammateInDirection();
+                        return;
+                    }
+
+                    // Jump/Shoot with X button or Space key
+                    if (controls.Gameplay.Jump.WasPressedThisFrame() && !isJumping && !isDunking)
+                    {
+                        // Check if player should attempt dunk instead of regular jump
+                        if (CanAttemptDunk())
+                        {
+                            StartDunk();
+                        }
+                        else
+                        {
+                            StartJump();
+                        }
+                    }
+
+                    // Release shot
+                    if (controls.Gameplay.Jump.WasReleasedThisFrame() && isJumping)
+                    {
+                        ReleaseShot();
+                    }
+                }
+            }
+            else
+            {
+                // Hide all icons when not holding ball (only if state changed)
+                if (wasInPassModeLastFrame)
+                {
+                    UpdateTeammateButtonIcons(false);
+                    wasInPassModeLastFrame = false;
                 }
             }
         }
@@ -371,6 +505,9 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             hoop.SetShotOutcome(outcome);
 
+            // Record release time to prevent catching own dunk
+            lastBallReleaseTime = Time.time;
+
             // Slam ball down through rim
             Vector2 startPos = courtPosition;
             float startHeight = jumpHeight + ballOverheadOffset;
@@ -388,6 +525,246 @@ namespace Sportland.Sports.Basketball.Gameplay
             //Debug.Log($"Shot released at height: {jumpHeight:F2}, Apex: {jumpApex:F2}, Passed apex: {passedApex}");
 
             ShootBall();
+        }
+
+        private void CycleNextTeammate()
+        {
+            if (teammates == null || teammates.Length == 0) return;
+
+            selectedTeammateIndex = (selectedTeammateIndex + 1) % teammates.Length;
+            Debug.Log($"Selected teammate: {teammates[selectedTeammateIndex].gameObject.name}");
+        }
+
+        private void CyclePreviousTeammate()
+        {
+            if (teammates == null || teammates.Length == 0) return;
+
+            selectedTeammateIndex--;
+            if (selectedTeammateIndex < 0)
+                selectedTeammateIndex = teammates.Length - 1;
+
+            Debug.Log($"Selected teammate: {teammates[selectedTeammateIndex].gameObject.name}");
+        }
+
+        private void PassToTeammateByIndex(int index)
+        {
+            if (teammates == null || index >= teammates.Length || teammates[index] == null)
+            {
+                Debug.LogWarning($"Cannot pass to teammate index {index}");
+                return;
+            }
+
+            Debug.Log($"Direct pass to {teammates[index].gameObject.name} (button {index})");
+            PassBall(teammates[index]);
+        }
+
+        private void PassToClosestTeammateInDirection()
+        {
+            if (teammates == null || teammates.Length == 0) return;
+
+            // Determine facing direction from movement input
+            Vector2 facingDir = moveInput.magnitude > 0.1f ? moveInput.normalized : Vector2.right;
+
+            BasketballPlayer closestTeammate = null;
+            float closestScore = float.MaxValue;
+
+            foreach (var teammate in teammates)
+            {
+                if (teammate == null || teammate == this) continue;
+
+                Vector2 toTeammate = teammate.courtPosition - courtPosition;
+                float distance = toTeammate.magnitude;
+
+                // Calculate dot product to see if teammate is in facing direction
+                float dot = Vector2.Dot(facingDir, toTeammate.normalized);
+
+                // Prioritize teammates in front (positive dot product)
+                // Score = distance / (1 + dot) -- lower score is better, forward teammates preferred
+                float score = dot > 0 ? distance / (1 + dot) : distance * 2; // Penalize backwards passes
+
+                if (score < closestScore)
+                {
+                    closestScore = score;
+                    closestTeammate = teammate;
+                }
+            }
+
+            if (closestTeammate != null)
+            {
+                Debug.Log($"Auto-passing to closest teammate: {closestTeammate.gameObject.name}");
+                PassBall(closestTeammate);
+            }
+        }
+
+        private void PassBall(BasketballPlayer targetTeammate)
+        {
+            if (ball == null || !ball.isHeld || targetTeammate == null) return;
+
+            CancelInvoke("ResetBall");  // Cancel any pending reset
+
+            PassContext passContext = CreatePassContext();
+
+            Debug.Log($"Pass: {passContext.type} ({passContext.location}) to {targetTeammate.gameObject.name} at {targetTeammate.courtPosition}");
+
+            Vector2 toTeammate = targetTeammate.courtPosition - courtPosition;
+            float distance = toTeammate.magnitude;
+
+            // Record release time to prevent catching own pass
+            lastBallReleaseTime = Time.time;
+
+            switch (passContext.type)
+            {
+                case PassType.Direct:
+                    ExecuteDirectPass(toTeammate, distance, passContext);
+                    break;
+                case PassType.Bounce:
+                    ExecuteBouncePass(toTeammate, distance, passContext);
+                    break;
+                case PassType.Lob:
+                    ExecuteLobPass(toTeammate, distance, passContext);
+                    break;
+                case PassType.AlleyOop:
+                    ExecuteAlleyOopPass(toTeammate, distance, passContext);
+                    break;
+            }
+        }
+
+        private PassContext CreatePassContext()
+        {
+            PassContext context = new PassContext
+            {
+                type = currentPassType,
+                location = currentPassLocation
+            };
+
+            // Set release height based on pass location
+            if (currentPassLocation == PassLocation.Chest)
+            {
+                context.releaseHeight = jumpHeight + chestPassHeight;
+            }
+            else // Overhead
+            {
+                context.releaseHeight = jumpHeight + overheadPassHeight;
+            }
+
+            // Set speed based on pass type
+            switch (currentPassType)
+            {
+                case PassType.Direct:
+                    context.speed = directPassSpeed;
+                    context.targetHeight = chestPassHeight;
+                    break;
+                case PassType.Bounce:
+                    context.speed = bouncePassSpeed;
+                    context.targetHeight = chestPassHeight;
+                    break;
+                case PassType.Lob:
+                    context.speed = lobPassSpeed;
+                    context.targetHeight = overheadPassHeight;
+                    break;
+                case PassType.AlleyOop:
+                    context.speed = alleyOopPassSpeed;
+                    context.targetHeight = 3.2f; // High catch point for dunk
+                    break;
+            }
+
+            return context;
+        }
+
+        private void ExecuteDirectPass(Vector2 toTeammate, float distance, PassContext context)
+        {
+            // Fast, nearly flat pass with minimal arc
+            float passTime = distance / context.speed;
+            Vector2 horizontalVelocity = toTeammate / passTime;
+
+            float gravity = Mathf.Abs(ball.gravity);
+
+            // For direct passes, we want minimal arc - just enough upward velocity to counteract gravity
+            // so the ball arrives at the same height it was released
+            // Using: final_height = initial_height + v0*t - 0.5*g*t^2
+            // For flat trajectory: v0 = 0.5*g*t (this keeps the ball at roughly constant height)
+            float verticalVelocity = 0.5f * gravity * passTime;
+
+            ball.Launch(courtPosition, context.releaseHeight, horizontalVelocity, verticalVelocity);
+        }
+
+        private void ExecuteBouncePass(Vector2 toTeammate, float distance, PassContext context)
+        {
+            // Pass bounces on the ground approximately 2/3 of the way to teammate
+            float bounceDistance = distance * 0.67f;
+            Vector2 bouncePosition = courtPosition + toTeammate.normalized * bounceDistance;
+
+            // First phase: Ball to bounce point
+            float passTime = distance / context.speed;
+            Vector2 horizontalVelocity = toTeammate / passTime;
+
+            // Calculate velocity to hit the ground at bounce point
+            // We want the ball to hit ground (height = 0) at the bounce position
+            float gravity = Mathf.Abs(ball.gravity);
+
+            // For a bounce pass, we aim to hit the ground with some downward velocity
+            // Time to reach bounce point
+            float timeToBounce = bounceDistance / context.speed;
+
+            // Solve for initial vertical velocity to reach height=0 at timeToBounce
+            // 0 = h0 + v0*t - 0.5*g*t^2
+            // v0 = (0.5*g*t^2 - h0) / t
+            float verticalVelocity = (0.5f * gravity * timeToBounce * timeToBounce - context.releaseHeight) / timeToBounce;
+
+            ball.Launch(courtPosition, context.releaseHeight, horizontalVelocity, verticalVelocity);
+        }
+
+        private void ExecuteLobPass(Vector2 toTeammate, float distance, PassContext context)
+        {
+            // High arcing pass that goes over defenders
+            // Lob has a high arc - peak is much higher than normal passes
+            float peakHeight = Mathf.Max(context.releaseHeight, context.targetHeight) + 3.0f; // 3 units above start/target
+
+            float gravity = Mathf.Abs(ball.gravity);
+
+            // Calculate actual flight time based on vertical motion
+            float upDistance = peakHeight - context.releaseHeight;
+            float downDistance = peakHeight - context.targetHeight;
+
+            float timeUp = Mathf.Sqrt(2f * upDistance / gravity);
+            float timeDown = Mathf.Sqrt(2f * downDistance / gravity);
+            float actualFlightTime = timeUp + timeDown;
+
+            // Calculate horizontal velocity based on actual flight time to reach teammate
+            Vector2 horizontalVelocity = toTeammate / actualFlightTime;
+
+            // Calculate vertical velocity to reach peak
+            float verticalVelocity = gravity * timeUp;
+
+            ball.Launch(courtPosition, context.releaseHeight, horizontalVelocity, verticalVelocity);
+        }
+
+        private void ExecuteAlleyOopPass(Vector2 toTeammate, float distance, PassContext context)
+        {
+            // High pass timed for teammate to catch in the air near the hoop
+            // Similar to lob but aims higher and expects teammate to jump
+            float passTime = distance / context.speed;
+            Vector2 horizontalVelocity = toTeammate / passTime;
+
+            // Alley-oop aims high for a jumping catch
+            float peakHeight = context.targetHeight + 1.5f; // High arc for dramatic catch
+
+            float gravity = Mathf.Abs(ball.gravity);
+
+            // Calculate to reach peak then descend to target height
+            float upDistance = peakHeight - context.releaseHeight;
+            float downDistance = peakHeight - context.targetHeight;
+
+            float timeUp = Mathf.Sqrt(2f * upDistance / gravity);
+            float timeDown = Mathf.Sqrt(2f * downDistance / gravity);
+
+            // Adjust horizontal velocity for actual flight time
+            float actualTime = timeUp + timeDown;
+            horizontalVelocity = toTeammate / actualTime;
+
+            float verticalVelocity = gravity * timeUp;
+
+            ball.Launch(courtPosition, context.releaseHeight, horizontalVelocity, verticalVelocity);
         }
 
         private ShotContext DetermineShotType()
@@ -490,13 +867,121 @@ namespace Sportland.Sports.Basketball.Gameplay
 
         private void HandleBallPickup()
         {
-            if (ball != null && !ball.isHeld && !isJumping)
+            if (ball != null && !ball.isHeld)
             {
-                float distanceToBall = Vector2.Distance(courtPosition, ball.courtPosition);
-                if (distanceToBall < 1.0f && ball.height < 0.5f)
+                // Prevent catching own pass or shot immediately after releasing
+                if (Time.time - lastBallReleaseTime < ballReleaseCooldown)
                 {
-                    ball.SetHolder(transform);
-                    //Debug.Log("Picked up ball!");
+                    return;
+                }
+
+                float distanceToBall = Vector2.Distance(courtPosition, ball.courtPosition);
+
+                // Check if ball is within horizontal pickup radius
+                if (distanceToBall < passPickupRadius)
+                {
+                    // Check if ball is moving toward the player (prevents catching balls passing by)
+                    Vector2 toBall = ball.courtPosition - courtPosition;
+                    Vector2 ballVelocity = ball.courtVelocity;
+
+                    // Only catch if ball is moving toward player (dot product < 0)
+                    // or if ball is nearly stationary (very slow)
+                    float dot = Vector2.Dot(toBall.normalized, ballVelocity.normalized);
+                    bool ballMovingTowardPlayer = dot < 0.3f || ballVelocity.magnitude < 1f;
+
+                    if (!ballMovingTowardPlayer)
+                    {
+                        return; // Ball is moving away or past the player
+                    }
+
+                    // Calculate the height difference between player and ball
+                    float playerCatchHeight = jumpHeight + chestPassHeight;
+                    float heightDifference = Mathf.Abs(ball.height - playerCatchHeight);
+
+                    // Can catch if ball is within catching height range (ground to overhead)
+                    bool canCatch = ball.height <= passPickupHeight;
+
+                    // For ground balls, require player to be on ground
+                    if (ball.height < 0.5f && isJumping)
+                    {
+                        canCatch = false;
+                    }
+
+                    // For passes at chest/overhead height, allow catching even when jumping
+                    if (ball.height >= 0.5f && heightDifference < 1.0f)
+                    {
+                        canCatch = true;
+                    }
+
+                    if (canCatch)
+                    {
+                        ball.SetHolder(transform);
+                        SwitchControlToThisPlayer();
+                        Debug.Log($"Player caught ball at height {ball.height:F2}! Control switched.");
+                    }
+                }
+            }
+        }
+
+        private void SwitchControlToThisPlayer()
+        {
+            // Make this player active
+            isActivePlayer = true;
+
+            // Deactivate all teammates
+            if (teammates != null)
+            {
+                foreach (var teammate in teammates)
+                {
+                    if (teammate != null && teammate != this)
+                    {
+                        teammate.isActivePlayer = false;
+                    }
+                }
+            }
+        }
+
+        private void UpdateTeammateButtonIcons(bool showIcons)
+        {
+            if (teammates == null) return;
+
+            // Show/hide button icons for each teammate
+            for (int i = 0; i < teammates.Length; i++)
+            {
+                if (teammates[i] == null || teammates[i].buttonIconRenderer == null) continue;
+
+                if (showIcons)
+                {
+                    // Show icon and set appropriate sprite
+                    teammates[i].buttonIconRenderer.enabled = true;
+
+                    // Assign sprite based on teammate index
+                    Sprite spriteToAssign = null;
+                    switch (i)
+                    {
+                        case 0: // Triangle
+                            spriteToAssign = triangleButtonSprite;
+                            break;
+                        case 1: // Circle
+                            spriteToAssign = circleButtonSprite;
+                            break;
+                        case 2: // X
+                            spriteToAssign = xButtonSprite;
+                            break;
+                        case 3: // Square
+                            spriteToAssign = squareButtonSprite;
+                            break;
+                    }
+
+                    if (spriteToAssign != null)
+                    {
+                        teammates[i].buttonIconRenderer.sprite = spriteToAssign;
+                    }
+                }
+                else
+                {
+                    // Hide icon
+                    teammates[i].buttonIconRenderer.enabled = false;
                 }
             }
         }
@@ -632,6 +1117,10 @@ namespace Sportland.Sports.Basketball.Gameplay
     }
 
     hoop.SetShotOutcome(outcome);
+
+    // Record release time to prevent catching own shot
+    lastBallReleaseTime = Time.time;
+
     LaunchBallToHoop(hoop.CourtPosition, hoop.RimHeight, outcome, shotContext);
 
     Invoke("ResetBall", 5f);
@@ -1071,37 +1560,38 @@ private float GetTargetHeightForShotType(ShotContext shotContext, float rimHeigh
         {
             if (ball == null) return;
 
-            //Debug.Log("Ball returned to player!");
+            // Only the active player should reset the ball to themselves
+            if (!isActivePlayer) return;
 
-            ball.SetHolder(transform);
-            ball.courtPosition = courtPosition;
-            ball.height = ballOverheadOffset;
-            ball.courtVelocity = Vector2.zero;
-            ball.verticalVelocity = 0f;
+            Debug.Log($"Ball reset to {gameObject.name}");
+
+            // Use immediate version to skip smooth catch animation
+            ball.SetHolderImmediate(transform);
 
             Invoke(nameof(ResetBall), 5f);
         }
 
         private void UpdateRendering()
         {
-            if (shadowSprite != null)
-            {
-                shadowSprite.transform.position = new Vector3(
-                    courtPosition.x,
-                    courtPosition.y,
-                    0
-                );
-            }
+            // Update parent GameObject position to match court position
+            transform.position = new Vector3(courtPosition.x, courtPosition.y, 0);
 
+            // Shadow stays at local origin (ground level) - no updates needed
+            // If shadowSprite is nested, it automatically stays at (0, 0, 0) local
+
+            // Update player sprite local position for jump height
             if (playerSprite != null)
             {
-                playerSprite.transform.position = new Vector3(
-                    courtPosition.x,
-                    courtPosition.y + spriteHeightOffset + jumpHeight,
-                    0
-                );
-
+                playerSprite.transform.localPosition = new Vector3(0, spriteHeightOffset + jumpHeight, 0);
                 playerSprite.sortingOrder = 1000 - (int)(courtPosition.y * 100);
+            }
+
+            // Update button icon local position above player's head
+            if (buttonIconRenderer != null)
+            {
+                buttonIconRenderer.transform.localPosition = new Vector3(0, iconHeightOffset + jumpHeight, 0);
+                // Keep icon above player in render order
+                buttonIconRenderer.sortingOrder = playerSprite != null ? playerSprite.sortingOrder + 1 : 1001;
             }
         }
     }

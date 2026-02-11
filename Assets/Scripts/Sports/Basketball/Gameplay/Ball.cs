@@ -22,6 +22,9 @@ namespace Sportland.Sports.Basketball.Gameplay
         [Header("State")]
         public bool isHeld = true;
         public Transform holder;
+        public float catchSmoothTime = 0.1f; // Time to smooth ball to holder position
+        public float heldBallHeight = 1.2f; // Height of ball when held (chest level)
+        private float catchTransitionTimer = 0f;
 
         private void Awake()
         {
@@ -37,8 +40,23 @@ namespace Sportland.Sports.Basketball.Gameplay
             {
                 if (holder.TryGetComponent<BasketballPlayer>(out var player))
                 {
-                    courtPosition = player.courtPosition;
-                    height = 1.0f;
+                    // Smooth transition when first caught
+                    if (catchTransitionTimer < catchSmoothTime)
+                    {
+                        catchTransitionTimer += Time.deltaTime;
+                        float t = catchTransitionTimer / catchSmoothTime;
+
+                        // Smoothly move ball to player position
+                        courtPosition = Vector2.Lerp(courtPosition, player.courtPosition, t);
+                        height = Mathf.Lerp(height, heldBallHeight, t);
+                    }
+                    else
+                    {
+                        // After smooth transition, snap to player position
+                        courtPosition = player.courtPosition;
+                        height = heldBallHeight;
+                    }
+
                     verticalVelocity = 0f;  // Reset velocity when held
                     courtVelocity = Vector2.zero;  // Reset court velocity too
                 }
@@ -117,7 +135,23 @@ namespace Sportland.Sports.Basketball.Gameplay
             holder = newHolder;
             courtVelocity = Vector2.zero;
             verticalVelocity = 0f;
-            height = 1.0f; // Reset height when caught
+            catchTransitionTimer = 0f; // Reset transition timer for smooth catch
+        }
+
+        public void SetHolderImmediate(Transform newHolder)
+        {
+            isHeld = true;
+            holder = newHolder;
+            courtVelocity = Vector2.zero;
+            verticalVelocity = 0f;
+            catchTransitionTimer = catchSmoothTime; // Skip smooth transition, snap immediately
+
+            // Immediately set position
+            if (newHolder.TryGetComponent<BasketballPlayer>(out var player))
+            {
+                courtPosition = player.courtPosition;
+                height = heldBallHeight;
+            }
         }
 
         public void CaptureAtHoop(Vector2 hoopCourtPosition, float rimHeight)
