@@ -15,6 +15,12 @@ namespace Sportland.Sports.Basketball.Gameplay
         public SpriteRenderer shadowSprite;
         public float spriteHeightOffset = 0.6f;
 
+        [Header("Ground Indicator")]
+        public SpriteRenderer groundIndicatorRenderer;
+        public Color activePlayerIndicatorColor = new Color(0.2f, 0.6f, 1f, 0.6f);
+        public Color passTargetIndicatorColor = new Color(1f, 0.8f, 0.2f, 0.5f);
+        public Color defaultIndicatorColor = new Color(1f, 1f, 1f, 0f);
+
         [Header("Pass Target UI")]
         public SpriteRenderer buttonIconRenderer; // Renderer to show button icon above head
         public Sprite triangleButtonSprite;
@@ -22,6 +28,13 @@ namespace Sportland.Sports.Basketball.Gameplay
         public Sprite xButtonSprite;
         public Sprite squareButtonSprite;
         public float iconHeightOffset = 2.5f; // How high above player to show icon
+
+        [Header("Status Buff Icons")]
+        public SpriteRenderer[] buffIconRenderers;
+        public Sprite[] activeBuffSprites;
+        public float buffIconHeightOffset = 2.5f;
+        public float buffIconSpacing = 0.4f;
+        public float buffIconStartX = -0.6f;
 
         [Header("Movement")]
         public float moveSpeed = 5f;
@@ -80,6 +93,13 @@ namespace Sportland.Sports.Basketball.Gameplay
         private float lastBallReleaseTime = -999f;
         private bool wasInPassModeLastFrame = false; // Track pass mode state changes
 
+        // Ground indicator state tracking
+        private bool wasActivePlayerLastFrame = false;
+        private BasketballPlayer lastPassTarget = null;
+
+        // Buff icon state tracking
+        private bool buffIconsVisible = true;
+
         [Header("Shot Accuracy")]
         public float apexWindow = 0.1f;
         public float risingPenalty = 0.1f;
@@ -117,6 +137,18 @@ namespace Sportland.Sports.Basketball.Gameplay
 
             // Initialize input actions
             controls = new BasketballControls();
+
+            // Initialize buff sprites array to match renderer slots
+            if ((activeBuffSprites == null || activeBuffSprites.Length == 0) && buffIconRenderers != null)
+            {
+                activeBuffSprites = new Sprite[buffIconRenderers.Length];
+            }
+
+            // Ground indicator starts hidden
+            if (groundIndicatorRenderer != null)
+            {
+                groundIndicatorRenderer.enabled = false;
+            }
         }
 
         private void OnEnable()
@@ -136,6 +168,7 @@ namespace Sportland.Sports.Basketball.Gameplay
             HandleJump();
             HandleBallPickup();
             UpdateBallPosition();
+            UpdateGroundIndicators();
             UpdateRendering();
         }
 
@@ -215,6 +248,7 @@ namespace Sportland.Sports.Basketball.Gameplay
                 if (inPassMode != wasInPassModeLastFrame)
                 {
                     UpdateTeammateButtonIcons(inPassMode);
+                    UpdateTeammateBuffIcons(!inPassMode);
                     wasInPassModeLastFrame = inPassMode;
                 }
 
@@ -291,6 +325,7 @@ namespace Sportland.Sports.Basketball.Gameplay
                 if (wasInPassModeLastFrame)
                 {
                     UpdateTeammateButtonIcons(false);
+                    UpdateTeammateBuffIcons(true);
                     wasInPassModeLastFrame = false;
                 }
             }
@@ -559,11 +594,10 @@ namespace Sportland.Sports.Basketball.Gameplay
             PassBall(teammates[index]);
         }
 
-        private void PassToClosestTeammateInDirection()
+        private BasketballPlayer GetClosestTeammateInFacingDirection()
         {
-            if (teammates == null || teammates.Length == 0) return;
+            if (teammates == null || teammates.Length == 0) return null;
 
-            // Determine facing direction from movement input
             Vector2 facingDir = moveInput.magnitude > 0.1f ? moveInput.normalized : Vector2.right;
 
             BasketballPlayer closestTeammate = null;
@@ -576,12 +610,8 @@ namespace Sportland.Sports.Basketball.Gameplay
                 Vector2 toTeammate = teammate.courtPosition - courtPosition;
                 float distance = toTeammate.magnitude;
 
-                // Calculate dot product to see if teammate is in facing direction
                 float dot = Vector2.Dot(facingDir, toTeammate.normalized);
-
-                // Prioritize teammates in front (positive dot product)
-                // Score = distance / (1 + dot) -- lower score is better, forward teammates preferred
-                float score = dot > 0 ? distance / (1 + dot) : distance * 2; // Penalize backwards passes
+                float score = dot > 0 ? distance / (1 + dot) : distance * 2;
 
                 if (score < closestScore)
                 {
@@ -590,6 +620,12 @@ namespace Sportland.Sports.Basketball.Gameplay
                 }
             }
 
+            return closestTeammate;
+        }
+
+        private void PassToClosestTeammateInDirection()
+        {
+            BasketballPlayer closestTeammate = GetClosestTeammateInFacingDirection();
             if (closestTeammate != null)
             {
                 Debug.Log($"Auto-passing to closest teammate: {closestTeammate.gameObject.name}");
@@ -984,6 +1020,144 @@ namespace Sportland.Sports.Basketball.Gameplay
                     // Hide icon
                     teammates[i].buttonIconRenderer.enabled = false;
                 }
+            }
+        }
+
+        private void UpdateGroundIndicators()
+        {
+            if (!isActivePlayer)
+            {
+                // If this player was active last frame, clear their indicator
+                if (wasActivePlayerLastFrame)
+                {
+                    SetGroundIndicatorColor(defaultIndicatorColor);
+                    wasActivePlayerLastFrame = false;
+
+                    // Clear the old pass target indicator
+                    if (lastPassTarget != null)
+                    {
+                        lastPassTarget.SetGroundIndicatorColor(defaultIndicatorColor);
+                        lastPassTarget = null;
+                    }
+                }
+                return;
+            }
+
+            // Active player: show own indicator
+            if (!wasActivePlayerLastFrame)
+            {
+                SetGroundIndicatorColor(activePlayerIndicatorColor);
+                wasActivePlayerLastFrame = true;
+            }
+
+            // Active player: highlight closest facing teammate
+            BasketballPlayer currentTarget = GetClosestTeammateInFacingDirection();
+
+            if (currentTarget != lastPassTarget)
+            {
+                // Clear old target
+                if (lastPassTarget != null)
+                {
+                    lastPassTarget.SetGroundIndicatorColor(defaultIndicatorColor);
+                }
+
+                // Set new target
+                if (currentTarget != null)
+                {
+                    currentTarget.SetGroundIndicatorColor(passTargetIndicatorColor);
+                }
+
+                lastPassTarget = currentTarget;
+            }
+        }
+
+        private void SetGroundIndicatorColor(Color color)
+        {
+            if (groundIndicatorRenderer == null) return;
+
+            bool shouldBeVisible = color.a > 0.01f;
+
+            if (groundIndicatorRenderer.enabled != shouldBeVisible)
+            {
+                groundIndicatorRenderer.enabled = shouldBeVisible;
+            }
+
+            if (shouldBeVisible)
+            {
+                groundIndicatorRenderer.color = color;
+            }
+        }
+
+        private void UpdateTeammateBuffIcons(bool showBuffs)
+        {
+            if (teammates == null) return;
+
+            foreach (var teammate in teammates)
+            {
+                if (teammate == null) continue;
+                teammate.SetBuffIconsVisible(showBuffs);
+            }
+
+            // Also update own buff icons
+            SetBuffIconsVisible(showBuffs);
+        }
+
+        private void SetBuffIconsVisible(bool visible)
+        {
+            if (buffIconRenderers == null) return;
+
+            if (visible == buffIconsVisible) return;
+            buffIconsVisible = visible;
+
+            for (int i = 0; i < buffIconRenderers.Length; i++)
+            {
+                if (buffIconRenderers[i] == null) continue;
+
+                bool hasBuffInSlot = activeBuffSprites != null
+                    && i < activeBuffSprites.Length
+                    && activeBuffSprites[i] != null;
+
+                buffIconRenderers[i].enabled = visible && hasBuffInSlot;
+
+                if (visible && hasBuffInSlot)
+                {
+                    buffIconRenderers[i].sprite = activeBuffSprites[i];
+                }
+            }
+        }
+
+        public void SetBuff(int slot, Sprite buffSprite)
+        {
+            if (activeBuffSprites == null || slot < 0 || slot >= activeBuffSprites.Length) return;
+
+            activeBuffSprites[slot] = buffSprite;
+
+            if (buffIconsVisible && buffIconRenderers != null && slot < buffIconRenderers.Length && buffIconRenderers[slot] != null)
+            {
+                buffIconRenderers[slot].sprite = buffSprite;
+                buffIconRenderers[slot].enabled = true;
+            }
+        }
+
+        public void ClearBuff(int slot)
+        {
+            if (activeBuffSprites == null || slot < 0 || slot >= activeBuffSprites.Length) return;
+
+            activeBuffSprites[slot] = null;
+
+            if (buffIconRenderers != null && slot < buffIconRenderers.Length && buffIconRenderers[slot] != null)
+            {
+                buffIconRenderers[slot].enabled = false;
+            }
+        }
+
+        public void ClearAllBuffs()
+        {
+            if (activeBuffSprites == null) return;
+
+            for (int i = 0; i < activeBuffSprites.Length; i++)
+            {
+                ClearBuff(i);
             }
         }
 
@@ -1587,12 +1761,39 @@ private float GetTargetHeightForShotType(ShotContext shotContext, float rimHeigh
                 playerSprite.sortingOrder = 1000 - (int)(courtPosition.y * 100);
             }
 
+            // Ground indicator stays at ground level - only update sorting order
+            if (groundIndicatorRenderer != null)
+            {
+                groundIndicatorRenderer.sortingOrder = playerSprite != null
+                    ? playerSprite.sortingOrder - 1
+                    : 999 - (int)(courtPosition.y * 100);
+            }
+
             // Update button icon local position above player's head
             if (buttonIconRenderer != null)
             {
                 buttonIconRenderer.transform.localPosition = new Vector3(0, iconHeightOffset + jumpHeight, 0);
                 // Keep icon above player in render order
                 buttonIconRenderer.sortingOrder = playerSprite != null ? playerSprite.sortingOrder + 1 : 1001;
+            }
+
+            // Update buff icon positions (follow jump height, horizontal row)
+            if (buffIconRenderers != null)
+            {
+                for (int i = 0; i < buffIconRenderers.Length; i++)
+                {
+                    if (buffIconRenderers[i] == null) continue;
+
+                    float xPos = buffIconStartX + (i * buffIconSpacing);
+                    buffIconRenderers[i].transform.localPosition = new Vector3(
+                        xPos,
+                        buffIconHeightOffset + jumpHeight,
+                        0
+                    );
+                    buffIconRenderers[i].sortingOrder = playerSprite != null
+                        ? playerSprite.sortingOrder + 2 + i
+                        : 1002 + i;
+                }
             }
         }
     }
