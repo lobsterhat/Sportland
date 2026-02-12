@@ -726,12 +726,20 @@ MonoBehaviour:
   shadowSprite: {fileID: 738238574}
   spriteHeightOffset: 0.6
   groundIndicatorRenderer: {fileID: 5000000033}
+  activePlayerIndicatorColor: {r: 0.2, g: 0.6, b: 1, a: 0.6}
+  passTargetIndicatorColor: {r: 1, g: 0.8, b: 0.2, a: 0.5}
+  defaultIndicatorColor: {r: 1, g: 1, b: 1, a: 0}
   buttonIconRenderer: {fileID: 743957804}
   triangleButtonSprite: {fileID: 0}
   circleButtonSprite: {fileID: -3195364068956382204, guid: 739bdf72d55857644a0cc47a238646e0, type: 3}
   xButtonSprite: {fileID: -58826231526489077, guid: 07fda8c0f2bc6604b88a5f3b191751ed, type: 3}
   squareButtonSprite: {fileID: 564401462232615530, guid: cfa1aad214d26fd4fa82e521a8387cf0, type: 3}
   iconHeightOffset: 2
+  buffIconRenderers: []
+  activeBuffSprites: []
+  buffIconHeightOffset: 2.5
+  buffIconSpacing: 0.4
+  buffIconStartX: -0.6
   moveSpeed: 5
   ball: {fileID: 1716409013}
   targetHoop: {fileID: 543158432}
@@ -1635,12 +1643,20 @@ MonoBehaviour:
   shadowSprite: {fileID: 1773924400}
   spriteHeightOffset: 0.6
   groundIndicatorRenderer: {fileID: 5000000043}
+  activePlayerIndicatorColor: {r: 0.2, g: 0.6, b: 1, a: 0.6}
+  passTargetIndicatorColor: {r: 1, g: 0.8, b: 0.2, a: 0.5}
+  defaultIndicatorColor: {r: 1, g: 1, b: 1, a: 0}
   buttonIconRenderer: {fileID: 690173560}
   triangleButtonSprite: {fileID: -8258800930731073538, guid: 151e4ebfca34637439bca917587407eb, type: 3}
   circleButtonSprite: {fileID: -3195364068956382204, guid: 739bdf72d55857644a0cc47a238646e0, type: 3}
   xButtonSprite: {fileID: -58826231526489077, guid: 07fda8c0f2bc6604b88a5f3b191751ed, type: 3}
   squareButtonSprite: {fileID: 564401462232615530, guid: cfa1aad214d26fd4fa82e521a8387cf0, type: 3}
   iconHeightOffset: 2
+  buffIconRenderers: []
+  activeBuffSprites: []
+  buffIconHeightOffset: 2.5
+  buffIconSpacing: 0.4
+  buffIconStartX: -0.6
   moveSpeed: 5
   ball: {fileID: 1716409013}
   targetHoop: {fileID: 543158432}
@@ -2127,12 +2143,20 @@ MonoBehaviour:
   shadowSprite: {fileID: 90269373}
   spriteHeightOffset: 0.6
   groundIndicatorRenderer: {fileID: 5000000003}
+  activePlayerIndicatorColor: {r: 0.2, g: 0.6, b: 1, a: 0.6}
+  passTargetIndicatorColor: {r: 1, g: 0.8, b: 0.2, a: 0.5}
+  defaultIndicatorColor: {r: 1, g: 1, b: 1, a: 0}
   buttonIconRenderer: {fileID: 1080634552}
   triangleButtonSprite: {fileID: -8258800930731073538, guid: 151e4ebfca34637439bca917587407eb, type: 3}
   circleButtonSprite: {fileID: -3195364068956382204, guid: 739bdf72d55857644a0cc47a238646e0, type: 3}
   xButtonSprite: {fileID: -58826231526489077, guid: 07fda8c0f2bc6604b88a5f3b191751ed, type: 3}
   squareButtonSprite: {fileID: 564401462232615530, guid: cfa1aad214d26fd4fa82e521a8387cf0, type: 3}
   iconHeightOffset: 2
+  buffIconRenderers: []
+  activeBuffSprites: []
+  buffIconHeightOffset: 2.5
+  buffIconSpacing: 0.4
+  buffIconStartX: -0.6
   moveSpeed: 5
   ball: {fileID: 1716409013}
   targetHoop: {fileID: 543158432}
@@ -2237,12 +2261,20 @@ MonoBehaviour:
   shadowSprite: {fileID: 352394772}
   spriteHeightOffset: 0.6
   groundIndicatorRenderer: {fileID: 5000000023}
+  activePlayerIndicatorColor: {r: 0.2, g: 0.6, b: 1, a: 0.6}
+  passTargetIndicatorColor: {r: 1, g: 0.8, b: 0.2, a: 0.5}
+  defaultIndicatorColor: {r: 1, g: 1, b: 1, a: 0}
   buttonIconRenderer: {fileID: 1137065667}
   triangleButtonSprite: {fileID: -8258800930731073538, guid: 151e4ebfca34637439bca917587407eb, type: 3}
   circleButtonSprite: {fileID: -3195364068956382204, guid: 739bdf72d55857644a0cc47a238646e0, type: 3}
   xButtonSprite: {fileID: -58826231526489077, guid: 07fda8c0f2bc6604b88a5f3b191751ed, type: 3}
   squareButtonSprite: {fileID: 564401462232615530, guid: cfa1aad214d26fd4fa82e521a8387cf0, type: 3}
   iconHeightOffset: 2
+  buffIconRenderers: []
+  activeBuffSprites: []
+  buffIconHeightOffset: 2.5
+  buffIconSpacing: 0.4
+  buffIconStartX: -0.6
   moveSpeed: 5
   ball: {fileID: 1716409013}
   targetHoop: {fileID: 543158432}
@@ -2347,12 +2379,20 @@ MonoBehaviour:
   shadowSprite: {fileID: 937526188}
   spriteHeightOffset: 0.6
   groundIndicatorRenderer: {fileID: 5000000013}
+  activePlayerIndicatorColor: {r: 0.2, g: 0.6, b: 1, a: 0.6}
+  passTargetIndicatorColor: {r: 1, g: 0.8, b: 0.2, a: 0.5}
+  defaultIndicatorColor: {r: 1, g: 1, b: 1, a: 0}
   buttonIconRenderer: {fileID: 97046257}
   triangleButtonSprite: {fileID: -8258800930731073538, guid: 151e4ebfca34637439bca917587407eb, type: 3}
   circleButtonSprite: {fileID: -3195364068956382204, guid: 739bdf72d55857644a0cc47a238646e0, type: 3}
   xButtonSprite: {fileID: -58826231526489077, guid: 07fda8c0f2bc6604b88a5f3b191751ed, type: 3}
   squareButtonSprite: {fileID: 564401462232615530, guid: cfa1aad214d26fd4fa82e521a8387cf0, type: 3}
   iconHeightOffset: 2
+  buffIconRenderers: []
+  activeBuffSprites: []
+  buffIconHeightOffset: 2.5
+  buffIconSpacing: 0.4
+  buffIconStartX: -0.6
   moveSpeed: 5
   ball: {fileID: 1716409013}
   targetHoop: {fileID: 543158432}
@@ -3392,7 +3432,7 @@ Transform:
   serializedVersion: 2
   m_LocalRotation: {x: -0, y: -0, z: -0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 0.6, y: 0.35, z: 1}
+  m_LocalScale: {x: 1.5, y: 0.5, z: 1}
   m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 1187651158}
