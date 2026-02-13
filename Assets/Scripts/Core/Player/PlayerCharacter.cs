@@ -49,8 +49,9 @@ namespace Sportland.Core.Player
     [System.Serializable]
     public class PlayerSkills
     {
-        // Universal athletic stats (same as Athlete)
-        [Range(0, 100)] public float speed = 50f;
+        // Universal athletic stats
+        [Range(0, 12)] public float topSpeed = 6f;
+        [Range(0, 12)] public float acceleration = 6f;
         [Range(0, 100)] public float strength = 50f;
         [Range(0, 100)] public float agility = 50f;
         [Range(0, 100)] public float reactionTime = 50f;

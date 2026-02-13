@@ -740,7 +740,12 @@ MonoBehaviour:
   buffIconHeightOffset: 2.5
   buffIconSpacing: 0.4
   buffIconStartX: -0.6
-  moveSpeed: 5
+  baseSkills:
+    topSpeed: 6
+    acceleration: 6
+    strength: 50
+    agility: 50
+    reactionTime: 50
   ball: {fileID: 1716409013}
   targetHoop: {fileID: 543158432}
   baseJumpHeight: 0.6
@@ -1657,7 +1662,12 @@ MonoBehaviour:
   buffIconHeightOffset: 2.5
   buffIconSpacing: 0.4
   buffIconStartX: -0.6
-  moveSpeed: 5
+  baseSkills:
+    topSpeed: 6
+    acceleration: 6
+    strength: 50
+    agility: 50
+    reactionTime: 50
   ball: {fileID: 1716409013}
   targetHoop: {fileID: 543158432}
   baseJumpHeight: 0.6
@@ -2157,7 +2167,12 @@ MonoBehaviour:
   buffIconHeightOffset: 2.5
   buffIconSpacing: 0.4
   buffIconStartX: -0.6
-  moveSpeed: 5
+  baseSkills:
+    topSpeed: 6
+    acceleration: 6
+    strength: 50
+    agility: 50
+    reactionTime: 50
   ball: {fileID: 1716409013}
   targetHoop: {fileID: 543158432}
   baseJumpHeight: 0.6
@@ -2275,7 +2290,12 @@ MonoBehaviour:
   buffIconHeightOffset: 2.5
   buffIconSpacing: 0.4
   buffIconStartX: -0.6
-  moveSpeed: 5
+  baseSkills:
+    topSpeed: 6
+    acceleration: 6
+    strength: 50
+    agility: 50
+    reactionTime: 50
   ball: {fileID: 1716409013}
   targetHoop: {fileID: 543158432}
   baseJumpHeight: 0.6
@@ -2393,7 +2413,12 @@ MonoBehaviour:
   buffIconHeightOffset: 2.5
   buffIconSpacing: 0.4
   buffIconStartX: -0.6
-  moveSpeed: 5
+  baseSkills:
+    topSpeed: 6
+    acceleration: 6
+    strength: 50
+    agility: 50
+    reactionTime: 50
   ball: {fileID: 1716409013}
   targetHoop: {fileID: 543158432}
   baseJumpHeight: 0.6
