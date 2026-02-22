@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using UnityEngine.InputSystem;
+using Sportland.Core.Player;
 using Sportland.Sports.Basketball.Stats;
 
 namespace Sportland.Sports.Basketball.Gameplay
@@ -37,7 +38,8 @@ namespace Sportland.Sports.Basketball.Gameplay
         public float buffIconStartX = -0.6f;
 
         [Header("Movement")]
-        public float moveSpeed = 5f;
+        public PlayerSkills baseSkills;
+        private Vector2 currentVelocity;
 
         [Header("Shooting")]
         public Ball ball;
@@ -357,7 +359,24 @@ namespace Sportland.Sports.Basketball.Gameplay
             }
             else
             {
-                courtPosition += moveSpeed * Time.deltaTime * moveInput.normalized;
+                // Acceleration-based ground movement
+                float topSpeed = baseSkills != null ? baseSkills.topSpeed : 6f;
+                float accel = baseSkills != null ? baseSkills.acceleration : 6f;
+
+                if (moveInput.magnitude > 0.1f)
+                {
+                    // Accelerate toward target velocity
+                    Vector2 targetVelocity = moveInput.normalized * topSpeed;
+                    currentVelocity = Vector2.MoveTowards(currentVelocity, targetVelocity, accel * Time.deltaTime);
+                }
+                else
+                {
+                    // Decelerate to stop (faster than acceleration for responsive feel)
+                    float deceleration = accel * 3f;
+                    currentVelocity = Vector2.MoveTowards(currentVelocity, Vector2.zero, deceleration * Time.deltaTime);
+                }
+
+                courtPosition += currentVelocity * Time.deltaTime;
             }
         }
 
@@ -431,6 +450,7 @@ namespace Sportland.Sports.Basketball.Gameplay
                 isHangingOnRim = false;
                 passedApex = false;
                 jumpApex = 0f;
+                currentVelocity = jumpMomentum; // Carry momentum back to ground movement
                 jumpMomentum = Vector2.zero;
                 isStationaryJump = false;
                 driftVelocity = Vector2.zero;
@@ -464,7 +484,7 @@ namespace Sportland.Sports.Basketball.Gameplay
             else
             {
                 isStationaryJump = false;
-                jumpMomentum = moveInput.normalized * moveSpeed;
+                jumpMomentum = currentVelocity;
                 //Debug.Log("Moving jump - momentum carried");
             }
         }
