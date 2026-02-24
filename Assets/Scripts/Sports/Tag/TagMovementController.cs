@@ -157,6 +157,8 @@ namespace Sportland.Sports.Tag
         /// </summary>
         public TagMovementController TryTag()
         {
+            Debug.Log($"[TAG] TryTag called. Role={CurrentRole}, Position={transform.position}, Hits={Physics2D.OverlapCircleAll(transform.position, tagReachRadius, taggableLayer).Length}");
+
             if (CurrentRole != TagRole.It) return null;
 
             Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, tagReachRadius, taggableLayer);

@@ -23,8 +23,8 @@ namespace Sportland.InputHandling
 
         [Header("=== CHASE BEHAVIOR ===")]
         private float sprintChaseDistance = 8f;
-        private float lungeAttemptDistance = 2.5f;
-        private float tagAttemptDistance = 1.5f;
+        private float lungeAttemptDistance = 1.8f;
+        private float tagAttemptDistance = 1.3f;
         private float sprintStaminaThreshold = 0.3f;
         private float sprintRecoveryThreshold = 0.6f;
 
@@ -195,19 +195,13 @@ namespace Sportland.InputHandling
             float distance = toTarget.magnitude;
             Vector2 direction = toTarget.normalized;
 
-            // Try tag if very close
-            if (distance <= tagAttemptDistance)
+            // Walk-up tag only — no lunging for now
+            if (movement.CanAct() && distance <= tagAttemptDistance)
             {
                 tagRequest = true;
             }
 
-            // Try lunge if in range
-            if (distance <= lungeAttemptDistance && distance > tagAttemptDistance)
-            {
-                specialRequest = true;
-            }
-
-            // Steering
+            // Always steer toward target
             currentDesiredDirection = ApplyWallAvoidance(direction);
             currentDesiredDirection = ApplyJitter(currentDesiredDirection);
 
