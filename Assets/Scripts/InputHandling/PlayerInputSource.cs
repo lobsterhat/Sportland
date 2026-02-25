@@ -3,19 +3,21 @@
 namespace Sportland.InputHandling
 {
     /// <summary>
-    /// Human player input source. Reads keyboard/controller input and
-    /// exposes it through IInputSource for the InputBroker.
+    /// Human player input source using Unity's new Input System.
+    /// Supports DualShock 4 (PS4) controller and keyboard simultaneously.
     /// 
     /// Controls:
-    ///   WASD / Arrow Keys — Move
-    ///   Left Shift       — Sprint (hold)
-    ///   Space            — Jump
-    ///   E                — Dive
-    ///   Q                — Special (Lunge if It / Evasion Burst if Runner)
-    ///   F                — Tag attempt (walk-up)
+    ///   Left Stick / WASD    — Move (analog stick gives variable speed)
+    ///   L2 / Left Shift      — Sprint (hold)
+    ///   X / Space            — Jump
+    ///   Circle / E           — Dive
+    ///   R1 / Q               — Special (Lunge if It / Evasion Burst if Runner)
+    ///   R2 / F               — Tag attempt (walk-up)
     /// </summary>
     public class PlayerInputSource : IInputSource
     {
+        private TagInputActions controls;
+
         private Vector2 moveInput;
         private bool sprinting;
         private bool jumpRequest;
@@ -25,12 +27,15 @@ namespace Sportland.InputHandling
 
         public void OnActivate(GameObject character)
         {
-            // Could cache references, show "you're controlling this player" UI, etc.
+            controls = new TagInputActions();
+            controls.Enable();
         }
 
         public void OnDeactivate()
         {
-            // Clear all input so the character doesn't keep moving
+            controls?.Disable();
+            controls = null;
+
             moveInput = Vector2.zero;
             sprinting = false;
             jumpRequest = false;
@@ -41,34 +46,54 @@ namespace Sportland.InputHandling
 
         public void UpdateInput()
         {
-            // Movement
-            float horizontal = 0f;
-            float vertical = 0f;
+            if (controls == null) return;
 
-            if (Input.GetKey(KeyCode.W) || Input.GetKey(KeyCode.UpArrow)) vertical += 1f;
-            if (Input.GetKey(KeyCode.S) || Input.GetKey(KeyCode.DownArrow)) vertical -= 1f;
-            if (Input.GetKey(KeyCode.D) || Input.GetKey(KeyCode.RightArrow)) horizontal += 1f;
-            if (Input.GetKey(KeyCode.A) || Input.GetKey(KeyCode.LeftArrow)) horizontal -= 1f;
-
-            moveInput = new Vector2(horizontal, vertical);
+            // Movement — analog stick gives 0-1 range automatically
+            moveInput = controls.Move.ReadValue<Vector2>();
             if (moveInput.sqrMagnitude > 1f)
                 moveInput.Normalize();
 
             // Sprint
-            sprinting = Input.GetKey(KeyCode.LeftShift);
+            sprinting = controls.Sprint.IsPressed();
 
-            // Actions (GetKeyDown — single frame)
-            jumpRequest = Input.GetKeyDown(KeyCode.Space);
-            diveRequest = Input.GetKeyDown(KeyCode.E);
-            specialRequest = Input.GetKeyDown(KeyCode.Q);
-            tagRequest = Input.GetKeyDown(KeyCode.F);
+            // Buffer single-frame actions — once set to true, they stay true
+            // until consumed by the getter. This prevents missed inputs
+            // when Update timing doesn't perfectly align.
+            if (controls.Jump.WasPressedThisFrame()) jumpRequest = true;
+            if (controls.Dive.WasPressedThisFrame()) diveRequest = true;
+            if (controls.Special.WasPressedThisFrame()) specialRequest = true;
+            if (controls.Tag.WasPressedThisFrame()) tagRequest = true;
         }
 
         public Vector2 GetMoveInput() => moveInput;
         public bool IsSprinting() => sprinting;
-        public bool JumpRequested() => jumpRequest;
-        public bool DiveRequested() => diveRequest;
-        public bool SpecialRequested() => specialRequest;
-        public bool TagRequested() => tagRequest;
+
+        public bool JumpRequested()
+        {
+            bool val = jumpRequest;
+            jumpRequest = false;
+            return val;
+        }
+
+        public bool DiveRequested()
+        {
+            bool val = diveRequest;
+            diveRequest = false;
+            return val;
+        }
+
+        public bool SpecialRequested()
+        {
+            bool val = specialRequest;
+            specialRequest = false;
+            return val;
+        }
+
+        public bool TagRequested()
+        {
+            bool val = tagRequest;
+            tagRequest = false;
+            return val;
+        }
     }
 }

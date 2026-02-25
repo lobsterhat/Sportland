@@ -116,7 +116,7 @@ namespace Sportland.Sports.Tag
             if (IsEliminated) return;
 
             UpdateImmunity();
-            UpdateFuse();
+            //UpdateFuse();
             UpdateLunge();
             UpdateEvasion();
         }

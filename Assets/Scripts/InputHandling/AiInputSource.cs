@@ -229,8 +229,19 @@ namespace Sportland.InputHandling
             {
                 // Flee with swerve
                 Vector2 fleeDir = fromThreat.normalized;
+
+                // Blend flee direction with center bias to avoid corners
+                Vector2 toCenter = (arenaCenter - (Vector2)characterTransform.position);
+                float distFromCenter = toCenter.magnitude;
+                if (distFromCenter > 4f)
+                {
+                    float centerPull = Mathf.Clamp01((distFromCenter - 4f) / 4f) * 0.5f;
+                    fleeDir = (fleeDir + toCenter.normalized * centerPull).normalized;
+                }
+
+                // Add swerve for unpredictability
                 Vector2 perpendicular = Vector2.Perpendicular(fleeDir);
-                float swerve = Mathf.Sin(Time.time * 2f) * 0.3f;
+                float swerve = Mathf.Sin(Time.time * 2f + characterTransform.GetInstanceID()) * 0.3f;
                 fleeDir = (fleeDir + perpendicular * swerve).normalized;
 
                 currentDesiredDirection = ApplyWallAvoidance(fleeDir);
@@ -364,6 +375,9 @@ namespace Sportland.InputHandling
         //  WANDER
         // ──────────────────────────────────────────────
 
+        private Vector2 arenaCenter = Vector2.zero;
+        private float centerBiasStrength = 0.4f;
+
         private void Wander()
         {
             float id = character != null ? character.GetInstanceID() * 0.1f : 0f;
@@ -371,6 +385,16 @@ namespace Sportland.InputHandling
             Vector2 wanderDir = new Vector2(
                 Mathf.Cos(wanderAngle * Mathf.Deg2Rad),
                 Mathf.Sin(wanderAngle * Mathf.Deg2Rad));
+
+            // Bias toward arena center to avoid drifting into corners
+            Vector2 toCenter = (arenaCenter - (Vector2)characterTransform.position);
+            float distFromCenter = toCenter.magnitude;
+            if (distFromCenter > 3f)
+            {
+                // Stronger pull the further from center
+                float pull = Mathf.Clamp01((distFromCenter - 3f) / 5f) * centerBiasStrength;
+                wanderDir = (wanderDir + toCenter.normalized * pull).normalized;
+            }
 
             currentDesiredDirection = ApplyWallAvoidance(wanderDir);
             sprinting = false;

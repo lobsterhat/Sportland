@@ -144,9 +144,9 @@ namespace Sportland.Movement
         /// </summary>
         public virtual bool TryJump()
         {
-            if (!CanAct()) return false;
-            if (!isGrounded) return false;
-            if (CurrentStamina < profile.jumpStaminaCost) return false;
+            if (!CanAct()) { Debug.Log($"[JUMP FAIL] Can't act. State={CurrentState}"); return false; }
+            if (!isGrounded) { Debug.Log("[JUMP FAIL] Not grounded"); return false; }
+            if (CurrentStamina < profile.jumpStaminaCost) { Debug.Log("[JUMP FAIL] No stamina"); return false; }
 
             ConsumeStamina(profile.jumpStaminaCost);
             PerformJump();

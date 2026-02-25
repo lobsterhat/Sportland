@@ -15,6 +15,7 @@ GameObject:
   - component: {fileID: 6474833190151048059}
   - component: {fileID: 4586161649094637328}
   - component: {fileID: 2938256329729460704}
+  - component: {fileID: 401573880187116780}
   m_Layer: 7
   m_Name: Player
   m_TagString: Untagged
@@ -157,7 +158,7 @@ MonoBehaviour:
   taggableLayer:
     serializedVersion: 2
     m_Bits: 128
-  tagImmunityDuration: 1.5
+  tagImmunityDuration: 3
   lungeDistance: 1.5
   lungeDuration: 0.2
   lungeRecoveryTime: 0.4
@@ -198,13 +199,34 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: c01f7ada9c3755b4090a8cd51fcb6420, type: 3}
   m_Name: 
   m_EditorClassIdentifier: 
-  defaultInput: 0
+  defaultInput: 1
   playerLayer:
     serializedVersion: 2
     m_Bits: 128
   wallLayer:
     serializedVersion: 2
     m_Bits: 1
+--- !u!114 &401573880187116780
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2909074609304120785}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 1b70b6804733ef94b91ec9c1fb15afdc, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  heightOffset: 1.8
+  barWidth: 1.2
+  barHeight: 0.12
+  fullColor: {r: 0.2, g: 0.9, b: 0.2, a: 0.9}
+  midColor: {r: 0.9, g: 0.9, b: 0.2, a: 0.9}
+  lowColor: {r: 0.9, g: 0.2, b: 0.2, a: 0.9}
+  backgroundColor: {r: 0.15, g: 0.15, b: 0.15, a: 0.7}
+  hideWhenFullDelay: 2
+  sortingOrder: 100
 --- !u!1 &7426292663391570516
 GameObject:
   m_ObjectHideFlags: 0
