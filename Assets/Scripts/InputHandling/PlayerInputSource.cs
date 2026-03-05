@@ -8,6 +8,7 @@ namespace Sportland.InputHandling
     /// 
     /// Controls:
     ///   Left Stick / WASD    — Move (analog stick gives variable speed)
+    ///   L1 / Tab             — Shuffle / Defensive Stance (hold)
     ///   L2 / Left Shift      — Sprint (hold)
     ///   X / Space            — Jump
     ///   Circle / E           — Dive
@@ -20,6 +21,7 @@ namespace Sportland.InputHandling
 
         private Vector2 moveInput;
         private bool sprinting;
+        private bool shuffling;
         private bool jumpRequest;
         private bool diveRequest;
         private bool specialRequest;
@@ -38,6 +40,7 @@ namespace Sportland.InputHandling
 
             moveInput = Vector2.zero;
             sprinting = false;
+            shuffling = false;
             jumpRequest = false;
             diveRequest = false;
             specialRequest = false;
@@ -53,8 +56,9 @@ namespace Sportland.InputHandling
             if (moveInput.sqrMagnitude > 1f)
                 moveInput.Normalize();
 
-            // Sprint
-            sprinting = controls.Sprint.IsPressed();
+            // Sprint and Shuffle — shuffle takes priority over sprint
+            shuffling = controls.Shuffle.IsPressed();
+            sprinting = !shuffling && controls.Sprint.IsPressed();
 
             // Buffer single-frame actions — once set to true, they stay true
             // until consumed by the getter. This prevents missed inputs
@@ -67,6 +71,7 @@ namespace Sportland.InputHandling
 
         public Vector2 GetMoveInput() => moveInput;
         public bool IsSprinting() => sprinting;
+        public bool IsShuffling() => shuffling;
 
         public bool JumpRequested()
         {

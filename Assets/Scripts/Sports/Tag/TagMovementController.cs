@@ -1,5 +1,8 @@
 using Sportland.Movement;
 using UnityEngine;
+using static Sportland.Movement.BaseMovementController;
+using static UnityEngine.RuleTile.TilingRuleOutput;
+
 
 namespace Sportland.Sports.Tag
 {
@@ -64,6 +67,11 @@ namespace Sportland.Sports.Tag
                  "Only drains while It. Eliminated at zero.")]
         [SerializeField] private float totalFuseTime = 15f;
 
+        [Header("=== TAG: TAG-BACK COOLDOWN ===")]
+
+        [Tooltip("Duration after being tagged before you can tag back the player who tagged you (seconds).")]
+        [SerializeField] private float tagBackCooldown = 3f;
+
         // ──────────────────────────────────────────────
         //  TAG STATE
         // ──────────────────────────────────────────────
@@ -72,8 +80,13 @@ namespace Sportland.Sports.Tag
 
         public TagRole CurrentRole { get; private set; } = TagRole.Runner;
         public float FuseTimeRemaining { get; private set; }
-        public bool IsImmune { get; private set; }
+        public bool IsImmune { get; set; }
         public bool IsEliminated { get; private set; }
+        public bool InSafeZone { get; set; }
+
+        // Tag-back tracking
+        private TagMovementController taggedByPlayer;  // who tagged me last
+        private float tagBackTimer;                     // time remaining before I can tag them back
 
         // Internal timers
         private float immunityTimer;
@@ -116,6 +129,7 @@ namespace Sportland.Sports.Tag
             if (IsEliminated) return;
 
             UpdateImmunity();
+            UpdateTagBackCooldown();
             //UpdateFuse();
             UpdateLunge();
             UpdateEvasion();
@@ -157,8 +171,6 @@ namespace Sportland.Sports.Tag
         /// </summary>
         public TagMovementController TryTag()
         {
-            Debug.Log($"[TAG] TryTag called. Role={CurrentRole}, Position={transform.position}, Hits={Physics2D.OverlapCircleAll(transform.position, tagReachRadius, taggableLayer).Length}");
-
             if (CurrentRole != TagRole.It) return null;
 
             Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, tagReachRadius, taggableLayer);
@@ -173,8 +185,12 @@ namespace Sportland.Sports.Tag
                 var target = hit.GetComponent<TagMovementController>();
                 if (target == null) continue;
                 if (target.IsImmune) continue;
+                if (target.InSafeZone) continue;
                 if (target.IsEliminated) continue;
                 if (target.CurrentRole == TagRole.It) continue;
+
+                // Tag-back cooldown: can't tag the player who just tagged me
+                if (target == taggedByPlayer && tagBackTimer > 0f) continue;
 
                 float dist = Vector2.Distance(transform.position, target.transform.position);
                 if (dist < closestDist)
@@ -200,7 +216,9 @@ namespace Sportland.Sports.Tag
             // This player becomes a runner
             BecomeRunner();
 
-            // Target becomes It
+            // Target becomes It — record who tagged them for tag-back cooldown
+            target.taggedByPlayer = this;
+            target.tagBackTimer = target.tagBackCooldown;
             target.BecomeIt();
         }
 
@@ -333,10 +351,33 @@ namespace Sportland.Sports.Tag
         {
             if (!IsImmune) return;
 
-            immunityTimer -= Time.deltaTime;
-            if (immunityTimer <= 0f)
+            // Only count down if there's an active timer (from tag transfer).
+            // External immunity (safe zones) manages IsImmune directly
+            // and doesn't use the timer.
+            if (immunityTimer > 0f)
             {
-                IsImmune = false;
+                immunityTimer -= Time.deltaTime;
+                if (immunityTimer <= 0f)
+                {
+                    immunityTimer = 0f;
+                    IsImmune = false;
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        //  TAG-BACK COOLDOWN
+        // ──────────────────────────────────────────────
+
+        private void UpdateTagBackCooldown()
+        {
+            if (tagBackTimer <= 0f) return;
+
+            tagBackTimer -= Time.deltaTime;
+            if (tagBackTimer <= 0f)
+            {
+                tagBackTimer = 0f;
+                taggedByPlayer = null;
             }
         }
 
@@ -372,6 +413,32 @@ namespace Sportland.Sports.Tag
         {
             if (IsEliminated) return false;
             return base.CanAct();
+        }
+
+        /// <summary>
+        /// Reset all Tag-specific state in addition to base movement state.
+        /// </summary>
+        public override void ResetMovementState()
+        {
+            base.ResetMovementState();
+
+            // Reset Tag state
+            IsEliminated = false;
+            IsImmune = false;
+            InSafeZone = false;
+            FuseTimeRemaining = totalFuseTime;
+
+            // Reset tag-back
+            taggedByPlayer = null;
+            tagBackTimer = 0f;
+
+            // Reset timers
+            immunityTimer = 0f;
+            lungeTimer = 0f;
+            evasionTimer = 0f;
+            evasionCooldownTimer = 0f;
+            isLunging = false;
+            isEvading = false;
         }
 
         // ──────────────────────────────────────────────

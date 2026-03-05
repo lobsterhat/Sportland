@@ -32,24 +32,30 @@ namespace Sportland.Movement
         [Header("=== AGILITY ===")]
 
         [Tooltip("Rotational speed when changing direction (degrees/sec). " +
-                 "Higher = snappier cuts.")]
+                 "Higher = snappier cuts. Used for gentle turns below the hard cut threshold.")]
         [Range(180f, 720f)]
         public float turnSpeed = 360f;
 
-        [Tooltip("Fraction of current speed retained after a hard cut (90°+). " +
-                 "0.3 = lose 70% speed on a hard cut. 1.0 = no penalty.")]
-        [Range(0.1f, 1f)]
-        public float cutSpeedRetention = 0.4f;
-
         [Tooltip("Angle threshold (degrees) that qualifies as a 'hard cut' " +
-                 "and triggers speed penalty.")]
+                 "and triggers the plant-and-go mechanic.")]
         [Range(45f, 135f)]
         public float hardCutAngleThreshold = 75f;
 
-        [Tooltip("How quickly the athlete recovers speed after a hard cut (units/sec²). " +
-                 "Can differ from base acceleration to represent agility vs straight-line speed.")]
+        [Tooltip("Duration of the 'plant' phase when executing a hard cut (seconds). " +
+                 "Character stops, plants foot, then explodes in new direction. " +
+                 "Low agility = longer plant. High agility = quick plant.")]
+        [Range(0.05f, 0.4f)]
+        public float cutPlantDuration = 0.15f;
+
+        [Tooltip("How quickly the athlete accelerates after planting (units/sec²). " +
+                 "This is the 'explosion' out of a cut. High agility athletes " +
+                 "have faster cut recovery than their base acceleration.")]
         [Range(5f, 30f)]
         public float cutRecoveryAcceleration = 12f;
+
+        [Tooltip("Flat stamina cost for executing a hard cut")]
+        [Range(1f, 10f)]
+        public float cutStaminaCost = 3f;
 
         [Header("=== VERTICAL ===")]
 
@@ -102,10 +108,6 @@ namespace Sportland.Movement
         [Range(5f, 25f)]
         public float diveStaminaCost = 12f;
 
-        [Tooltip("Flat stamina cost for executing a hard cut")]
-        [Range(1f, 10f)]
-        public float cutStaminaCost = 3f;
-
         [Tooltip("Stamina recovered per second while jogging or idle")]
         [Range(3f, 15f)]
         public float staminaRegenRate = 8f;
@@ -138,5 +140,73 @@ namespace Sportland.Movement
         [Tooltip("Additional dive recovery time at zero stamina (added seconds)")]
         [Range(0f, 1.5f)]
         public float fatigueDiveRecoveryPenalty = 0.5f;
+
+        [Header("=== SHUFFLE / DEFENSIVE STANCE ===")]
+
+        [Tooltip("Movement speed while shuffling (fraction of topSpeed). " +
+                 "Slower than jogging but offers better reactive advantages.")]
+        [Range(0.2f, 0.5f)]
+        public float shuffleSpeedRatio = 0.35f;
+
+        [Tooltip("Acceleration while in shuffle stance (units/sec²). " +
+                 "Should be high — you're already in a balanced, ready position.")]
+        [Range(10f, 40f)]
+        public float shuffleAcceleration = 25f;
+
+        [Tooltip("Speed bonus when bursting out of shuffle into a sprint (multiplier). " +
+                 "Rewards patient defensive play with an explosive exit. " +
+                 "1.0 = no bonus, 1.3 = 30% faster initial burst.")]
+        [Range(1f, 1.5f)]
+        public float shuffleBurstMultiplier = 1.25f;
+
+        [Tooltip("Duration of the burst speed bonus when exiting shuffle (seconds).")]
+        [Range(0.1f, 0.5f)]
+        public float shuffleBurstDuration = 0.25f;
+
+        [Tooltip("Stamina drain per second while shuffling. " +
+                 "Should be between jog and sprint — you're exerting but not sprinting.")]
+        [Range(0f, 8f)]
+        public float shuffleStaminaDrain = 3f;
+
+        [Tooltip("Cut speed retention while in shuffle stance. " +
+                 "Much higher than normal — you're already balanced. " +
+                 "1.0 = no speed loss on direction changes while shuffling.")]
+        [Range(0.7f, 1f)]
+        public float shuffleCutRetention = 0.95f;
+
+        [Tooltip("Awareness multiplier while in shuffle stance (for AI and gameplay systems). " +
+                 "Higher = harder to fool with feints, faster reaction to opponent movement.")]
+        [Range(1f, 2f)]
+        public float shuffleAwarenessMultiplier = 1.5f;
+
+        [Header("=== FEINT / LEAN ===")]
+
+        [Tooltip("How far the sprite shifts during a lean (world units). " +
+                 "This is visual only — the collider stays planted.")]
+        [Range(0.05f, 0.5f)]
+        public float leanDistance = 0.2f;
+
+        [Tooltip("How quickly the lean reaches full extension (units/sec). " +
+                 "Fast = snappy, convincing fakes. Slow = telegraphed.")]
+        [Range(1f, 8f)]
+        public float leanSpeed = 5f;
+
+        [Tooltip("How quickly the lean returns to center when stick is released (units/sec).")]
+        [Range(2f, 10f)]
+        public float leanReturnSpeed = 6f;
+
+        [Tooltip("Stamina cost per feint lean. Small but adds up if spamming.")]
+        [Range(0f, 3f)]
+        public float leanStaminaCost = 1f;
+
+        [Tooltip("Minimum time between lean direction changes to prevent jittery spam (seconds).")]
+        [Range(0.05f, 0.3f)]
+        public float leanCooldown = 0.1f;
+
+        [Tooltip("How convincing this athlete's fakes are (0-1). " +
+                 "Affects how quickly AI reacts to the lean as if it were real movement. " +
+                 "Higher = more deceptive, AI bites faster.")]
+        [Range(0f, 1f)]
+        public float deceptionRating = 0.5f;
     }
 }

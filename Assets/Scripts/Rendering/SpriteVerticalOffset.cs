@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace Sportland.Movement
+namespace Sportland.Rendering
 {
     /// <summary>
     /// Manages the visual separation between the ground-plane collider (parent)

@@ -1,4 +1,5 @@
 ﻿using UnityEngine;
+using Sportland.Movement;
 using Sportland.Sports.Tag;
 
 namespace Sportland.InputHandling
@@ -33,6 +34,15 @@ namespace Sportland.InputHandling
         private float evasionTriggerDistance = 2.5f;
         private float panicDistance = 3f;
 
+        [Header("=== STANDOFF BEHAVIOR ===")]
+        private float standoffEvalDistance = 3.5f;   // max distance to consider entering standoff
+        private float standoffMinStamina = 0.25f;    // enter standoff if stamina below this
+        private float standoffWallThreshold = 3;     // number of blocked escape routes to trigger standoff
+        private float standoffMaintainDistance = 2.5f;// ideal gap to hold during standoff
+        private float standoffLeanInterval = 0.4f;   // time between AI lean feints
+        private float standoffBurstChance = 0.3f;    // chance per evaluation to commit to a burst
+        private float standoffEscapeCheckInterval = 0.5f; // how often to re-evaluate escape routes
+
         [Header("=== WALL AVOIDANCE ===")]
         private float wallDetectDistance = 2f;
         private float wallAvoidanceStrength = 0.6f;
@@ -53,9 +63,17 @@ namespace Sportland.InputHandling
         private float decisionTimer;
         private bool isRecoveringStamina;
 
+        // Standoff state
+        private bool isInStandoff;
+        private float standoffLeanTimer;
+        private int currentLeanSide;       // -1 = left, 0 = center, 1 = right
+        private float standoffEscapeTimer;
+        private bool standoffBurstCommitted;
+
         // Current frame outputs
         private Vector2 currentDesiredDirection;
         private bool sprinting;
+        private bool shuffling;
         private bool jumpRequest;
         private bool diveRequest;
         private bool specialRequest;
@@ -156,6 +174,7 @@ namespace Sportland.InputHandling
 
         public Vector2 GetMoveInput() => currentDesiredDirection;
         public bool IsSprinting() => sprinting;
+        public bool IsShuffling() => shuffling;
         public bool JumpRequested() => jumpRequest;
         public bool DiveRequested() => diveRequest;
         public bool SpecialRequested() => specialRequest;
@@ -201,12 +220,78 @@ namespace Sportland.InputHandling
                 tagRequest = true;
             }
 
-            // Always steer toward target
-            currentDesiredDirection = ApplyWallAvoidance(direction);
+            // Check if target is in standoff — stalk instead of rush
+            var targetMovement = chaseTarget.GetComponent<TagMovementController>();
+            bool targetIsShuffling = targetMovement != null
+                && targetMovement.CurrentState == BaseMovementController.MovementState.Shuffling;
+
+            if (targetIsShuffling && distance < standoffEvalDistance)
+            {
+                DecideAsStalk(distance, direction, targetMovement);
+                return;
+            }
+
+            // Normal chase — steer toward target, avoid active safe zones
+            Vector2 steerDir = ApplyZoneAvoidance(direction);
+            currentDesiredDirection = ApplyWallAvoidance(steerDir);
             currentDesiredDirection = ApplyJitter(currentDesiredDirection);
 
             // Sprint management
             UpdateSprintDecision(distance, sprintChaseDistance);
+        }
+
+        // ──────────────────────────────────────────────
+        //  STALK AI (chaser in standoff)
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Cautious approach when the target is in standoff/shuffle stance.
+        /// The chaser slows down, tries to read the target's leans,
+        /// and waits for a real commitment before lunging in.
+        /// </summary>
+        private void DecideAsStalk(float distance, Vector2 dirToTarget,
+            TagMovementController targetMovement)
+        {
+            // Read the target's apparent movement (leans look like real movement)
+            Vector2 apparentDir = targetMovement.GetApparentMovementDirection();
+            float targetDeception = targetMovement.Profile != null
+                ? targetMovement.Profile.deceptionRating : 0.5f;
+            float myAwareness = movement.GetAwarenessMultiplier();
+
+            // How likely we are to bite on a fake (0 = never fooled, 1 = always fooled)
+            float fooledChance = targetDeception * (1f / myAwareness);
+
+            // Slow approach — don't sprint at a player in stance
+            sprinting = false;
+
+            if (distance > standoffMaintainDistance * 1.2f)
+            {
+                // Close the gap slowly
+                currentDesiredDirection = ApplyWallAvoidance(dirToTarget);
+            }
+            else
+            {
+                // In range — mirror the target's apparent movement
+                // The lower our awareness, the more we react to fakes
+                if (apparentDir.sqrMagnitude > 0.1f && Random.value < fooledChance)
+                {
+                    // Bite on the fake — shift toward where the lean suggests they're going
+                    Vector2 predictedDir = (dirToTarget + apparentDir * 0.5f).normalized;
+                    currentDesiredDirection = ApplyWallAvoidance(predictedDir);
+                }
+                else
+                {
+                    // Hold position, slight drift toward target
+                    currentDesiredDirection = dirToTarget * 0.3f;
+                }
+            }
+
+            // If the target drops shuffle (burst out), immediately sprint to chase
+            if (!targetMovement.IsLeaning && targetMovement.CurrentState != BaseMovementController.MovementState.Shuffling)
+            {
+                sprinting = true;
+                currentDesiredDirection = ApplyWallAvoidance(dirToTarget);
+            }
         }
 
         // ──────────────────────────────────────────────
@@ -217,6 +302,7 @@ namespace Sportland.InputHandling
         {
             if (threatSource == null)
             {
+                ExitStandoff();
                 Wander();
                 sprinting = false;
                 return;
@@ -227,10 +313,53 @@ namespace Sportland.InputHandling
 
             if (distance < fleeDistance)
             {
-                // Flee with swerve
+                // Check if we're in a safe zone — position away from threat within zone
+                if (movement.InSafeZone)
+                {
+                    ExitStandoff();
+                    Vector2 awayFromThreat = fromThreat.normalized;
+                    currentDesiredDirection = awayFromThreat * 0.3f;
+                    sprinting = false;
+                    return;
+                }
+
+                // Check if a safe zone is available and nearby
+                SafeZone nearestZone = FindAvailableSafeZone();
+                if (nearestZone != null && distance < panicDistance)
+                {
+                    Vector2 toZone = ((Vector2)nearestZone.transform.position - (Vector2)characterTransform.position);
+                    float zoneDistance = toZone.magnitude;
+
+                    if (zoneDistance < 8f)
+                    {
+                        ExitStandoff();
+                        currentDesiredDirection = ApplyWallAvoidance(toZone.normalized);
+                        sprinting = true;
+                        isRecoveringStamina = false;
+
+                        if (distance < evasionTriggerDistance)
+                        {
+                            specialRequest = true;
+                        }
+                        return;
+                    }
+                }
+
+                // Evaluate: should we enter standoff or keep running?
+                if (!isInStandoff && ShouldEnterStandoff(distance, fromThreat))
+                {
+                    EnterStandoff();
+                }
+
+                if (isInStandoff)
+                {
+                    DecideAsStandoff(distance, fromThreat);
+                    return;
+                }
+
+                // Normal flee with swerve
                 Vector2 fleeDir = fromThreat.normalized;
 
-                // Blend flee direction with center bias to avoid corners
                 Vector2 toCenter = (arenaCenter - (Vector2)characterTransform.position);
                 float distFromCenter = toCenter.magnitude;
                 if (distFromCenter > 4f)
@@ -239,7 +368,6 @@ namespace Sportland.InputHandling
                     fleeDir = (fleeDir + toCenter.normalized * centerPull).normalized;
                 }
 
-                // Add swerve for unpredictability
                 Vector2 perpendicular = Vector2.Perpendicular(fleeDir);
                 float swerve = Mathf.Sin(Time.time * 2f + characterTransform.GetInstanceID()) * 0.3f;
                 fleeDir = (fleeDir + perpendicular * swerve).normalized;
@@ -247,13 +375,11 @@ namespace Sportland.InputHandling
                 currentDesiredDirection = ApplyWallAvoidance(fleeDir);
                 currentDesiredDirection = ApplyJitter(currentDesiredDirection);
 
-                // Evasion burst when threatened
                 if (distance < evasionTriggerDistance)
                 {
                     specialRequest = true;
                 }
 
-                // Panic sprint
                 if (distance < panicDistance)
                 {
                     sprinting = true;
@@ -266,10 +392,222 @@ namespace Sportland.InputHandling
             }
             else
             {
+                ExitStandoff();
                 Wander();
                 sprinting = false;
                 isRecoveringStamina = true;
             }
+        }
+
+        // ──────────────────────────────────────────────
+        //  STANDOFF EVALUATION
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Evaluate whether to enter standoff mode.
+        /// Triggers when: cornered (walls blocking escape), low stamina,
+        /// or threat is too close to outrun.
+        /// </summary>
+        private bool ShouldEnterStandoff(float threatDistance, Vector2 fromThreat)
+        {
+            // Only consider standoff when threat is close
+            if (threatDistance > standoffEvalDistance) return false;
+
+            // Low stamina — can't outrun, better to stand and fake
+            float normalizedStamina = movement.GetNormalizedStamina();
+            if (normalizedStamina < standoffMinStamina)
+                return true;
+
+            // Cornered — count blocked escape routes
+            int blockedRoutes = CountBlockedEscapeRoutes(fromThreat);
+            if (blockedRoutes >= standoffWallThreshold)
+                return true;
+
+            return false;
+        }
+
+        /// <summary>
+        /// Cast rays in escape directions to check how many are blocked by walls.
+        /// </summary>
+        private int CountBlockedEscapeRoutes(Vector2 fromThreat)
+        {
+            int blocked = 0;
+            int rayCount = 6;
+            Vector2 fleeDir = fromThreat.normalized;
+
+            // Cast rays in a fan from the flee direction
+            for (int i = 0; i < rayCount; i++)
+            {
+                float angle = -90f + (180f / (rayCount - 1)) * i; // -90 to +90 relative to flee
+                Vector2 rayDir = (Quaternion.Euler(0, 0, angle) * fleeDir).normalized;
+
+                RaycastHit2D hit = Physics2D.Raycast(
+                    characterTransform.position, rayDir, 3f, wallLayer);
+
+                if (hit.collider != null)
+                {
+                    blocked++;
+                }
+            }
+
+            return blocked;
+        }
+
+        // ──────────────────────────────────────────────
+        //  STANDOFF BEHAVIOR
+        // ──────────────────────────────────────────────
+
+        private void EnterStandoff()
+        {
+            isInStandoff = true;
+            standoffLeanTimer = 0f;
+            standoffEscapeTimer = 0f;
+            standoffBurstCommitted = false;
+            currentLeanSide = 0;
+            shuffling = true; // enter defensive stance
+        }
+
+        private void ExitStandoff()
+        {
+            if (!isInStandoff) return;
+            isInStandoff = false;
+            standoffBurstCommitted = false;
+            currentLeanSide = 0;
+            shuffling = false;
+        }
+
+        /// <summary>
+        /// Standoff behavior: face the threat, maintain distance,
+        /// lean side to side to fake, then burst when the moment is right.
+        /// </summary>
+        private void DecideAsStandoff(float threatDistance, Vector2 fromThreat)
+        {
+            shuffling = true;
+            sprinting = false;
+
+            // Periodically re-evaluate if we can escape
+            standoffEscapeTimer -= Time.deltaTime;
+            if (standoffEscapeTimer <= 0f)
+            {
+                standoffEscapeTimer = standoffEscapeCheckInterval;
+
+                // If we've recovered stamina or escape routes opened, break out
+                float normalizedStamina = movement.GetNormalizedStamina();
+                int blockedRoutes = CountBlockedEscapeRoutes(fromThreat);
+
+                if (normalizedStamina > standoffMinStamina + 0.2f && blockedRoutes < standoffWallThreshold)
+                {
+                    // Found an opening — burst out!
+                    standoffBurstCommitted = true;
+                }
+            }
+
+            // BURST — commit to an escape direction
+            if (standoffBurstCommitted)
+            {
+                ExitStandoff();
+                sprinting = true;
+
+                // Burst in the best available direction
+                Vector2 bestEscape = FindBestEscapeDirection(fromThreat);
+                currentDesiredDirection = bestEscape;
+                return;
+            }
+
+            // MAINTAIN DISTANCE — drift backward if too close, forward if too far
+            Vector2 toThreat = -fromThreat.normalized;
+            if (threatDistance < standoffMaintainDistance * 0.7f)
+            {
+                // Too close — back up
+                currentDesiredDirection = fromThreat.normalized * 0.5f;
+            }
+            else if (threatDistance > standoffMaintainDistance * 1.3f)
+            {
+                // Too far — close the gap slightly (confident stance)
+                currentDesiredDirection = toThreat * 0.2f;
+            }
+            else
+            {
+                // Good distance — lean side to side
+                currentDesiredDirection = Vector2.zero;
+            }
+
+            // LEAN FEINTS — side to side to bait the chaser
+            standoffLeanTimer -= Time.deltaTime;
+            if (standoffLeanTimer <= 0f)
+            {
+                // Pick a new lean direction
+                float id = character != null ? character.GetInstanceID() : 0f;
+                float randomVal = Mathf.PerlinNoise(Time.time * 3f, id * 0.1f);
+
+                if (randomVal < 0.35f)
+                    currentLeanSide = -1; // lean left
+                else if (randomVal > 0.65f)
+                    currentLeanSide = 1;  // lean right
+                else
+                    currentLeanSide = 0;  // center (pause between fakes)
+
+                standoffLeanTimer = standoffLeanInterval
+                    + Random.Range(-0.1f, 0.15f); // slight timing variation
+
+                // Random chance to commit to a burst
+                if (Random.value < standoffBurstChance && threatDistance < standoffMaintainDistance)
+                {
+                    standoffBurstCommitted = true;
+                }
+            }
+
+            // Apply lean as lateral input relative to facing
+            if (currentLeanSide != 0 && !standoffBurstCommitted)
+            {
+                Vector2 lateral = Vector2.Perpendicular(fromThreat.normalized) * currentLeanSide;
+                currentDesiredDirection = (currentDesiredDirection + lateral * 0.7f);
+                if (currentDesiredDirection.sqrMagnitude > 0.01f)
+                    currentDesiredDirection = currentDesiredDirection.normalized;
+            }
+        }
+
+        /// <summary>
+        /// Find the best escape direction by raycasting and picking
+        /// the most open direction away from the threat.
+        /// </summary>
+        private Vector2 FindBestEscapeDirection(Vector2 fromThreat)
+        {
+            Vector2 bestDir = fromThreat.normalized;
+            float bestScore = 0f;
+            int rayCount = 8;
+
+            for (int i = 0; i < rayCount; i++)
+            {
+                float angle = (360f / rayCount) * i;
+                Vector2 rayDir = (Quaternion.Euler(0, 0, angle) * Vector2.right).normalized;
+
+                // Score based on: open space AND away from threat
+                float awayFromThreat = Vector2.Dot(rayDir, fromThreat.normalized);
+                float openSpace = 1f;
+
+                RaycastHit2D hit = Physics2D.Raycast(
+                    characterTransform.position, rayDir, 5f, wallLayer);
+
+                if (hit.collider != null)
+                {
+                    openSpace = hit.distance / 5f;
+                }
+
+                // Bias toward center
+                Vector2 toCenter = (arenaCenter - (Vector2)characterTransform.position).normalized;
+                float centerBias = Vector2.Dot(rayDir, toCenter) * 0.3f;
+
+                float score = (awayFromThreat * 0.5f) + (openSpace * 0.3f) + centerBias;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    bestDir = rayDir;
+                }
+            }
+
+            return bestDir;
         }
 
         // ──────────────────────────────────────────────
@@ -372,6 +710,47 @@ namespace Sportland.InputHandling
         }
 
         // ──────────────────────────────────────────────
+        //  SAFE ZONE AVOIDANCE (when It)
+        // ──────────────────────────────────────────────
+
+        private float zoneAvoidanceRadius = 4f;
+        private float zoneAvoidanceStrength = 0.8f;
+
+        /// <summary>
+        /// When It, steer around active safe zones to avoid pausing their timers.
+        /// Only avoids zones that are currently protecting runners.
+        /// </summary>
+        private Vector2 ApplyZoneAvoidance(Vector2 desiredDir)
+        {
+            if (movement.CurrentRole != TagMovementController.TagRole.It)
+                return desiredDir;
+
+            var zones = Object.FindObjectsByType<SafeZone>(FindObjectsSortMode.None);
+            Vector2 avoidance = Vector2.zero;
+
+            foreach (var zone in zones)
+            {
+                // Only avoid active zones with runners inside
+                if (!zone.IsActive || zone.RunnerCount == 0) continue;
+
+                Vector2 toZone = (Vector2)zone.transform.position - (Vector2)characterTransform.position;
+                float distance = toZone.magnitude;
+
+                if (distance < zoneAvoidanceRadius)
+                {
+                    // Push away from zone, stronger when closer
+                    float proximity = 1f - (distance / zoneAvoidanceRadius);
+                    avoidance -= toZone.normalized * proximity;
+                }
+            }
+
+            if (avoidance.sqrMagnitude > 0.01f)
+                return (desiredDir + avoidance.normalized * zoneAvoidanceStrength).normalized;
+
+            return desiredDir;
+        }
+
+        // ──────────────────────────────────────────────
         //  WANDER
         // ──────────────────────────────────────────────
 
@@ -418,10 +797,36 @@ namespace Sportland.InputHandling
         {
             currentDesiredDirection = Vector2.zero;
             sprinting = false;
+            shuffling = false;
             jumpRequest = false;
             diveRequest = false;
             specialRequest = false;
             tagRequest = false;
+        }
+
+        /// <summary>
+        /// Find the nearest safe zone that this player can use (not on cooldown).
+        /// Returns null if no zones are available.
+        /// </summary>
+        private SafeZone FindAvailableSafeZone()
+        {
+            var zones = Object.FindObjectsByType<SafeZone>(FindObjectsSortMode.None);
+            SafeZone nearest = null;
+            float nearestDist = float.MaxValue;
+
+            foreach (var zone in zones)
+            {
+                if (!zone.IsAvailableForPlayer(movement)) continue;
+
+                float dist = Vector2.Distance(characterTransform.position, zone.transform.position);
+                if (dist < nearestDist)
+                {
+                    nearestDist = dist;
+                    nearest = zone;
+                }
+            }
+
+            return nearest;
         }
     }
 }

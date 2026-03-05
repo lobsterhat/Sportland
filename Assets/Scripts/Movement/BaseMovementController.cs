@@ -1,4 +1,5 @@
 using UnityEngine;
+using Sportland.Rendering;
 
 namespace Sportland.Movement
 {
@@ -36,6 +37,7 @@ namespace Sportland.Movement
             Idle,
             Jogging,
             Sprinting,
+            Shuffling,    // defensive stance, locked facing, lateral movement
             Cutting,      // mid-direction-change, speed penalty active
             Airborne,     // jumping
             Diving,       // committed dive, no cancellation
@@ -57,6 +59,19 @@ namespace Sportland.Movement
         protected Vector2 facingDirection = Vector2.right;
         protected float currentSpeed;        // current scalar speed
         protected bool isSprinting;
+
+        // Shuffle / Defensive Stance
+        protected bool isShuffling;
+        protected Vector2 shuffleFacingLock;  // direction locked when entering shuffle
+        protected float shuffleBurstTimer;    // time remaining on burst bonus after exiting shuffle
+        protected bool shuffleBurstActive;
+
+        // Feint / Lean (active only during shuffle)
+        protected Vector2 leanDirection;      // current lean direction (normalized, or zero)
+        protected float leanIntensity;        // 0 = centered, 1 = full lean
+        protected float leanCooldownTimer;    // prevents jittery direction changes
+        protected Vector2 lastLeanInput;      // previous frame's lean input for change detection
+        protected bool isLeaning;             // true when actively leaning in a direction
 
         // Stamina
         public float CurrentStamina { get; protected set; }
@@ -82,6 +97,11 @@ namespace Sportland.Movement
         public System.Action OnDiveStarted;
         public System.Action OnJumpStarted;
         public System.Action OnHardCut;
+        public System.Action OnShuffleEntered;
+        public System.Action OnShuffleExited;
+        public System.Action OnShuffleBurst;
+        public System.Action<Vector2> OnLeanStarted;   // passes lean direction
+        public System.Action OnLeanCentered;            // lean returned to center
 
         // ──────────────────────────────────────────────
         //  UNITY LIFECYCLE
@@ -139,14 +159,51 @@ namespace Sportland.Movement
         }
 
         /// <summary>
+        /// Toggle shuffle/defensive stance on/off. Hold to maintain stance.
+        /// Locks facing direction, enables lateral movement, grants reactive advantages.
+        /// Cannot shuffle while sprinting — shuffle overrides sprint.
+        /// </summary>
+        public virtual void SetShuffling(bool shuffling)
+        {
+            if (shuffling && !isShuffling && CanAct() && isGrounded)
+            {
+                // Enter shuffle
+                isShuffling = true;
+                shuffleFacingLock = facingDirection;
+                SetState(MovementState.Shuffling);
+                OnShuffleEntered?.Invoke();
+            }
+            else if (!shuffling && isShuffling)
+            {
+                // Exit shuffle
+                isShuffling = false;
+
+                // Reset speed — player must accelerate from shuffle speed
+                // Burst gives a better first step, not a higher top speed
+                if (moveInput.sqrMagnitude > 0.01f)
+                {
+                    shuffleBurstActive = true;
+                    shuffleBurstTimer = profile.shuffleBurstDuration;
+                    OnShuffleBurst?.Invoke();
+                }
+                else
+                {
+                    currentSpeed = 0f;
+                }
+
+                OnShuffleExited?.Invoke();
+            }
+        }
+
+        /// <summary>
         /// Attempt to jump. Fails if not grounded, insufficient stamina, or in
         /// a non-cancellable state.
         /// </summary>
         public virtual bool TryJump()
         {
-            if (!CanAct()) { Debug.Log($"[JUMP FAIL] Can't act. State={CurrentState}"); return false; }
-            if (!isGrounded) { Debug.Log("[JUMP FAIL] Not grounded"); return false; }
-            if (CurrentStamina < profile.jumpStaminaCost) { Debug.Log("[JUMP FAIL] No stamina"); return false; }
+            if (!CanAct()) return false;
+            if (!isGrounded) return false;
+            if (CurrentStamina < profile.jumpStaminaCost) return false;
 
             ConsumeStamina(profile.jumpStaminaCost);
             PerformJump();
@@ -200,6 +257,16 @@ namespace Sportland.Movement
 
         protected virtual void ApplyMovement()
         {
+            // Update shuffle burst timer
+            if (shuffleBurstActive)
+            {
+                shuffleBurstTimer -= Time.fixedDeltaTime;
+                if (shuffleBurstTimer <= 0f)
+                {
+                    shuffleBurstActive = false;
+                }
+            }
+
             switch (CurrentState)
             {
                 case MovementState.Diving:
@@ -213,9 +280,24 @@ namespace Sportland.Movement
                     rb.linearVelocity = facingDirection * currentSpeed;
                     return; // no voluntary movement during recovery/stun
 
+                case MovementState.Cutting:
+                    if (!isInCutRecovery)
+                    {
+                        // Plant phase — completely stopped, waiting to push off
+                        currentSpeed = 0f;
+                        rb.linearVelocity = Vector2.zero;
+                        return;
+                    }
+                    // Recovery phase — fall through to normal movement with cut recovery acceleration
+                    break;
+
                 case MovementState.Airborne:
                     // Allow horizontal movement while airborne but don't change state
                     break;
+
+                case MovementState.Shuffling:
+                    ApplyShuffleMovement();
+                    return;
             }
 
             if (moveInput.sqrMagnitude < 0.01f)
@@ -247,14 +329,21 @@ namespace Sportland.Movement
 
                 // Accelerate
                 float targetSpeed = isSprinting ? GetEffectiveTopSpeed() : GetEffectiveJogSpeed();
+
                 float effectiveAcceleration = (CurrentState == MovementState.Cutting)
                     ? profile.cutRecoveryAcceleration
                     : profile.acceleration;
                 effectiveAcceleration *= GetFatigueMultiplier(profile.fatigueAccelerationPenalty);
 
+                // Shuffle burst bonus — brief acceleration boost for explosive first step
+                if (shuffleBurstActive)
+                {
+                    effectiveAcceleration *= profile.shuffleBurstMultiplier;
+                }
+
                 currentSpeed = Mathf.MoveTowards(currentSpeed, targetSpeed, effectiveAcceleration * Time.fixedDeltaTime);
 
-                // Update state (don't override Airborne)
+                // Update state (don't override Airborne or Shuffling)
                 if (CurrentState != MovementState.Airborne)
                 {
                     if (isSprinting && currentSpeed > GetEffectiveJogSpeed())
@@ -273,22 +362,219 @@ namespace Sportland.Movement
         }
 
         // ──────────────────────────────────────────────
-        //  HARD CUT
+        //  SHUFFLE / DEFENSIVE STANCE
         // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Movement while in shuffle stance. Facing is locked,
+        /// movement is lateral relative to facing direction.
+        /// Lateral stick input creates leans (feints) instead of full movement.
+        /// Forward/backward input creates shuffle movement.
+        /// </summary>
+        protected virtual void ApplyShuffleMovement()
+        {
+            // If shuffle was released, transition back to normal movement
+            if (!isShuffling)
+            {
+                currentSpeed = 0f;
+                rb.linearVelocity = Vector2.zero;
+                ClearLean();
+                SetState(MovementState.Idle);
+                return;
+            }
+
+            // Drain stamina
+            if (profile.shuffleStaminaDrain > 0f)
+            {
+                ConsumeStamina(profile.shuffleStaminaDrain * Time.fixedDeltaTime);
+
+                if (CurrentStamina <= 0f)
+                {
+                    SetShuffling(false);
+                    return;
+                }
+            }
+
+            // Facing stays locked
+            facingDirection = shuffleFacingLock;
+
+            // Update lean cooldown
+            if (leanCooldownTimer > 0f)
+                leanCooldownTimer -= Time.fixedDeltaTime;
+
+            // Determine lean vs movement based on input relative to facing
+            if (moveInput.sqrMagnitude > 0.1f)
+            {
+                // Decompose input into components relative to facing
+                Vector2 inputDir = moveInput.normalized;
+                Vector2 right = Vector2.Perpendicular(facingDirection) * -1f;
+                float lateralComponent = Vector2.Dot(inputDir, right);
+                float forwardComponent = Vector2.Dot(inputDir, facingDirection);
+
+                // Lateral input = lean (the feint)
+                if (Mathf.Abs(lateralComponent) > 0.5f)
+                {
+                    Vector2 newLeanDir = lateralComponent > 0f ? right : -right;
+
+                    // Check for direction change (new lean)
+                    if (!isLeaning || Vector2.Dot(newLeanDir, leanDirection) < 0.5f)
+                    {
+                        if (leanCooldownTimer <= 0f)
+                        {
+                            leanDirection = newLeanDir;
+                            isLeaning = true;
+                            leanCooldownTimer = profile.leanCooldown;
+                            ConsumeStamina(profile.leanStaminaCost);
+                            OnLeanStarted?.Invoke(leanDirection);
+                        }
+                    }
+
+                    // Ramp up lean intensity
+                    leanIntensity = Mathf.MoveTowards(leanIntensity, 1f,
+                        profile.leanSpeed * Time.fixedDeltaTime);
+
+                    // Slight actual movement in lean direction to sell the fake
+                    float leanMoveSpeed = profile.topSpeed * profile.shuffleSpeedRatio * 0.3f;
+                    currentSpeed = Mathf.MoveTowards(currentSpeed, leanMoveSpeed,
+                        profile.shuffleAcceleration * Time.fixedDeltaTime);
+                    rb.linearVelocity = leanDirection * currentSpeed;
+                }
+                else
+                {
+                    // Forward/backward shuffle movement
+                    ReturnLeanToCenter();
+
+                    float shuffleTopSpeed = profile.topSpeed * profile.shuffleSpeedRatio
+                        * GetFatigueMultiplier(profile.fatigueSpeedPenalty);
+                    float shuffleAccel = profile.shuffleAcceleration
+                        * GetFatigueMultiplier(profile.fatigueAccelerationPenalty);
+
+                    currentSpeed = Mathf.MoveTowards(currentSpeed, shuffleTopSpeed,
+                        shuffleAccel * Time.fixedDeltaTime);
+                    rb.linearVelocity = moveInput.normalized * currentSpeed;
+                }
+            }
+            else
+            {
+                // No input — return to center, stop
+                ReturnLeanToCenter();
+                currentSpeed = 0f;
+                rb.linearVelocity = Vector2.zero;
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        //  LEAN MANAGEMENT
+        // ──────────────────────────────────────────────
+
+        private void ReturnLeanToCenter()
+        {
+            if (leanIntensity > 0f)
+            {
+                leanIntensity = Mathf.MoveTowards(leanIntensity, 0f,
+                    profile.leanReturnSpeed * Time.fixedDeltaTime);
+
+                if (leanIntensity <= 0.01f)
+                {
+                    ClearLean();
+                }
+            }
+        }
+
+        private void ClearLean()
+        {
+            if (isLeaning)
+            {
+                OnLeanCentered?.Invoke();
+            }
+            leanDirection = Vector2.zero;
+            leanIntensity = 0f;
+            isLeaning = false;
+        }
+
+        /// <summary>
+        /// Get the current lean offset for sprite rendering.
+        /// Returns a world-space offset vector the sprite should shift by.
+        /// </summary>
+        public Vector2 GetLeanOffset()
+        {
+            return leanDirection * leanIntensity * profile.leanDistance;
+        }
+
+        /// <summary>
+        /// Get the current lean direction and intensity for AI reading.
+        /// AI treats this as apparent movement intent, filtered by
+        /// the leaner's deception rating.
+        /// </summary>
+        public Vector2 GetApparentMovementDirection()
+        {
+            if (isLeaning && leanIntensity > 0.3f)
+            {
+                return leanDirection * leanIntensity;
+            }
+            return moveInput;
+        }
+
+        /// <summary>
+        /// Is this character currently leaning/feinting?
+        /// </summary>
+        public bool IsLeaning => isLeaning;
+
+        /// <summary>
+        /// Current lean intensity (0-1). Used by sprite system and AI.
+        /// </summary>
+        public float LeanIntensity => leanIntensity;
+
+        /// <summary>
+        /// Current lean direction. Zero if not leaning.
+        /// </summary>
+        public Vector2 LeanDirection => leanDirection;
+
+        // ──────────────────────────────────────────────
+        //  AWARENESS
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Get the current awareness multiplier based on movement state.
+        /// Used by AI and gameplay systems to determine feint resistance,
+        /// reaction speed, etc.
+        /// </summary>
+        public virtual float GetAwarenessMultiplier()
+        {
+            if (CurrentState == MovementState.Shuffling)
+                return profile.shuffleAwarenessMultiplier;
+            if (CurrentState == MovementState.Sprinting)
+                return 0.7f; // sprinting reduces awareness
+            return 1f;
+        }
+
+        // ──────────────────────────────────────────────
+        //  HARD CUT (plant-and-go)
+        // ──────────────────────────────────────────────
+
+        // Cut phases: Plant (stopped, facing snaps) → Recovery (accelerating in new direction)
+        protected bool isInCutRecovery;
 
         protected virtual void PerformHardCut(float angleDelta)
         {
             if (CurrentState == MovementState.Cutting) return; // already cutting
 
-            // Speed penalty scales with cut angle: 90° = full penalty, threshold° = none
-            float cutSeverity = Mathf.InverseLerp(profile.hardCutAngleThreshold, 180f, angleDelta);
-            float retention = Mathf.Lerp(1f, profile.cutSpeedRetention, cutSeverity);
-            retention *= GetFatigueMultiplier(profile.fatigueAgilityPenalty); // fatigue makes cuts worse
+            // Snap facing to the new direction immediately — no smooth rotation
+            facingDirection = moveInput.normalized;
 
-            currentSpeed *= retention;
+            // Kill speed — plant foot in the ground
+            currentSpeed = 0f;
+            rb.linearVelocity = Vector2.zero;
+
+            // Consume stamina
             ConsumeStamina(profile.cutStaminaCost);
+
+            // Enter plant phase
+            isInCutRecovery = false;
+            float effectivePlantTime = profile.cutPlantDuration
+                * (2f - GetFatigueMultiplier(profile.fatigueAgilityPenalty)); // fatigue = longer plant
+            cutTimer = effectivePlantTime;
             SetState(MovementState.Cutting);
-            cutTimer = 0.15f; // brief "cutting" state before returning to normal
 
             OnHardCut?.Invoke();
         }
@@ -506,13 +792,24 @@ namespace Sportland.Movement
                 }
             }
 
-            // Cut recovery
+            // Cut phases: Plant → Recovery → Normal
             if (CurrentState == MovementState.Cutting)
             {
                 cutTimer -= Time.deltaTime;
                 if (cutTimer <= 0f)
                 {
-                    SetState(moveInput.sqrMagnitude > 0.01f ? MovementState.Jogging : MovementState.Idle);
+                    if (!isInCutRecovery)
+                    {
+                        // Plant phase finished — enter recovery (can move again)
+                        isInCutRecovery = true;
+                        cutTimer = 0.2f; // brief recovery window with cut acceleration
+                    }
+                    else
+                    {
+                        // Recovery finished — back to normal
+                        isInCutRecovery = false;
+                        SetState(moveInput.sqrMagnitude > 0.01f ? MovementState.Jogging : MovementState.Idle);
+                    }
                 }
             }
         }
@@ -540,5 +837,39 @@ namespace Sportland.Movement
         public Vector2 GetFacingDirection() => facingDirection;
         public float GetCurrentSpeed() => currentSpeed;
         public bool IsGrounded() => isGrounded;
+        public MovementProfile Profile => profile;
+
+        // ──────────────────────────────────────────────
+        //  RESET
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Reset all movement state to defaults. Used by game reset.
+        /// </summary>
+        public virtual void ResetMovementState()
+        {
+            CurrentStamina = profile.maxStamina;
+            currentSpeed = 0f;
+            verticalVelocity = 0f;
+            isGrounded = true;
+            isSprinting = false;
+            isShuffling = false;
+            shuffleBurstActive = false;
+            shuffleBurstTimer = 0f;
+            leanDirection = Vector2.zero;
+            leanIntensity = 0f;
+            leanCooldownTimer = 0f;
+            isLeaning = false;
+            moveInput = Vector2.zero;
+            facingDirection = Vector2.right;
+            stateTimer = 0f;
+            cutTimer = 0f;
+            isInCutRecovery = false;
+            staminaRegenCooldown = 0f;
+            SetState(MovementState.Idle);
+            SetVerticalOffset(0f);
+
+            OnStaminaChanged?.Invoke(1f);
+        }
     }
 }

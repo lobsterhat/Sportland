@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using Sportland.Sports.Tag;
+using Sportland.Movement;
 
 namespace Sportland.InputHandling
 {
@@ -133,6 +134,7 @@ namespace Sportland.InputHandling
             // Feed input to movement controller
             movement.SetMoveInput(currentSource.GetMoveInput());
             movement.SetSprinting(currentSource.IsSprinting());
+            movement.SetShuffling(currentSource.IsShuffling());
 
             // Single-frame actions
             if (currentSource.JumpRequested())

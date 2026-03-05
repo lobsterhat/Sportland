@@ -23,6 +23,11 @@ namespace Sportland.InputHandling
         bool IsSprinting();
 
         /// <summary>
+        /// Whether the character should be in shuffle/defensive stance.
+        /// </summary>
+        bool IsShuffling();
+
+        /// <summary>
         /// Whether a jump was requested this frame.
         /// </summary>
         bool JumpRequested();

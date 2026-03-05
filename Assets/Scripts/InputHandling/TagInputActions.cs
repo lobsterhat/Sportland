@@ -29,10 +29,12 @@ namespace Sportland.InputHandling
 
         public InputAction Move { get; private set; }
         public InputAction Sprint { get; private set; }
+        public InputAction Shuffle { get; private set; }
         public InputAction Jump { get; private set; }
         public InputAction Dive { get; private set; }
         public InputAction Special { get; private set; }
         public InputAction Tag { get; private set; }
+        public InputAction Reset { get; private set; }
 
         private InputActionMap actionMap;
 
@@ -63,6 +65,11 @@ namespace Sportland.InputHandling
             Sprint.AddBinding("<Keyboard>/leftShift");
             Sprint.AddBinding("<Gamepad>/leftTrigger");
 
+            // Shuffle / Defensive Stance — L1 / Tab (hold)
+            Shuffle = actionMap.AddAction("Shuffle", InputActionType.Button);
+            Shuffle.AddBinding("<Keyboard>/tab");
+            Shuffle.AddBinding("<Gamepad>/leftShoulder");
+
             // Jump — X button (buttonSouth) / Space
             Jump = actionMap.AddAction("Jump", InputActionType.Button);
             Jump.AddBinding("<Keyboard>/space");
@@ -82,6 +89,11 @@ namespace Sportland.InputHandling
             Tag = actionMap.AddAction("Tag", InputActionType.Button);
             Tag.AddBinding("<Keyboard>/f");
             Tag.AddBinding("<Gamepad>/rightTrigger");
+
+            // Reset — Touchpad / R
+            Reset = actionMap.AddAction("Reset", InputActionType.Button);
+            Reset.AddBinding("<Keyboard>/r");
+            Reset.AddBinding("<DualShockGamepad>/touchpadButton");
         }
 
         // ──────────────────────────────────────────────
