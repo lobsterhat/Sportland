@@ -1,5 +1,6 @@
 ﻿using UnityEngine;
 using Sportland.Movement;
+using Sportland.Rendering;
 using Sportland.Sports.Tag;
 
 namespace Sportland.InputHandling
@@ -126,11 +127,14 @@ namespace Sportland.InputHandling
         //  IInputSource LIFECYCLE
         // ──────────────────────────────────────────────
 
+        private StatusIconDisplay statusIcons;
+
         public void OnActivate(GameObject character)
         {
             this.character = character;
             this.characterTransform = character.transform;
             this.movement = character.GetComponent<TagMovementController>();
+            this.statusIcons = character.GetComponent<StatusIconDisplay>();
             this.decisionTimer = 0f;
             this.isRecoveringStamina = false;
 
@@ -175,6 +179,7 @@ namespace Sportland.InputHandling
         public Vector2 GetMoveInput() => currentDesiredDirection;
         public bool IsSprinting() => sprinting;
         public bool IsShuffling() => shuffling;
+        public float GetLeanInput() => isInStandoff ? currentLeanSide : 0f;
         public bool JumpRequested() => jumpRequest;
         public bool DiveRequested() => diveRequest;
         public bool SpecialRequested() => specialRequest;
@@ -207,6 +212,7 @@ namespace Sportland.InputHandling
             if (chaseTarget == null)
             {
                 Wander();
+                ReportAIState(StatusIconDisplay.AIDecisionState.Wandering);
                 return;
             }
 
@@ -228,6 +234,7 @@ namespace Sportland.InputHandling
             if (targetIsShuffling && distance < standoffEvalDistance)
             {
                 DecideAsStalk(distance, direction, targetMovement);
+                ReportAIState(StatusIconDisplay.AIDecisionState.Stalking);
                 return;
             }
 
@@ -235,6 +242,7 @@ namespace Sportland.InputHandling
             Vector2 steerDir = ApplyZoneAvoidance(direction);
             currentDesiredDirection = ApplyWallAvoidance(steerDir);
             currentDesiredDirection = ApplyJitter(currentDesiredDirection);
+            ReportAIState(StatusIconDisplay.AIDecisionState.Chasing);
 
             // Sprint management
             UpdateSprintDecision(distance, sprintChaseDistance);
@@ -305,6 +313,7 @@ namespace Sportland.InputHandling
                 ExitStandoff();
                 Wander();
                 sprinting = false;
+                ReportAIState(StatusIconDisplay.AIDecisionState.Wandering);
                 return;
             }
 
@@ -320,6 +329,7 @@ namespace Sportland.InputHandling
                     Vector2 awayFromThreat = fromThreat.normalized;
                     currentDesiredDirection = awayFromThreat * 0.3f;
                     sprinting = false;
+                    ReportAIState(StatusIconDisplay.AIDecisionState.RestingInZone);
                     return;
                 }
 
@@ -336,6 +346,7 @@ namespace Sportland.InputHandling
                         currentDesiredDirection = ApplyWallAvoidance(toZone.normalized);
                         sprinting = true;
                         isRecoveringStamina = false;
+                        ReportAIState(StatusIconDisplay.AIDecisionState.FleeingToZone);
 
                         if (distance < evasionTriggerDistance)
                         {
@@ -354,6 +365,7 @@ namespace Sportland.InputHandling
                 if (isInStandoff)
                 {
                     DecideAsStandoff(distance, fromThreat);
+                    ReportAIState(StatusIconDisplay.AIDecisionState.Standoff);
                     return;
                 }
 
@@ -374,6 +386,7 @@ namespace Sportland.InputHandling
 
                 currentDesiredDirection = ApplyWallAvoidance(fleeDir);
                 currentDesiredDirection = ApplyJitter(currentDesiredDirection);
+                ReportAIState(StatusIconDisplay.AIDecisionState.Fleeing);
 
                 if (distance < evasionTriggerDistance)
                 {
@@ -396,6 +409,7 @@ namespace Sportland.InputHandling
                 Wander();
                 sprinting = false;
                 isRecoveringStamina = true;
+                ReportAIState(StatusIconDisplay.AIDecisionState.Wandering);
             }
         }
 
@@ -802,6 +816,12 @@ namespace Sportland.InputHandling
             diveRequest = false;
             specialRequest = false;
             tagRequest = false;
+        }
+
+        private void ReportAIState(StatusIconDisplay.AIDecisionState state)
+        {
+            if (statusIcons != null)
+                statusIcons.SetAIDecisionState(state);
         }
 
         /// <summary>

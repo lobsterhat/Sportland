@@ -66,12 +66,17 @@ namespace Sportland.Movement
         protected float shuffleBurstTimer;    // time remaining on burst bonus after exiting shuffle
         protected bool shuffleBurstActive;
 
-        // Feint / Lean (active only during shuffle)
-        protected Vector2 leanDirection;      // current lean direction (normalized, or zero)
+        // Feint / Lean (driven by triggers while shuffling)
+        protected float triggerLeanInput;     // raw input: -1 = left, 0 = center, 1 = right
+        protected Vector2 leanDirection;      // current lean direction (world space, normalized)
         protected float leanIntensity;        // 0 = centered, 1 = full lean
         protected float leanCooldownTimer;    // prevents jittery direction changes
-        protected Vector2 lastLeanInput;      // previous frame's lean input for change detection
         protected bool isLeaning;             // true when actively leaning in a direction
+
+        // Burst window (after releasing shuffle while leaning)
+        protected bool burstWindowActive;
+        protected float burstWindowTimer;
+        protected float burstWindowDuration = 0.3f;
 
         // Stamina
         public float CurrentStamina { get; protected set; }
@@ -178,10 +183,16 @@ namespace Sportland.Movement
                 // Exit shuffle
                 isShuffling = false;
 
-                // Reset speed — player must accelerate from shuffle speed
-                // Burst gives a better first step, not a higher top speed
-                if (moveInput.sqrMagnitude > 0.01f)
+                // If we were leaning, open burst window
+                if (isLeaning)
                 {
+                    burstWindowActive = true;
+                    burstWindowTimer = burstWindowDuration;
+                    ClearLean();
+                }
+                else if (moveInput.sqrMagnitude > 0.01f)
+                {
+                    // Not leaning but moving — normal burst
                     shuffleBurstActive = true;
                     shuffleBurstTimer = profile.shuffleBurstDuration;
                     OnShuffleBurst?.Invoke();
@@ -193,6 +204,15 @@ namespace Sportland.Movement
 
                 OnShuffleExited?.Invoke();
             }
+        }
+
+        /// <summary>
+        /// Set the lean input from triggers. -1 = full lean left, 0 = center, 1 = full lean right.
+        /// Only meaningful while in shuffle stance.
+        /// </summary>
+        public virtual void SetLeanInput(float input)
+        {
+            triggerLeanInput = Mathf.Clamp(input, -1f, 1f);
         }
 
         /// <summary>
@@ -373,9 +393,14 @@ namespace Sportland.Movement
         /// </summary>
         protected virtual void ApplyShuffleMovement()
         {
-            // If shuffle was released, transition back to normal movement
+            // If shuffle was released, check burst window
             if (!isShuffling)
             {
+                if (burstWindowActive)
+                {
+                    ApplyBurstWindow();
+                    return;
+                }
                 currentSpeed = 0f;
                 rb.linearVelocity = Vector2.zero;
                 ClearLean();
@@ -402,48 +427,46 @@ namespace Sportland.Movement
             if (leanCooldownTimer > 0f)
                 leanCooldownTimer -= Time.fixedDeltaTime;
 
-            // Determine lean vs movement based on input relative to facing
-            if (moveInput.sqrMagnitude > 0.1f)
+            // ── LEAN (from triggers L2/R2) ──
+            Vector2 right = Vector2.Perpendicular(facingDirection) * -1f;
+
+            if (Mathf.Abs(triggerLeanInput) > 0.15f)
             {
-                // Decompose input into components relative to facing
-                Vector2 inputDir = moveInput.normalized;
-                Vector2 right = Vector2.Perpendicular(facingDirection) * -1f;
-                float lateralComponent = Vector2.Dot(inputDir, right);
-                float forwardComponent = Vector2.Dot(inputDir, facingDirection);
+                // Determine lean direction from trigger input
+                Vector2 newLeanDir = right * Mathf.Sign(triggerLeanInput);
 
-                // Lateral input = lean (the feint)
-                if (Mathf.Abs(lateralComponent) > 0.5f)
+                if (!isLeaning || Vector2.Dot(newLeanDir, leanDirection) < 0.5f)
                 {
-                    Vector2 newLeanDir = lateralComponent > 0f ? right : -right;
-
-                    // Check for direction change (new lean)
-                    if (!isLeaning || Vector2.Dot(newLeanDir, leanDirection) < 0.5f)
+                    if (leanCooldownTimer <= 0f)
                     {
-                        if (leanCooldownTimer <= 0f)
-                        {
-                            leanDirection = newLeanDir;
-                            isLeaning = true;
-                            leanCooldownTimer = profile.leanCooldown;
-                            ConsumeStamina(profile.leanStaminaCost);
-                            OnLeanStarted?.Invoke(leanDirection);
-                        }
+                        leanDirection = newLeanDir;
+                        isLeaning = true;
+                        leanCooldownTimer = profile.leanCooldown;
+                        ConsumeStamina(profile.leanStaminaCost);
+                        OnLeanStarted?.Invoke(leanDirection);
                     }
-
-                    // Ramp up lean intensity
-                    leanIntensity = Mathf.MoveTowards(leanIntensity, 1f,
-                        profile.leanSpeed * Time.fixedDeltaTime);
-
-                    // Slight actual movement in lean direction to sell the fake
-                    float leanMoveSpeed = profile.topSpeed * profile.shuffleSpeedRatio * 0.3f;
-                    currentSpeed = Mathf.MoveTowards(currentSpeed, leanMoveSpeed,
-                        profile.shuffleAcceleration * Time.fixedDeltaTime);
-                    rb.linearVelocity = leanDirection * currentSpeed;
                 }
-                else
-                {
-                    // Forward/backward shuffle movement
-                    ReturnLeanToCenter();
 
+                // Lean intensity driven by trigger pressure (analog)
+                float targetIntensity = Mathf.Abs(triggerLeanInput);
+                leanIntensity = Mathf.MoveTowards(leanIntensity, targetIntensity,
+                    profile.leanSpeed * Time.fixedDeltaTime);
+
+                // Slight drift in lean direction to sell the fake
+                float leanMoveSpeed = profile.topSpeed * profile.shuffleSpeedRatio * 0.25f
+                    * leanIntensity;
+                currentSpeed = Mathf.MoveTowards(currentSpeed, leanMoveSpeed,
+                    profile.shuffleAcceleration * Time.fixedDeltaTime);
+                rb.linearVelocity = leanDirection * currentSpeed;
+            }
+            else
+            {
+                // No trigger input — return lean to center
+                ReturnLeanToCenter();
+
+                // ── SHUFFLE MOVEMENT (from stick) ──
+                if (moveInput.sqrMagnitude > 0.1f)
+                {
                     float shuffleTopSpeed = profile.topSpeed * profile.shuffleSpeedRatio
                         * GetFatigueMultiplier(profile.fatigueSpeedPenalty);
                     float shuffleAccel = profile.shuffleAcceleration
@@ -453,13 +476,45 @@ namespace Sportland.Movement
                         shuffleAccel * Time.fixedDeltaTime);
                     rb.linearVelocity = moveInput.normalized * currentSpeed;
                 }
+                else
+                {
+                    currentSpeed = 0f;
+                    rb.linearVelocity = Vector2.zero;
+                }
             }
-            else
+        }
+
+        /// <summary>
+        /// Burst window: brief period after releasing shuffle while leaning.
+        /// Player holds stick in desired burst direction.
+        /// When window closes, character explodes that way.
+        /// </summary>
+        protected virtual void ApplyBurstWindow()
+        {
+            burstWindowTimer -= Time.fixedDeltaTime;
+
+            // Hold still during the window — player is choosing direction
+            currentSpeed = 0f;
+            rb.linearVelocity = Vector2.zero;
+
+            if (burstWindowTimer <= 0f)
             {
-                // No input — return to center, stop
-                ReturnLeanToCenter();
-                currentSpeed = 0f;
-                rb.linearVelocity = Vector2.zero;
+                burstWindowActive = false;
+
+                // Burst in whatever direction the stick is pointing
+                if (moveInput.sqrMagnitude > 0.1f)
+                {
+                    facingDirection = moveInput.normalized;
+                    shuffleBurstActive = true;
+                    shuffleBurstTimer = profile.shuffleBurstDuration;
+                    OnShuffleBurst?.Invoke();
+                    SetState(MovementState.Idle);
+                }
+                else
+                {
+                    // No direction chosen — snap back, no burst
+                    SetState(MovementState.Idle);
+                }
             }
         }
 
@@ -860,6 +915,9 @@ namespace Sportland.Movement
             leanIntensity = 0f;
             leanCooldownTimer = 0f;
             isLeaning = false;
+            triggerLeanInput = 0f;
+            burstWindowActive = false;
+            burstWindowTimer = 0f;
             moveInput = Vector2.zero;
             facingDirection = Vector2.right;
             stateTimer = 0f;
