@@ -28,6 +28,13 @@ namespace Sportland.InputHandling
         bool IsShuffling();
 
         /// <summary>
+        /// Get the lean input: -1 = full lean left, 0 = center, 1 = full lean right.
+        /// Analog triggers provide values between -1 and 1.
+        /// Only meaningful while shuffling.
+        /// </summary>
+        float GetLeanInput();
+
+        /// <summary>
         /// Whether a jump was requested this frame.
         /// </summary>
         bool JumpRequested();

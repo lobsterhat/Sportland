@@ -9,17 +9,19 @@ namespace Sportland.InputHandling
     /// 
     /// Control Scheme:
     ///   Move        — Left Stick / WASD
-    ///   Sprint      — L2 (hold) / Left Shift
+    ///   Sprint      — L3 click (toggle) / Left Shift (hold)
+    ///   Shuffle     — L1 (hold) / Tab (hold)
+    ///   Lean Left   — L2 (analog, while shuffling) / Z
+    ///   Lean Right  — R2 (analog, while shuffling) / C
     ///   Jump        — X button / Space
     ///   Dive        — Circle button / E
     ///   Special     — R1 / Q (Lunge when It, Evasion Burst when Runner)
-    ///   Tag         — R2 / F (walk-up tag when It)
+    ///   Tag         — R2 / F (walk-up tag when not shuffling)
+    ///   Reset       — Touchpad / R
     /// 
-    /// Usage:
-    ///   var controls = new TagInputActions();
-    ///   controls.Enable();
-    ///   Vector2 move = controls.Move.ReadValue&lt;Vector2&gt;();
-    ///   bool jumped = controls.Jump.WasPressedThisFrame();
+    /// Note: R2 is dual-purpose. When shuffling, R2 = Lean Right.
+    ///       When not shuffling, R2 = Tag attempt.
+    ///       The PlayerInputSource handles the context switching.
     /// </summary>
     public class TagInputActions
     {
@@ -28,8 +30,11 @@ namespace Sportland.InputHandling
         // ──────────────────────────────────────────────
 
         public InputAction Move { get; private set; }
-        public InputAction Sprint { get; private set; }
+        public InputAction SprintToggle { get; private set; }
+        public InputAction SprintHold { get; private set; }
         public InputAction Shuffle { get; private set; }
+        public InputAction LeanLeft { get; private set; }
+        public InputAction LeanRight { get; private set; }
         public InputAction Jump { get; private set; }
         public InputAction Dive { get; private set; }
         public InputAction Special { get; private set; }
@@ -60,15 +65,28 @@ namespace Sportland.InputHandling
                 .With("Right", "<Keyboard>/rightArrow");
             Move.AddBinding("<Gamepad>/leftStick");
 
-            // Sprint — L2 / Left Shift
-            Sprint = actionMap.AddAction("Sprint", InputActionType.Button);
-            Sprint.AddBinding("<Keyboard>/leftShift");
-            Sprint.AddBinding("<Gamepad>/leftTrigger");
+            // Sprint Toggle — L3 (left stick click)
+            SprintToggle = actionMap.AddAction("SprintToggle", InputActionType.Button);
+            SprintToggle.AddBinding("<Gamepad>/leftStickPress");
+
+            // Sprint Hold — Left Shift (keyboard fallback, hold-style)
+            SprintHold = actionMap.AddAction("SprintHold", InputActionType.Button);
+            SprintHold.AddBinding("<Keyboard>/leftShift");
 
             // Shuffle / Defensive Stance — L1 / Tab (hold)
             Shuffle = actionMap.AddAction("Shuffle", InputActionType.Button);
             Shuffle.AddBinding("<Keyboard>/tab");
             Shuffle.AddBinding("<Gamepad>/leftShoulder");
+
+            // Lean Left — L2 (analog) / Z
+            LeanLeft = actionMap.AddAction("LeanLeft", InputActionType.Value);
+            LeanLeft.AddBinding("<Keyboard>/z");
+            LeanLeft.AddBinding("<Gamepad>/leftTrigger");
+
+            // Lean Right — R2 (analog) / C
+            LeanRight = actionMap.AddAction("LeanRight", InputActionType.Value);
+            LeanRight.AddBinding("<Keyboard>/c");
+            LeanRight.AddBinding("<Gamepad>/rightTrigger");
 
             // Jump — X button (buttonSouth) / Space
             Jump = actionMap.AddAction("Jump", InputActionType.Button);
@@ -85,10 +103,9 @@ namespace Sportland.InputHandling
             Special.AddBinding("<Keyboard>/q");
             Special.AddBinding("<Gamepad>/rightShoulder");
 
-            // Tag — R2 / F
+            // Tag — F (keyboard only — R2 on gamepad is context-sensitive)
             Tag = actionMap.AddAction("Tag", InputActionType.Button);
             Tag.AddBinding("<Keyboard>/f");
-            Tag.AddBinding("<Gamepad>/rightTrigger");
 
             // Reset — Touchpad / R
             Reset = actionMap.AddAction("Reset", InputActionType.Button);

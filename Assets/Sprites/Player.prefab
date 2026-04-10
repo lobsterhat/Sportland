@@ -16,6 +16,9 @@ GameObject:
   - component: {fileID: 4586161649094637328}
   - component: {fileID: 2938256329729460704}
   - component: {fileID: 401573880187116780}
+  - component: {fileID: 2280430140093809731}
+  - component: {fileID: 2188998162658611913}
+  - component: {fileID: 684979565547144664}
   m_Layer: 7
   m_Name: Player
   m_TagString: Untagged
@@ -168,6 +171,7 @@ MonoBehaviour:
   evasionBurstCooldown: 3
   evasionBurstStaminaCost: 10
   totalFuseTime: 15
+  tagBackCooldown: 3
 --- !u!114 &4586161649094637328
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -227,6 +231,74 @@ MonoBehaviour:
   backgroundColor: {r: 0.15, g: 0.15, b: 0.15, a: 0.7}
   hideWhenFullDelay: 2
   sortingOrder: 100
+--- !u!114 &2280430140093809731
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2909074609304120785}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 466096f57096062428164716135579b3, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  heightOffset: 2.2
+  iconSpacing: 0.35
+  iconSize: 0.25
+  sortingOrder: 110
+  iconIdle: {fileID: 0}
+  iconJogging: {fileID: 0}
+  iconSprinting: {fileID: 0}
+  iconShuffling: {fileID: 21300000, guid: bc96914288539b442aedae313e41e72c, type: 3}
+  iconCuttingPlant: {fileID: 0}
+  iconCuttingRecovery: {fileID: 0}
+  iconAirborne: {fileID: 0}
+  iconDiving: {fileID: 0}
+  iconDiveRecovery: {fileID: 0}
+  iconLandingRecovery: {fileID: 0}
+  iconStunned: {fileID: 0}
+  iconChasing: {fileID: 0}
+  iconFleeing: {fileID: 0}
+  iconWandering: {fileID: 0}
+  iconStandoff: {fileID: 0}
+  iconStalking: {fileID: 0}
+  iconFleeingToZone: {fileID: 0}
+  iconRestingInZone: {fileID: 0}
+  iconPlayerControlled: {fileID: 0}
+  iconLeanLeft: {fileID: 0}
+  iconLeanRight: {fileID: 0}
+  iconShuffleBurst: {fileID: 0}
+--- !u!114 &2188998162658611913
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2909074609304120785}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 21ee28e07d48dbb429d192312fef77f4, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spriteChild: {fileID: 0}
+  visualMultiplier: 1
+  smoothTime: 0.03
+--- !u!114 &684979565547144664
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 2909074609304120785}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 65057c923eae8964b8cd9319ebeedfce, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spriteRenderer: {fileID: 0}
+  defaultFacesRight: 1
+  flipDeadzone: 0.1
 --- !u!1 &7426292663391570516
 GameObject:
   m_ObjectHideFlags: 0
