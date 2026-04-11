@@ -1,5 +1,6 @@
 using UnityEngine;
 using Sportland.Rendering;
+using Sportland.World;
 
 namespace Sportland.Movement
 {
@@ -92,6 +93,18 @@ namespace Sportland.Movement
 
         // Dive
         protected Vector2 diveDirection;
+
+        // ── Surface / terrain ──
+        // Keyed by the SurfaceZone that registered the surface so reference
+        // equality on the definition instance is never needed for removal.
+        private System.Collections.Generic.List<(SurfaceZone zone, SurfaceDefinition def)>
+            activeSurfaceList = new System.Collections.Generic.List<(SurfaceZone, SurfaceDefinition)>();
+
+        /// <summary>
+        /// The highest-priority surface currently under this character.
+        /// Null when no surface zones are active (baseline movement applies).
+        /// </summary>
+        public SurfaceDefinition ActiveSurface { get; private set; }
 
         // ──────────────────────────────────────────────
         //  EVENTS (for UI, VFX, audio hooks)
@@ -224,6 +237,7 @@ namespace Sportland.Movement
             if (!CanAct()) return false;
             if (!isGrounded) return false;
             if (CurrentStamina < profile.jumpStaminaCost) return false;
+            if (ActiveSurface != null && !ActiveSurface.allowJump) return false;
 
             ConsumeStamina(profile.jumpStaminaCost);
             PerformJump();
@@ -239,6 +253,7 @@ namespace Sportland.Movement
             if (!CanAct()) return false;
             if (!isGrounded) return false;
             if (CurrentStamina < profile.diveStaminaCost) return false;
+            if (ActiveSurface != null && !ActiveSurface.allowDive) return false;
 
             ConsumeStamina(profile.diveStaminaCost);
             PerformDive();
@@ -343,17 +358,24 @@ namespace Sportland.Movement
                     PerformHardCut(angleDelta);
                 }
 
-                // Rotate facing toward input
-                float effectiveTurnSpeed = profile.turnSpeed * GetFatigueMultiplier(profile.fatigueAgilityPenalty);
+                // Rotate facing toward input — traction scales turn rate
+                float effectiveTurnSpeed = profile.turnSpeed
+                    * GetFatigueMultiplier(profile.fatigueAgilityPenalty)
+                    * (ActiveSurface?.tractionMultiplier ?? 1f);
                 facingDirection = RotateToward(facingDirection, moveInput, effectiveTurnSpeed * Time.fixedDeltaTime);
 
+                // Sprint is blocked on surfaces that disallow it (preserve the input field)
+                bool effectiveSprint = isSprinting
+                    && (ActiveSurface == null || ActiveSurface.allowSprint);
+
                 // Accelerate
-                float targetSpeed = isSprinting ? GetEffectiveTopSpeed() : GetEffectiveJogSpeed();
+                float targetSpeed = effectiveSprint ? GetEffectiveTopSpeed() : GetEffectiveJogSpeed();
 
                 float effectiveAcceleration = (CurrentState == MovementState.Cutting)
                     ? profile.cutRecoveryAcceleration
                     : profile.acceleration;
                 effectiveAcceleration *= GetFatigueMultiplier(profile.fatigueAccelerationPenalty);
+                effectiveAcceleration *= ActiveSurface?.accelerationMultiplier ?? 1f;
 
                 // Shuffle burst bonus — brief acceleration boost for explosive first step
                 if (shuffleBurstActive)
@@ -366,7 +388,7 @@ namespace Sportland.Movement
                 // Update state (don't override Airborne or Shuffling)
                 if (CurrentState != MovementState.Airborne)
                 {
-                    if (isSprinting && currentSpeed > GetEffectiveJogSpeed())
+                    if (effectiveSprint && currentSpeed > GetEffectiveJogSpeed())
                         SetState(MovementState.Sprinting);
                     else if (currentSpeed > 0.1f)
                         SetState(MovementState.Jogging);
@@ -378,7 +400,8 @@ namespace Sportland.Movement
 
         protected virtual void ApplyDeceleration()
         {
-            currentSpeed = Mathf.MoveTowards(currentSpeed, 0f, profile.deceleration * Time.fixedDeltaTime);
+            float decel = profile.deceleration * (ActiveSurface?.decelerationMultiplier ?? 1f);
+            currentSpeed = Mathf.MoveTowards(currentSpeed, 0f, decel * Time.fixedDeltaTime);
         }
 
         // ──────────────────────────────────────────────
@@ -624,10 +647,12 @@ namespace Sportland.Movement
             // Consume stamina
             ConsumeStamina(profile.cutStaminaCost);
 
-            // Enter plant phase
+            // Enter plant phase — less traction = longer plant (harder to change direction)
             isInCutRecovery = false;
+            float traction = ActiveSurface?.tractionMultiplier ?? 1f;
             float effectivePlantTime = profile.cutPlantDuration
-                * (2f - GetFatigueMultiplier(profile.fatigueAgilityPenalty)); // fatigue = longer plant
+                * (2f - GetFatigueMultiplier(profile.fatigueAgilityPenalty)) // fatigue penalty
+                * (2f - Mathf.Clamp(traction, 0.1f, 2f));                    // traction penalty
             cutTimer = effectivePlantTime;
             SetState(MovementState.Cutting);
 
@@ -725,14 +750,15 @@ namespace Sportland.Movement
 
         protected virtual void UpdateStamina()
         {
-            // Drain
+            // Drain — surface multiplier makes certain terrain more tiring
+            float surfaceDrainMult = ActiveSurface?.staminaDrainMultiplier ?? 1f;
             if (CurrentState == MovementState.Sprinting)
             {
-                ConsumeStamina(profile.sprintStaminaDrain * Time.deltaTime);
+                ConsumeStamina(profile.sprintStaminaDrain * Time.deltaTime * surfaceDrainMult);
             }
             else if (CurrentState == MovementState.Jogging)
             {
-                ConsumeStamina(profile.jogStaminaDrain * Time.deltaTime);
+                ConsumeStamina(profile.jogStaminaDrain * Time.deltaTime * surfaceDrainMult);
             }
 
             // Regen cooldown
@@ -789,7 +815,21 @@ namespace Sportland.Movement
 
         public float GetEffectiveTopSpeed()
         {
-            return profile.topSpeed * GetFatigueMultiplier(profile.fatigueSpeedPenalty);
+            float speed = profile.topSpeed * GetFatigueMultiplier(profile.fatigueSpeedPenalty);
+
+            if (ActiveSurface != null)
+            {
+                speed *= ActiveSurface.speedMultiplier;
+
+                // Slope: directional speed delta based on current movement input
+                if (ActiveSurface.surfaceType == SurfaceType.Slope
+                    && moveInput.sqrMagnitude > 0.01f)
+                {
+                    speed *= ActiveSurface.GetSlopeSpeedMultiplier(moveInput);
+                }
+            }
+
+            return speed;
         }
 
         public float GetEffectiveJogSpeed()
@@ -893,6 +933,51 @@ namespace Sportland.Movement
         public float GetCurrentSpeed() => currentSpeed;
         public bool IsGrounded() => isGrounded;
         public MovementProfile Profile => profile;
+
+        // ──────────────────────────────────────────────
+        //  SURFACE / TERRAIN API
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Called by SurfaceZone when this character enters its trigger.
+        /// </summary>
+        public void EnterSurface(SurfaceZone zone, SurfaceDefinition def)
+        {
+            // Prevent duplicate entries (e.g. fast re-entry edge case)
+            for (int i = 0; i < activeSurfaceList.Count; i++)
+            {
+                if (activeSurfaceList[i].zone == zone) return;
+            }
+            activeSurfaceList.Add((zone, def));
+            RefreshActiveSurface();
+        }
+
+        /// <summary>
+        /// Called by SurfaceZone when this character exits its trigger.
+        /// </summary>
+        public void ExitSurface(SurfaceZone zone)
+        {
+            for (int i = 0; i < activeSurfaceList.Count; i++)
+            {
+                if (activeSurfaceList[i].zone == zone)
+                {
+                    activeSurfaceList.RemoveAt(i);
+                    break;
+                }
+            }
+            RefreshActiveSurface();
+        }
+
+        private void RefreshActiveSurface()
+        {
+            ActiveSurface = null;
+            for (int i = 0; i < activeSurfaceList.Count; i++)
+            {
+                var def = activeSurfaceList[i].def;
+                if (ActiveSurface == null || def.priority > ActiveSurface.priority)
+                    ActiveSurface = def;
+            }
+        }
 
         // ──────────────────────────────────────────────
         //  RESET

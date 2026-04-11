@@ -1,4 +1,5 @@
 using Sportland.Movement;
+using Sportland.World;
 using UnityEngine;
 using static Sportland.Movement.BaseMovementController;
 using static UnityEngine.RuleTile.TilingRuleOutput;
@@ -313,6 +314,7 @@ namespace Sportland.Sports.Tag
             if (!CanAct()) return false;
             if (isLunging) return false;
             if (CurrentStamina < lungeStaminaCost) return false;
+            if (ActiveSurface != null && !ActiveSurface.allowLunge) return false;
 
             ConsumeStamina(lungeStaminaCost);
             PerformLunge();
@@ -413,6 +415,7 @@ namespace Sportland.Sports.Tag
             if (isBargeBursting) return false;
             if (bargeCooldownTimer > 0f) return false;
             if (CurrentStamina < bargeStaminaCost) return false;
+            if (ActiveSurface != null && !ActiveSurface.allowBarge) return false;
 
             Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, bargeRadius, taggableLayer);
 
