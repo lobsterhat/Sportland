@@ -34,6 +34,7 @@ namespace Sportland.Sports.Tag
         [SerializeField] private Color runnerColor    = Color.white;
         [SerializeField] private Color immuneColor    = new Color(1f, 1f, 0.5f, 1f);
         [SerializeField] private Color eliminatedColor = new Color(0.3f, 0.3f, 0.3f, 0.5f);
+        [SerializeField] private Color bargeStunnedColor = new Color(0.5f, 0.9f, 1f, 1f); // bright cyan flash
 
         // ──────────────────────────────────────────────
         //  RUNTIME STATE
@@ -234,6 +235,8 @@ namespace Sportland.Sports.Tag
 
                 if (player.IsEliminated)
                     playerSprites[i].color = eliminatedColor;
+                else if (player.IsBargeStunned)
+                    playerSprites[i].color = bargeStunnedColor;
                 else if (player.IsImmune)
                     playerSprites[i].color = immuneColor;
                 else if (player.CurrentRole == TagMovementController.TagRole.It)

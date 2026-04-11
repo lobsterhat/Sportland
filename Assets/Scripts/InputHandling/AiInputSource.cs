@@ -69,6 +69,12 @@ namespace Sportland.InputHandling
         private bool isRecoveringStamina;
         private float lungeTimer;           // AI-side cooldown between lunge attempts
 
+        // Barge window: AI briefly charges toward the It player to connect a barge
+        private float bargeChargeTimer;     // > 0 while AI is in the charge-at-chaser window
+        private float aiBargeCooldownTimer; // prevents AI from re-entering barge window too quickly
+        private const float AiBargeTriggerDist = 2.4f;  // how close chaser must be to trigger
+        private const float AiBargeCooldown = 6f;
+
         // Standoff state
         private bool isInStandoff;
         private float standoffLeanTimer;
@@ -213,6 +219,8 @@ namespace Sportland.InputHandling
 
             // Tick cooldowns
             if (lungeTimer > 0f) lungeTimer -= Time.deltaTime;
+            if (aiBargeCooldownTimer > 0f) aiBargeCooldownTimer -= Time.deltaTime;
+            if (bargeChargeTimer > 0f) bargeChargeTimer -= Time.deltaTime;
 
             UpdateDebugVisuals();
 
@@ -471,6 +479,26 @@ namespace Sportland.InputHandling
                     DecideAsStandoff(distance, fromThreat);
                     ReportAIState(StatusIconDisplay.AIDecisionState.Standoff);
                     return;
+                }
+
+                // ── BARGE WINDOW ──
+                // If chaser is close and barge is available, briefly charge through them.
+                if (bargeChargeTimer > 0f)
+                {
+                    // Actively charging at the It player
+                    currentDesiredDirection = -fromThreat.normalized;
+                    sprinting = true;
+                    isRecoveringStamina = false;
+                    specialRequest = true;
+                    ReportAIState(StatusIconDisplay.AIDecisionState.Fleeing);
+                    return;
+                }
+
+                if (aiBargeCooldownTimer <= 0f && distance < AiBargeTriggerDist
+                    && movement.BargeCooldownNormalized <= 0f)
+                {
+                    bargeChargeTimer = 0.3f;
+                    aiBargeCooldownTimer = AiBargeCooldown;
                 }
 
                 // Normal flee with swerve
@@ -1098,6 +1126,7 @@ namespace Sportland.InputHandling
             diveRequest = false;
             specialRequest = false;
             tagRequest = false;
+            bargeChargeTimer = 0f;
         }
 
         private void ReportAIState(StatusIconDisplay.AIDecisionState state)

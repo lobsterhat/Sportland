@@ -148,8 +148,8 @@ namespace Sportland.InputHandling
             {
                 if (movement.CurrentRole == TagMovementController.TagRole.It)
                     movement.TryLunge();
-                else
-                    movement.TryEvasionBurst();
+                else if (!movement.TryBarge())
+                    movement.TryEvasionBurst(); // fallback if not in barge position
             }
 
             if (currentSource.TagRequested())

@@ -72,6 +72,30 @@ namespace Sportland.Sports.Tag
         [Tooltip("Duration after being tagged before you can tag back the player who tagged you (seconds).")]
         [SerializeField] private float tagBackCooldown = 3f;
 
+        [Header("=== TAG: BARGE ===")]
+
+        [Tooltip("Radius in which the runner can connect a barge on an It player.")]
+        [SerializeField] private float bargeRadius = 2.2f;
+
+        [Tooltip("How long the barged It player is stunned (seconds).")]
+        [SerializeField] private float bargeStunDuration = 0.8f;
+
+        [Tooltip("Distance of the brief burst-through when the barge connects.")]
+        [SerializeField] private float bargeBurstDistance = 1.5f;
+
+        [Tooltip("Duration of the burst-through (seconds). Keep short.")]
+        [SerializeField] private float bargeBurstDuration = 0.18f;
+
+        [Tooltip("Cooldown before this runner can barge again (seconds).")]
+        [SerializeField] private float bargeCooldown = 5f;
+
+        [Tooltip("Stamina cost to barge.")]
+        [SerializeField] private float bargeStaminaCost = 20f;
+
+        [Tooltip("Minimum dot product between runner velocity and direction-to-It required to barge. " +
+                 "0 = any direction, 1 = must be heading directly at them.")]
+        [SerializeField] private float bargeAlignmentThreshold = 0.35f;
+
         [Header("=== TAG: DEBUG ===")]
 
         [Tooltip("When enabled, this character always stays It — tags are registered but IT status never transfers away. Useful for testing chaser AI.")]
@@ -102,6 +126,13 @@ namespace Sportland.Sports.Tag
         private bool isLunging;
         private bool isEvading;
 
+        // Barge state
+        private float bargeCooldownTimer;
+        private float stunTimer;          // counts down on the It player who was barged
+        private bool isBargeBursting;     // true on the runner during the brief burst-through
+        private float bargeBurstTimer;
+        private Vector2 bargeBurstDirection;
+
         // ──────────────────────────────────────────────
         //  EVENTS
         // ──────────────────────────────────────────────
@@ -113,6 +144,18 @@ namespace Sportland.Sports.Tag
         public System.Action OnEvasionBurst;
         public System.Action OnEliminated;                          // this player was eliminated
         public System.Action<float> OnFuseChanged;                  // passes normalized 0-1
+        public System.Action OnBargeConnected;                      // this runner connected a barge
+        public System.Action OnBargeStunned;                        // this It player was stunned by a barge
+
+        // ──────────────────────────────────────────────
+        //  PUBLIC QUERIES (Tag-specific)
+        // ──────────────────────────────────────────────
+
+        /// <summary>True while this It player is stunned from a barge (and not permanently eliminated).</summary>
+        public bool IsBargeStunned => !IsEliminated && stunTimer > 0f;
+
+        /// <summary>Normalized barge cooldown remaining (0 = ready, 1 = just used).</summary>
+        public float BargeCooldownNormalized => bargeCooldownTimer / bargeCooldown;
 
         // ──────────────────────────────────────────────
         //  INITIALIZATION
@@ -141,6 +184,7 @@ namespace Sportland.Sports.Tag
             //UpdateFuse();
             UpdateLunge();
             UpdateEvasion();
+            UpdateBarge();
         }
 
         // ──────────────────────────────────────────────
@@ -354,6 +398,114 @@ namespace Sportland.Sports.Tag
         }
 
         // ──────────────────────────────────────────────
+        //  BARGE (Runner offensive counter-move)
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Runner charges through an It player, stunning them briefly.
+        /// Requires moving toward the It player within barge radius.
+        /// High risk (running at the chaser), high reward (they freeze, you sprint away).
+        /// </summary>
+        public bool TryBarge()
+        {
+            if (CurrentRole != TagRole.Runner) return false;
+            if (!CanAct()) return false;
+            if (isBargeBursting) return false;
+            if (bargeCooldownTimer > 0f) return false;
+            if (CurrentStamina < bargeStaminaCost) return false;
+
+            Collider2D[] hits = Physics2D.OverlapCircleAll(transform.position, bargeRadius, taggableLayer);
+
+            TagMovementController target = null;
+            float closestDist = float.MaxValue;
+
+            foreach (var hit in hits)
+            {
+                if (hit.gameObject == gameObject) continue;
+
+                var t = hit.GetComponent<TagMovementController>();
+                if (t == null) continue;
+                if (t.CurrentRole != TagRole.It) continue;
+                if (t.IsEliminated) continue;
+                if (t.IsBargeStunned) continue; // already stunned
+
+                // Runner must be moving toward the target
+                Vector2 toTarget = ((Vector2)t.transform.position - (Vector2)transform.position).normalized;
+                Vector2 vel = rb.linearVelocity.sqrMagnitude > 0.01f
+                    ? rb.linearVelocity.normalized
+                    : facingDirection;
+
+                if (Vector2.Dot(vel, toTarget) < bargeAlignmentThreshold) continue;
+
+                float dist = Vector2.Distance(transform.position, t.transform.position);
+                if (dist < closestDist)
+                {
+                    closestDist = dist;
+                    target = t;
+                }
+            }
+
+            if (target == null) return false;
+
+            // Barge connects!
+            ConsumeStamina(bargeStaminaCost);
+            bargeCooldownTimer = bargeCooldown;
+
+            // Stun the It player
+            target.ApplyBarge(bargeStunDuration);
+
+            // Runner bursts through
+            bargeBurstDirection = ((Vector2)target.transform.position - (Vector2)transform.position).normalized;
+            isBargeBursting = true;
+            bargeBurstTimer = bargeBurstDuration;
+
+            // Brief immunity while passing through
+            IsImmune = true;
+            immunityTimer = bargeBurstDuration + 0.15f;
+
+            OnBargeConnected?.Invoke();
+            return true;
+        }
+
+        /// <summary>
+        /// Called on the It player to apply the stun from a barge.
+        /// </summary>
+        public void ApplyBarge(float stunDuration)
+        {
+            SetState(MovementState.Stunned);
+            rb.linearVelocity = Vector2.zero;
+            currentSpeed = 0f;
+            stunTimer = stunDuration;
+            OnBargeStunned?.Invoke();
+        }
+
+        private void UpdateBarge()
+        {
+            // Cooldown on the runner
+            if (bargeCooldownTimer > 0f)
+                bargeCooldownTimer -= Time.deltaTime;
+
+            // Burst-through: override velocity while active
+            if (isBargeBursting)
+            {
+                bargeBurstTimer -= Time.deltaTime;
+                if (bargeBurstTimer <= 0f)
+                    isBargeBursting = false;
+            }
+
+            // Stun countdown on the It player (stunTimer is only nonzero on the It side)
+            if (CurrentState == MovementState.Stunned && stunTimer > 0f)
+            {
+                stunTimer -= Time.deltaTime;
+                if (stunTimer <= 0f)
+                {
+                    stunTimer = 0f;
+                    SetState(MovementState.Idle);
+                }
+            }
+        }
+
+        // ──────────────────────────────────────────────
         //  BURNING FUSE
         // ──────────────────────────────────────────────
 
@@ -418,10 +570,18 @@ namespace Sportland.Sports.Tag
         // ──────────────────────────────────────────────
 
         /// <summary>
-        /// Override to apply It speed boost and evasion burst multiplier.
+        /// Override to apply It speed boost, evasion burst, and barge burst-through.
         /// </summary>
         protected override void ApplyMovement()
         {
+            // Barge burst-through: override base movement entirely for its brief duration
+            if (isBargeBursting)
+            {
+                float burstSpeed = bargeBurstDistance / bargeBurstDuration;
+                rb.linearVelocity = bargeBurstDirection * burstSpeed;
+                return;
+            }
+
             // Let base handle all core movement
             base.ApplyMovement();
 
@@ -471,6 +631,12 @@ namespace Sportland.Sports.Tag
             evasionCooldownTimer = 0f;
             isLunging = false;
             isEvading = false;
+
+            // Reset barge state
+            bargeCooldownTimer = 0f;
+            stunTimer = 0f;
+            isBargeBursting = false;
+            bargeBurstTimer = 0f;
         }
 
         // ──────────────────────────────────────────────
