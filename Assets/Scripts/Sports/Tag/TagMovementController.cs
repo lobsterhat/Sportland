@@ -111,6 +111,7 @@ namespace Sportland.Sports.Tag
         public System.Action OnFuseExpired;
         public System.Action OnLungeStarted;
         public System.Action OnEvasionBurst;
+        public System.Action OnEliminated;                          // this player was eliminated
         public System.Action<float> OnFuseChanged;                  // passes normalized 0-1
 
         // ──────────────────────────────────────────────
@@ -169,6 +170,20 @@ namespace Sportland.Sports.Tag
             immunityTimer = tagImmunityDuration;
         }
 
+        /// <summary>
+        /// Remove this player from the game. Called by the game manager
+        /// when they are tagged in elimination mode.
+        /// </summary>
+        public void Eliminate()
+        {
+            if (IsEliminated) return;
+            IsEliminated = true;
+            SetState(MovementState.Stunned);
+            rb.linearVelocity = Vector2.zero;
+            currentSpeed = 0f;
+            OnEliminated?.Invoke();
+        }
+
         // ──────────────────────────────────────────────
         //  TAG ACTION
         // ──────────────────────────────────────────────
@@ -213,10 +228,9 @@ namespace Sportland.Sports.Tag
             {
                 if (alwaysIt)
                 {
-                    // Acknowledge the tag (fire event, give runner brief immunity)
-                    // but keep It status here — useful for AI testing.
+                    // Signal the tag but don't transfer It status.
+                    // The game manager listens to OnTagged and handles elimination.
                     OnTagged?.Invoke(closest);
-                    closest.BecomeRunner(); // grants immunity; they're already a runner so no role change
                 }
                 else
                 {
