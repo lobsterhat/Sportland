@@ -134,6 +134,14 @@ namespace Sportland.InputHandling
 
         private StatusIconDisplay statusIcons;
 
+        // Debug visualization
+        private LineRenderer interceptLine;
+        private LineRenderer cutoffLine;
+        private Vector2 debugInterceptPoint;
+        private Vector2 debugCutoffPoint;
+        private bool debugShowIntercept;
+        private bool debugShowCutoff;
+
         public void OnActivate(GameObject character)
         {
             this.character = character;
@@ -143,15 +151,42 @@ namespace Sportland.InputHandling
             this.decisionTimer = 0f;
             this.isRecoveringStamina = false;
 
+            interceptLine = CreateDebugLine("AIDebug_Intercept", Color.green);
+            cutoffLine = CreateDebugLine("AIDebug_Cutoff", new Color(1f, 0.45f, 0f));
+
             ClearOutputs();
         }
 
         public void OnDeactivate()
         {
             ClearOutputs();
+
+            if (interceptLine != null) Object.Destroy(interceptLine.gameObject);
+            if (cutoffLine != null) Object.Destroy(cutoffLine.gameObject);
+            interceptLine = null;
+            cutoffLine = null;
+
             character = null;
             characterTransform = null;
             movement = null;
+        }
+
+        private LineRenderer CreateDebugLine(string name, Color color)
+        {
+            var go = new GameObject(name);
+            go.transform.SetParent(characterTransform);
+
+            var lr = go.AddComponent<LineRenderer>();
+            lr.positionCount = 2;
+            lr.startWidth = 0.06f;
+            lr.endWidth = 0.06f;
+            lr.startColor = color;
+            lr.endColor = color;
+            lr.material = new Material(Shader.Find("Sprites/Default"));
+            lr.sortingOrder = 120;
+            lr.useWorldSpace = true;
+            lr.enabled = false;
+            return lr;
         }
 
         public void UpdateInput()
@@ -170,6 +205,8 @@ namespace Sportland.InputHandling
 
             // Tick cooldowns
             if (lungeTimer > 0f) lungeTimer -= Time.deltaTime;
+
+            UpdateDebugVisuals();
 
             // Throttle decisions
             decisionTimer -= Time.deltaTime;
@@ -271,9 +308,13 @@ namespace Sportland.InputHandling
             Vector2 chaseDir;
             StatusIconDisplay.AIDecisionState reportedState;
 
+            debugShowIntercept = false;
+            debugShowCutoff = false;
+
             if (IsRunnerHeadingToZone(chaseTarget, out SafeZone targetZone))
             {
-                chaseDir = GetCutoffDirection(chaseTarget, targetZone);
+                chaseDir = GetCutoffDirection(chaseTarget, targetZone, out debugCutoffPoint);
+                debugShowCutoff = true;
                 reportedState = StatusIconDisplay.AIDecisionState.CuttingOff;
             }
             else
@@ -285,6 +326,11 @@ namespace Sportland.InputHandling
 
                 // Report Intercepting only when the predict point is meaningfully ahead of current pos
                 bool isIntercepting = Vector2.Distance(interceptPoint, (Vector2)chaseTarget.position) > 0.4f;
+                if (isIntercepting)
+                {
+                    debugInterceptPoint = interceptPoint;
+                    debugShowIntercept = true;
+                }
                 reportedState = isIntercepting
                     ? StatusIconDisplay.AIDecisionState.Intercepting
                     : StatusIconDisplay.AIDecisionState.Chasing;
@@ -744,8 +790,9 @@ namespace Sportland.InputHandling
         /// Get the direction to move to intercept the runner before they reach a safe zone.
         /// If we're already between the runner and the zone, just chase directly.
         /// Otherwise, aim for a point 65% of the way from runner to zone to cut the angle.
+        /// cutoffPoint is the world-space target used (for debug visualization).
         /// </summary>
-        private Vector2 GetCutoffDirection(Transform runner, SafeZone zone)
+        private Vector2 GetCutoffDirection(Transform runner, SafeZone zone, out Vector2 cutoffPoint)
         {
             Vector2 runnerPos = runner.position;
             Vector2 zonePos = zone.transform.position;
@@ -755,10 +802,13 @@ namespace Sportland.InputHandling
             float myDistToZone = Vector2.Distance(myPos, zonePos);
             float runnerDistToZone = Vector2.Distance(runnerPos, zonePos);
             if (myDistToZone < runnerDistToZone * 0.85f)
+            {
+                cutoffPoint = runnerPos;
                 return (runnerPos - myPos).normalized;
+            }
 
             // Aim for a point between runner and zone to get in their path
-            Vector2 cutoffPoint = Vector2.Lerp(runnerPos, zonePos, 0.65f);
+            cutoffPoint = Vector2.Lerp(runnerPos, zonePos, 0.65f);
             Vector2 dir = cutoffPoint - myPos;
             return dir.sqrMagnitude > 0.01f ? dir.normalized : (runnerPos - myPos).normalized;
         }
@@ -983,6 +1033,39 @@ namespace Sportland.InputHandling
         // ──────────────────────────────────────────────
         //  UTILITY
         // ──────────────────────────────────────────────
+
+        // ──────────────────────────────────────────────
+        //  DEBUG VISUALIZATION
+        // ──────────────────────────────────────────────
+
+        private void UpdateDebugVisuals()
+        {
+            if (characterTransform == null) return;
+
+            Vector3 origin = characterTransform.position;
+
+            // Green line → intercept point (where the runner will be)
+            if (interceptLine != null)
+            {
+                interceptLine.enabled = debugShowIntercept;
+                if (debugShowIntercept)
+                {
+                    interceptLine.SetPosition(0, origin);
+                    interceptLine.SetPosition(1, debugInterceptPoint);
+                }
+            }
+
+            // Orange line → cutoff point (blocking path to safe zone)
+            if (cutoffLine != null)
+            {
+                cutoffLine.enabled = debugShowCutoff;
+                if (debugShowCutoff)
+                {
+                    cutoffLine.SetPosition(0, origin);
+                    cutoffLine.SetPosition(1, debugCutoffPoint);
+                }
+            }
+        }
 
         private void ClearOutputs()
         {

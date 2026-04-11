@@ -72,6 +72,11 @@ namespace Sportland.Sports.Tag
         [Tooltip("Duration after being tagged before you can tag back the player who tagged you (seconds).")]
         [SerializeField] private float tagBackCooldown = 3f;
 
+        [Header("=== TAG: DEBUG ===")]
+
+        [Tooltip("When enabled, this character always stays It — tags are registered but IT status never transfers away. Useful for testing chaser AI.")]
+        [SerializeField] private bool alwaysIt = false;
+
         // ──────────────────────────────────────────────
         //  TAG STATE
         // ──────────────────────────────────────────────
@@ -116,6 +121,8 @@ namespace Sportland.Sports.Tag
         {
             base.Start();
             FuseTimeRemaining = totalFuseTime;
+            if (alwaysIt)
+                CurrentRole = TagRole.It;
         }
 
         // ──────────────────────────────────────────────
@@ -152,9 +159,11 @@ namespace Sportland.Sports.Tag
         /// <summary>
         /// Make this player a Runner (after successfully tagging someone).
         /// Grants brief immunity to prevent tag-backs.
+        /// If alwaysIt is set, this is a no-op — the character never gives up It status.
         /// </summary>
         public void BecomeRunner()
         {
+            if (alwaysIt) return;
             CurrentRole = TagRole.Runner;
             IsImmune = true;
             immunityTimer = tagImmunityDuration;
@@ -202,8 +211,17 @@ namespace Sportland.Sports.Tag
 
             if (closest != null)
             {
-                // Transfer tag
-                TransferTag(closest);
+                if (alwaysIt)
+                {
+                    // Acknowledge the tag (fire event, give runner brief immunity)
+                    // but keep It status here — useful for AI testing.
+                    OnTagged?.Invoke(closest);
+                    closest.BecomeRunner(); // grants immunity; they're already a runner so no role change
+                }
+                else
+                {
+                    TransferTag(closest);
+                }
             }
 
             return closest;
