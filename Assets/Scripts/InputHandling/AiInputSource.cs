@@ -20,7 +20,7 @@ namespace Sportland.InputHandling
         // ──────────────────────────────────────────────
 
         [Header("=== AWARENESS ===")]
-        private float awarenessRadius = 15f;
+        private float awarenessRadius = 20f;
         private LayerMask playerLayer;
 
         [Header("=== CHASE BEHAVIOR ===")]
