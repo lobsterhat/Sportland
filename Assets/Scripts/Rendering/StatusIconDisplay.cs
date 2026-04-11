@@ -54,6 +54,8 @@ namespace Sportland.Rendering
 
         [Header("=== AI DECISION ICONS ===")]
         [SerializeField] private Sprite iconChasing;
+        [SerializeField] private Sprite iconIntercepting;
+        [SerializeField] private Sprite iconCuttingOff;
         [SerializeField] private Sprite iconFleeing;
         [SerializeField] private Sprite iconWandering;
         [SerializeField] private Sprite iconStandoff;
@@ -75,6 +77,8 @@ namespace Sportland.Rendering
         {
             None,
             Chasing,
+            Intercepting,   // chasing predicted future position, not current
+            CuttingOff,     // repositioning to block runner's path to a safe zone
             Fleeing,
             Wandering,
             Standoff,
@@ -130,6 +134,8 @@ namespace Sportland.Rendering
 
         // AI Decision
         private static readonly Color colorChasing = new Color(1f, 0.2f, 0.2f, 0.8f);
+        private static readonly Color colorIntercepting = new Color(0.2f, 0.8f, 1f, 0.8f);   // cyan — predictive lock-on
+        private static readonly Color colorCuttingOff = new Color(1f, 0.45f, 0f, 0.8f);       // orange — blocking escape
         private static readonly Color colorFleeing = new Color(1f, 1f, 0.2f, 0.8f);
         private static readonly Color colorWandering = new Color(0.6f, 0.8f, 0.6f, 0.8f);
         private static readonly Color colorStandoff = new Color(0.8f, 0.2f, 0.8f, 0.8f);
@@ -285,6 +291,10 @@ namespace Sportland.Rendering
                     icon = null; fallback = colorNone; break;
                 case AIDecisionState.Chasing:
                     icon = iconChasing; fallback = colorChasing; break;
+                case AIDecisionState.Intercepting:
+                    icon = iconIntercepting; fallback = colorIntercepting; break;
+                case AIDecisionState.CuttingOff:
+                    icon = iconCuttingOff; fallback = colorCuttingOff; break;
                 case AIDecisionState.Fleeing:
                     icon = iconFleeing; fallback = colorFleeing; break;
                 case AIDecisionState.Wandering:

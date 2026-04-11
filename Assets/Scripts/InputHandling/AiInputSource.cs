@@ -29,6 +29,10 @@ namespace Sportland.InputHandling
         private float tagAttemptDistance = 1.3f;
         private float sprintStaminaThreshold = 0.3f;
         private float sprintRecoveryThreshold = 0.6f;
+        private float lungeCooldown = 1.2f;          // min seconds between AI lunge decisions
+        private float interceptLookaheadCap = 1.5f;  // max seconds to predict ahead for intercept
+        private float cutoffZoneScanRadius = 8f;     // how far ahead to check if runner targets a zone
+        private float cutoffAlignmentThreshold = 0.6f; // dot product: how directly runner heads at zone
 
         [Header("=== FLEE BEHAVIOR ===")]
         private float fleeDistance = 7f;
@@ -63,6 +67,7 @@ namespace Sportland.InputHandling
 
         private float decisionTimer;
         private bool isRecoveringStamina;
+        private float lungeTimer;           // AI-side cooldown between lunge attempts
 
         // Standoff state
         private bool isInStandoff;
@@ -163,6 +168,9 @@ namespace Sportland.InputHandling
             specialRequest = false;
             tagRequest = false;
 
+            // Tick cooldowns
+            if (lungeTimer > 0f) lungeTimer -= Time.deltaTime;
+
             // Throttle decisions
             decisionTimer -= Time.deltaTime;
             if (decisionTimer <= 0f)
@@ -216,18 +224,37 @@ namespace Sportland.InputHandling
                 return;
             }
 
+            var targetMovement = chaseTarget.GetComponent<TagMovementController>();
+
             Vector2 toTarget = (Vector2)(chaseTarget.position - characterTransform.position);
             float distance = toTarget.magnitude;
             Vector2 direction = toTarget.normalized;
 
-            // Walk-up tag only — no lunging for now
+            // Walk-up tag — close enough to touch
             if (movement.CanAct() && distance <= tagAttemptDistance)
             {
                 tagRequest = true;
             }
 
-            // Check if target is in standoff — stalk instead of rush
-            var targetMovement = chaseTarget.GetComponent<TagMovementController>();
+            // Lunge — commit when in the gap between touch range and lunge range,
+            // target isn't in shuffle stance (no lunging into a standoff), and
+            // our AI-side cooldown has expired.
+            if (movement.CanAct()
+                && distance > tagAttemptDistance
+                && distance <= lungeAttemptDistance
+                && lungeTimer <= 0f)
+            {
+                bool targetShuffling = targetMovement != null
+                    && targetMovement.CurrentState == BaseMovementController.MovementState.Shuffling;
+
+                if (!targetShuffling)
+                {
+                    specialRequest = true;
+                    lungeTimer = lungeCooldown;
+                }
+            }
+
+            // Shuffling target at close range — switch to stalk mode
             bool targetIsShuffling = targetMovement != null
                 && targetMovement.CurrentState == BaseMovementController.MovementState.Shuffling;
 
@@ -238,13 +265,36 @@ namespace Sportland.InputHandling
                 return;
             }
 
-            // Normal chase — steer toward target, avoid active safe zones
-            Vector2 steerDir = ApplyZoneAvoidance(direction);
+            // Determine chase direction.
+            // Priority 1: cut off the runner if they're heading for a safe zone.
+            // Priority 2: intercept their predicted future position.
+            Vector2 chaseDir;
+            StatusIconDisplay.AIDecisionState reportedState;
+
+            if (IsRunnerHeadingToZone(chaseTarget, out SafeZone targetZone))
+            {
+                chaseDir = GetCutoffDirection(chaseTarget, targetZone);
+                reportedState = StatusIconDisplay.AIDecisionState.CuttingOff;
+            }
+            else
+            {
+                Vector2 interceptPoint = GetInterceptPoint(chaseTarget, movement.GetEffectiveTopSpeed());
+                chaseDir = ((Vector2)interceptPoint - (Vector2)characterTransform.position);
+                if (chaseDir.sqrMagnitude > 0.01f) chaseDir = chaseDir.normalized;
+                else chaseDir = direction;
+
+                // Report Intercepting only when the predict point is meaningfully ahead of current pos
+                bool isIntercepting = Vector2.Distance(interceptPoint, (Vector2)chaseTarget.position) > 0.4f;
+                reportedState = isIntercepting
+                    ? StatusIconDisplay.AIDecisionState.Intercepting
+                    : StatusIconDisplay.AIDecisionState.Chasing;
+            }
+
+            Vector2 steerDir = ApplyZoneAvoidance(chaseDir);
             currentDesiredDirection = ApplyWallAvoidance(steerDir);
             currentDesiredDirection = ApplyJitter(currentDesiredDirection);
-            ReportAIState(StatusIconDisplay.AIDecisionState.Chasing);
+            ReportAIState(reportedState);
 
-            // Sprint management
             UpdateSprintDecision(distance, sprintChaseDistance);
         }
 
@@ -625,6 +675,95 @@ namespace Sportland.InputHandling
         }
 
         // ──────────────────────────────────────────────
+        //  INTERCEPT / CUTOFF HELPERS
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Predict where the target will be based on their current velocity,
+        /// so we steer toward the intercept point rather than chasing their
+        /// current position. Caps lookahead to avoid wild predictions.
+        /// </summary>
+        private Vector2 GetInterceptPoint(Transform target, float myEffectiveSpeed)
+        {
+            var targetRb = target.GetComponent<Rigidbody2D>();
+            if (targetRb == null) return target.position;
+
+            Vector2 targetVelocity = targetRb.linearVelocity;
+
+            // No meaningful movement to predict from
+            if (targetVelocity.sqrMagnitude < 1f)
+                return target.position;
+
+            float distance = Vector2.Distance(characterTransform.position, target.position);
+            if (myEffectiveSpeed < 0.1f) return target.position;
+
+            float timeToReach = Mathf.Clamp(distance / myEffectiveSpeed, 0f, interceptLookaheadCap);
+            return (Vector2)target.position + targetVelocity * timeToReach;
+        }
+
+        /// <summary>
+        /// Returns true if the runner appears to be heading toward a safe zone,
+        /// and sets targetZone to the zone they're aiming for.
+        /// Uses runner velocity alignment with zone direction as the signal.
+        /// </summary>
+        private bool IsRunnerHeadingToZone(Transform runner, out SafeZone targetZone)
+        {
+            targetZone = null;
+
+            var runnerRb = runner.GetComponent<Rigidbody2D>();
+            if (runnerRb == null) return false;
+
+            Vector2 runnerVelocity = runnerRb.linearVelocity;
+            if (runnerVelocity.sqrMagnitude < 1f) return false;
+
+            Vector2 runnerDir = runnerVelocity.normalized;
+            float closestAlignedDist = float.MaxValue;
+
+            var zones = Object.FindObjectsByType<SafeZone>(FindObjectsSortMode.None);
+            foreach (var zone in zones)
+            {
+                if (!zone.IsActive) continue;
+
+                Vector2 toZone = (Vector2)zone.transform.position - (Vector2)runner.position;
+                float zoneDist = toZone.magnitude;
+
+                if (zoneDist > cutoffZoneScanRadius) continue;
+
+                float alignment = Vector2.Dot(runnerDir, toZone.normalized);
+                if (alignment > cutoffAlignmentThreshold && zoneDist < closestAlignedDist)
+                {
+                    closestAlignedDist = zoneDist;
+                    targetZone = zone;
+                }
+            }
+
+            return targetZone != null;
+        }
+
+        /// <summary>
+        /// Get the direction to move to intercept the runner before they reach a safe zone.
+        /// If we're already between the runner and the zone, just chase directly.
+        /// Otherwise, aim for a point 65% of the way from runner to zone to cut the angle.
+        /// </summary>
+        private Vector2 GetCutoffDirection(Transform runner, SafeZone zone)
+        {
+            Vector2 runnerPos = runner.position;
+            Vector2 zonePos = zone.transform.position;
+            Vector2 myPos = characterTransform.position;
+
+            // If we're already closer to the zone than the runner is, just chase them directly
+            float myDistToZone = Vector2.Distance(myPos, zonePos);
+            float runnerDistToZone = Vector2.Distance(runnerPos, zonePos);
+            if (myDistToZone < runnerDistToZone * 0.85f)
+                return (runnerPos - myPos).normalized;
+
+            // Aim for a point between runner and zone to get in their path
+            Vector2 cutoffPoint = Vector2.Lerp(runnerPos, zonePos, 0.65f);
+            Vector2 dir = cutoffPoint - myPos;
+            return dir.sqrMagnitude > 0.01f ? dir.normalized : (runnerPos - myPos).normalized;
+        }
+
+        // ──────────────────────────────────────────────
         //  TARGET SCANNING
         // ──────────────────────────────────────────────
 
@@ -636,7 +775,7 @@ namespace Sportland.InputHandling
             Collider2D[] hits = Physics2D.OverlapCircleAll(
                 characterTransform.position, awarenessRadius, playerLayer);
 
-            float closestRunnerDist = float.MaxValue;
+            float bestRunnerScore = float.MaxValue;
             float closestItDist = float.MaxValue;
 
             foreach (var hit in hits)
@@ -649,11 +788,17 @@ namespace Sportland.InputHandling
 
                 float dist = Vector2.Distance(characterTransform.position, other.transform.position);
 
-                if (other.CurrentRole == TagMovementController.TagRole.Runner
-                    && dist < closestRunnerDist)
+                if (other.CurrentRole == TagMovementController.TagRole.Runner)
                 {
-                    closestRunnerDist = dist;
-                    chaseTarget = other.transform;
+                    // Skip runners already in safe zones — untouchable
+                    if (other.InSafeZone) continue;
+
+                    float score = ScoreRunnerTarget(other, dist);
+                    if (score < bestRunnerScore)
+                    {
+                        bestRunnerScore = score;
+                        chaseTarget = other.transform;
+                    }
                 }
 
                 if (other.CurrentRole == TagMovementController.TagRole.It
@@ -663,6 +808,38 @@ namespace Sportland.InputHandling
                     threatSource = other.transform;
                 }
             }
+        }
+
+        /// <summary>
+        /// Score a runner as a chase target. Lower = more attractive.
+        /// Factors: proximity (closer is better), distance to nearest safe zone
+        /// (penalize runners near safety), and current stamina (prefer tired runners).
+        /// </summary>
+        private float ScoreRunnerTarget(TagMovementController runner, float distance)
+        {
+            float score = distance;
+
+            // Penalize runners close to a safe zone — they can shelter quickly
+            var zones = Object.FindObjectsByType<SafeZone>(FindObjectsSortMode.None);
+            float nearestZoneDist = float.MaxValue;
+            foreach (var zone in zones)
+            {
+                if (!zone.IsActive) continue;
+                float d = Vector2.Distance(runner.transform.position, zone.transform.position);
+                if (d < nearestZoneDist) nearestZoneDist = d;
+            }
+            if (nearestZoneDist < float.MaxValue)
+            {
+                // Zone within ~4 units starts penalizing; max penalty at zone edge
+                float zonePenalty = Mathf.Clamp(4f - nearestZoneDist, 0f, 4f) * 2.5f;
+                score += zonePenalty;
+            }
+
+            // Prefer runners low on stamina — they're slower and can't burst away
+            float staminaBonus = (1f - runner.GetNormalizedStamina()) * 3f;
+            score -= staminaBonus;
+
+            return score;
         }
 
         // ──────────────────────────────────────────────
