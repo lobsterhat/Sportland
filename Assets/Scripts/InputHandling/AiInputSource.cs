@@ -89,6 +89,10 @@ namespace Sportland.InputHandling
         private Transform chaseTarget;
         private Transform threatSource;
 
+        // Track which runners we last put scores on so we can clear them when they drop out
+        private System.Collections.Generic.HashSet<StatusIconDisplay> scoredRunners
+            = new System.Collections.Generic.HashSet<StatusIconDisplay>();
+
         // ──────────────────────────────────────────────
         //  CONSTRUCTOR
         // ──────────────────────────────────────────────
@@ -165,6 +169,10 @@ namespace Sportland.InputHandling
             if (cutoffLine != null) Object.Destroy(cutoffLine.gameObject);
             interceptLine = null;
             cutoffLine = null;
+
+            foreach (var display in scoredRunners)
+                if (display != null) display.ClearTargetScore();
+            scoredRunners.Clear();
 
             character = null;
             characterTransform = null;
@@ -768,7 +776,7 @@ namespace Sportland.InputHandling
             var zones = Object.FindObjectsByType<SafeZone>(FindObjectsSortMode.None);
             foreach (var zone in zones)
             {
-                if (!zone.IsActive) continue;
+                if (zone.IsOnCooldown) continue;  // skip disabled zones; Ready zones are valid targets
 
                 Vector2 toZone = (Vector2)zone.transform.position - (Vector2)runner.position;
                 float zoneDist = toZone.magnitude;
@@ -822,6 +830,11 @@ namespace Sportland.InputHandling
             chaseTarget = null;
             threatSource = null;
 
+            // Clear scores from runners that may have left awareness range
+            foreach (var display in scoredRunners)
+                if (display != null) display.ClearTargetScore();
+            scoredRunners.Clear();
+
             Collider2D[] hits = Physics2D.OverlapCircleAll(
                 characterTransform.position, awarenessRadius, playerLayer);
 
@@ -844,6 +857,15 @@ namespace Sportland.InputHandling
                     if (other.InSafeZone) continue;
 
                     float score = ScoreRunnerTarget(other, dist);
+
+                    // Display the score on the runner for debugging
+                    var display = other.GetComponent<StatusIconDisplay>();
+                    if (display != null)
+                    {
+                        display.SetTargetScore(score);
+                        scoredRunners.Add(display);
+                    }
+
                     if (score < bestRunnerScore)
                     {
                         bestRunnerScore = score;
@@ -869,12 +891,12 @@ namespace Sportland.InputHandling
         {
             float score = distance;
 
-            // Penalize runners close to a safe zone — they can shelter quickly
+            // Penalize runners close to a usable safe zone — they can shelter quickly
             var zones = Object.FindObjectsByType<SafeZone>(FindObjectsSortMode.None);
             float nearestZoneDist = float.MaxValue;
             foreach (var zone in zones)
             {
-                if (!zone.IsActive) continue;
+                if (zone.IsOnCooldown) continue;
                 float d = Vector2.Distance(runner.transform.position, zone.transform.position);
                 if (d < nearestZoneDist) nearestZoneDist = d;
             }

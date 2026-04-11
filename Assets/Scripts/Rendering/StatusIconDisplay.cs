@@ -107,6 +107,7 @@ namespace Sportland.Rendering
         private SpriteRenderer movementIcon;
         private SpriteRenderer aiDecisionIcon;
         private SpriteRenderer feintIcon;
+        private TextMesh targetScoreLabel;
 
         private Sprite placeholderSprite;
 
@@ -171,6 +172,20 @@ namespace Sportland.Rendering
             movementIcon = CreateIconSlot("MovementState", -iconSpacing);
             aiDecisionIcon = CreateIconSlot("AIDecision", 0f);
             feintIcon = CreateIconSlot("FeintState", iconSpacing);
+
+            // Score label — shown when this character is being evaluated by an It AI
+            var scoreGO = new GameObject("TargetScore");
+            scoreGO.transform.SetParent(iconRoot);
+            scoreGO.transform.localPosition = new Vector3(0f, -0.35f, 0f);
+            targetScoreLabel = scoreGO.AddComponent<TextMesh>();
+            targetScoreLabel.fontSize = 28;
+            targetScoreLabel.characterSize = 0.045f;
+            targetScoreLabel.anchor = TextAnchor.MiddleCenter;
+            targetScoreLabel.alignment = TextAlignment.Center;
+            targetScoreLabel.color = new Color(1f, 0.85f, 0.2f);
+            targetScoreLabel.text = "";
+            scoreGO.GetComponent<MeshRenderer>().sortingOrder = sortingOrder;
+            scoreGO.SetActive(false);
         }
 
         private SpriteRenderer CreateIconSlot(string name, float xOffset)
@@ -312,6 +327,26 @@ namespace Sportland.Rendering
             }
 
             ApplyIcon(aiDecisionIcon, icon, fallback);
+        }
+
+        /// <summary>
+        /// Show a target score above this character (set by the It AI during scanning).
+        /// Lower score = more attractive target.
+        /// </summary>
+        public void SetTargetScore(float score)
+        {
+            if (targetScoreLabel == null) return;
+            targetScoreLabel.gameObject.SetActive(true);
+            targetScoreLabel.text = score.ToString("F1");
+        }
+
+        /// <summary>
+        /// Hide the target score label (called when this runner leaves awareness range).
+        /// </summary>
+        public void ClearTargetScore()
+        {
+            if (targetScoreLabel == null) return;
+            targetScoreLabel.gameObject.SetActive(false);
         }
 
         // ──────────────────────────────────────────────
