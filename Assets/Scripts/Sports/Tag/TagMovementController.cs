@@ -156,7 +156,29 @@ namespace Sportland.Sports.Tag
         public bool IsBargeStunned => !IsEliminated && stunTimer > 0f;
 
         /// <summary>Normalized barge cooldown remaining (0 = ready, 1 = just used).</summary>
-        public float BargeCooldownNormalized => bargeCooldownTimer / bargeCooldown;
+        public float BargeCooldownNormalized => bargeCooldown > 0f ? bargeCooldownTimer / bargeCooldown : 0f;
+
+        /// <summary>Normalized evasion burst cooldown (0 = ready, 1 = just used).</summary>
+        public float EvasionCooldownNormalized => evasionBurstCooldown > 0f ? evasionCooldownTimer / evasionBurstCooldown : 0f;
+
+        /// <summary>True if this It player can lunge right now.</summary>
+        public bool LungeReady => CurrentRole == TagRole.It
+            && CanAct() && !isLunging
+            && CurrentStamina >= lungeStaminaCost
+            && (ActiveSurface == null || ActiveSurface.allowLunge);
+
+        /// <summary>True if this runner can barge right now.</summary>
+        public bool BargeReady => CurrentRole == TagRole.Runner
+            && CanAct() && !isBargeBursting
+            && bargeCooldownTimer <= 0f
+            && CurrentStamina >= bargeStaminaCost
+            && (ActiveSurface == null || ActiveSurface.allowBarge);
+
+        /// <summary>True if this runner can use evasion burst right now.</summary>
+        public bool EvasionReady => CurrentRole == TagRole.Runner
+            && CanAct() && !isEvading
+            && evasionCooldownTimer <= 0f
+            && CurrentStamina >= evasionBurstStaminaCost;
 
         // ──────────────────────────────────────────────
         //  INITIALIZATION

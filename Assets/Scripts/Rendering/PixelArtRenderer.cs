@@ -38,6 +38,10 @@ namespace Sportland.Rendering
         [Tooltip("Letterbox/pillarbox bar colour when the screen aspect doesn't match.")]
         [SerializeField] private Color letterboxColor = Color.black;
 
+        [Tooltip("Pixels to reserve at the bottom of the screen for the PlayerInfoBar. " +
+                 "The game view is constrained to the remaining space above this.")]
+        [SerializeField] private float hudBarHeight = 200f;
+
         // ──────────────────────────────────────────────
         //  RUNTIME
         // ──────────────────────────────────────────────
@@ -47,6 +51,9 @@ namespace Sportland.Rendering
 
         /// <summary>The RenderTexture the game camera draws into.</summary>
         public RenderTexture RenderTexture => renderTexture;
+
+        /// <summary>Pixels reserved at the bottom for the PlayerInfoBar HUD.</summary>
+        public float HudBarHeight => hudBarHeight;
 
         /// <summary>Reference width set in the Inspector.</summary>
         public int ReferenceWidth  => referenceWidth;
@@ -118,10 +125,10 @@ namespace Sportland.Rendering
             canvas.renderMode   = RenderMode.ScreenSpaceOverlay;
             canvas.sortingOrder = 0; // game HUD canvases sit above this (sortingOrder > 0)
 
-            canvasGO.AddComponent<CanvasScaler>();    // default pixel-for-pixel scaling
-            canvasGO.AddComponent<GraphicRaycaster>(); // required for Canvas
+            canvasGO.AddComponent<CanvasScaler>();     // default pixel-for-pixel scaling
+            canvasGO.AddComponent<GraphicRaycaster>();
 
-            // ── Letterbox background ─────────────────────
+            // ── Letterbox background (full canvas including bar region) ──
             var bgGO    = new GameObject("Letterbox");
             bgGO.transform.SetParent(canvasGO.transform, false);
             var bgImage = bgGO.AddComponent<Image>();
@@ -129,27 +136,34 @@ namespace Sportland.Rendering
             bgImage.raycastTarget = false;
             StretchToFill(bgGO.GetComponent<RectTransform>());
 
-            // ── Game view ────────────────────────────────
+            // ── Game area — full canvas minus the HUD bar at the bottom ──
+            // The PlayerInfoBar canvas fills the reserved bottom strip.
+            var areaGO   = new GameObject("GameArea");
+            areaGO.transform.SetParent(canvasGO.transform, false);
+            var areaRect = areaGO.AddComponent<RectTransform>();
+            areaRect.anchorMin = Vector2.zero;
+            areaRect.anchorMax = Vector2.one;
+            areaRect.offsetMin = new Vector2(0f, hudBarHeight); // leave bottom for HUD
+            areaRect.offsetMax = Vector2.zero;
+
+            // ── Game view (RT) inside the game area ──────
             var viewGO   = new GameObject("GameView");
-            viewGO.transform.SetParent(canvasGO.transform, false);
+            viewGO.transform.SetParent(areaGO.transform, false);
 
-            var rawImage          = viewGO.AddComponent<RawImage>();
-            rawImage.texture      = renderTexture;
+            var rawImage           = viewGO.AddComponent<RawImage>();
+            rawImage.texture       = renderTexture;
             rawImage.raycastTarget = false;
-            // RenderTexture.filterMode = Point is inherited when sampled —
-            // no custom material needed for nearest-neighbour display.
 
-            // AspectRatioFitter centres the view and adds bars as needed
-            var fitter            = viewGO.AddComponent<AspectRatioFitter>();
-            fitter.aspectMode     = AspectRatioFitter.AspectMode.FitInParent;
-            fitter.aspectRatio    = (float)referenceWidth / referenceHeight;
+            // AspectRatioFitter centres the RT within GameArea and adds bars as needed
+            var fitter         = viewGO.AddComponent<AspectRatioFitter>();
+            fitter.aspectMode  = AspectRatioFitter.AspectMode.FitInParent;
+            fitter.aspectRatio = (float)referenceWidth / referenceHeight;
 
-            var rect              = viewGO.GetComponent<RectTransform>();
-            rect.anchorMin        = new Vector2(0.5f, 0.5f);
-            rect.anchorMax        = new Vector2(0.5f, 0.5f);
-            rect.pivot            = new Vector2(0.5f, 0.5f);
-            // Start at full screen size; AspectRatioFitter will correct it
-            rect.sizeDelta        = new Vector2(Screen.width, Screen.height);
+            var rect       = viewGO.GetComponent<RectTransform>();
+            rect.anchorMin = new Vector2(0.5f, 0.5f);
+            rect.anchorMax = new Vector2(0.5f, 0.5f);
+            rect.pivot     = new Vector2(0.5f, 0.5f);
+            rect.sizeDelta = new Vector2(Screen.width, Screen.height - hudBarHeight);
         }
 
         // ──────────────────────────────────────────────
