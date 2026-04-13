@@ -115,6 +115,20 @@ namespace Sportland.Rendering
 
         private void BuildDisplayCanvas()
         {
+            // ── Output camera ─────────────────────────────
+            // Unity 6 requires at least one camera rendering to Display 1 for the
+            // Screen Space Overlay canvas to activate. The game camera now renders
+            // to a RenderTexture instead, so we add a cheap "output" camera that
+            // renders nothing but keeps Display 1 alive.
+            var outputCamGO = new GameObject("PixelArtOutputCamera");
+            var outputCam   = outputCamGO.AddComponent<Camera>();
+            outputCam.clearFlags      = CameraClearFlags.SolidColor;
+            outputCam.backgroundColor = letterboxColor;
+            outputCam.cullingMask     = 0;                // render no scene objects
+            outputCam.depth           = cam.depth - 1;   // composite before game camera
+            outputCam.targetTexture   = null;             // output to Display 1
+            outputCam.allowMSAA       = false;
+
             // ── Root canvas ──────────────────────────────
             var canvasGO = new GameObject("PixelArtDisplay");
             var canvas   = canvasGO.AddComponent<Canvas>();
