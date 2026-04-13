@@ -164,7 +164,7 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.05, g: 0.05, b: 0.05, a: 1}
+  m_BackGroundColor: {r: 0.13, g: 0.38, b: 0.18, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
@@ -529,3 +529,55 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: d0a2b7c9e1f6a8d3b5c0e4f2a6b8d1e3, type: 3}
   m_Name:
   m_EditorClassIdentifier:
+--- !u!1 &600000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 600000002}
+  - component: {fileID: 600000003}
+  m_Layer: 0
+  m_Name: FieldRenderer
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &600000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 600000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &600000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 600000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e5b7a2c4f6d9e0b3c8f1a4d7e2b6f9c1, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  fieldRadius: 12
+  ringWidth: 1.5
+  centreMarkRadius: 0.4
+  segments: 64
+  fieldColour: {r: 0.18, g: 0.5, b: 0.22, a: 1}
+  ringColour: {r: 0.25, g: 0.65, b: 0.28, a: 1}
+  lineColour: {r: 0.85, g: 0.92, b: 0.82, a: 0.7}
+  centreColour: {r: 0.85, g: 0.92, b: 0.82, a: 0.8}
