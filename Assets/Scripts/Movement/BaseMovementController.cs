@@ -813,7 +813,7 @@ namespace Sportland.Movement
         //  EFFECTIVE STATS (after fatigue)
         // ──────────────────────────────────────────────
 
-        public float GetEffectiveTopSpeed()
+        public virtual float GetEffectiveTopSpeed()
         {
             float speed = profile.topSpeed * GetFatigueMultiplier(profile.fatigueSpeedPenalty);
 
