@@ -69,10 +69,6 @@ namespace Sportland.Rendering
         {
             cam = GetComponent<Camera>();
             CreateRenderTexture();
-        }
-
-        private void Start()
-        {
             BuildDisplayCanvas();
         }
 

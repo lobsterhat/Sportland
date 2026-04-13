@@ -119,11 +119,6 @@ NavMeshSettings:
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  MAIN CAMERA
-#  Components: Transform | Camera | AudioListener | CameraFollow | PixelArtRenderer
-# ─────────────────────────────────────────────────────────────────────────────
 --- !u!1 &100000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -256,10 +251,6 @@ MonoBehaviour:
   referenceHeight: 270
   letterboxColor: {r: 0, g: 0, b: 0, a: 1}
   hudBarHeight: 200
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  DEMOBALL GAME MANAGER
-# ─────────────────────────────────────────────────────────────────────────────
 --- !u!1 &200000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -315,10 +306,6 @@ MonoBehaviour:
   scoringRing: {fileID: 400000004}
   teamA: []
   teamB: []
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  BALL CANNON  (centre of field at origin)
-# ─────────────────────────────────────────────────────────────────────────────
 --- !u!1 &300000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -365,10 +352,6 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   ballPool: []
   landingScatterRadius: 1.8
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  SCORING RING  (centred at origin, radius 12 — covers full field perimeter)
-# ─────────────────────────────────────────────────────────────────────────────
 --- !u!1 &400000001
 GameObject:
   m_ObjectHideFlags: 0
@@ -455,11 +438,6 @@ MonoBehaviour:
   bonusZoneArcDegrees: 90
   ringGizmoColor: {r: 0.2, g: 0.9, b: 0.2, a: 0.4}
   bonusGizmoColor: {r: 1, g: 0.85, b: 0, a: 0.45}
-
-# ─────────────────────────────────────────────────────────────────────────────
-#  TAG-UP ZONE  (arc along the north inner edge of the scoring ring)
-#  Tackled players enter here to re-enter play. Position can be adjusted.
-# ─────────────────────────────────────────────────────────────────────────────
 --- !u!1 &500000001
 GameObject:
   m_ObjectHideFlags: 0
