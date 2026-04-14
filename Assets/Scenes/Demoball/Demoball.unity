@@ -600,6 +600,7 @@ GameObject:
   - component: {fileID: 710004}
   - component: {fileID: 710005}
   - component: {fileID: 710006}
+  - component: {fileID: 710007}
   m_Layer: 0
   m_Name: Ball_1
   m_TagString: Untagged
@@ -629,7 +630,7 @@ SpriteRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 710001}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -766,6 +767,7 @@ GameObject:
   - component: {fileID: 720004}
   - component: {fileID: 720005}
   - component: {fileID: 720006}
+  - component: {fileID: 720007}
   m_Layer: 0
   m_Name: Ball_2
   m_TagString: Untagged
@@ -795,7 +797,7 @@ SpriteRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 720001}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -932,6 +934,7 @@ GameObject:
   - component: {fileID: 730004}
   - component: {fileID: 730005}
   - component: {fileID: 730006}
+  - component: {fileID: 730007}
   m_Layer: 0
   m_Name: Ball_3
   m_TagString: Untagged
@@ -961,7 +964,7 @@ SpriteRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 730001}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -1098,6 +1101,7 @@ GameObject:
   - component: {fileID: 740004}
   - component: {fileID: 740005}
   - component: {fileID: 740006}
+  - component: {fileID: 740007}
   m_Layer: 0
   m_Name: Ball_4
   m_TagString: Untagged
@@ -1127,7 +1131,7 @@ SpriteRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 740001}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -1265,6 +1269,7 @@ GameObject:
   - component: {fileID: 810005}
   - component: {fileID: 810006}
   - component: {fileID: 810007}
+  - component: {fileID: 810008}
   m_Layer: 7
   m_Name: Player_A1
   m_TagString: Untagged
@@ -1357,7 +1362,7 @@ SpriteRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 810001}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -1455,6 +1460,7 @@ GameObject:
   - component: {fileID: 820005}
   - component: {fileID: 820006}
   - component: {fileID: 820007}
+  - component: {fileID: 820008}
   m_Layer: 7
   m_Name: Player_B1
   m_TagString: Untagged
@@ -1547,7 +1553,7 @@ SpriteRenderer:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 820001}
-  m_Enabled: 1
+  m_Enabled: 0
   m_CastShadows: 0
   m_ReceiveShadows: 0
   m_DynamicOccludee: 1
@@ -1631,3 +1637,93 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   playerControlled: 0
   pickupRadius: 1.2
+--- !u!114 &810008
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 810001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3e5a7b9d1f2e4c6a8b0d3f5a7c9e1b4, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  bodyColor: {r: 0.2, g: 0.45, b: 0.9, a: 1}
+  bodyRadius: 0.45
+  carryIndicatorColor: {r: 0.95, g: 0.9, b: 0.2, a: 0.95}
+--- !u!114 &820008
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 820001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3e5a7b9d1f2e4c6a8b0d3f5a7c9e1b4, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  bodyColor: {r: 0.9, g: 0.2, b: 0.2, a: 1}
+  bodyRadius: 0.45
+  carryIndicatorColor: {r: 0.95, g: 0.9, b: 0.2, a: 0.95}
+--- !u!114 &710007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 710001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3e5a7b9d1f2e4c6a8b0d3f5a7c9e1b4, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  bodyColor: {r: 0.95, g: 0.55, b: 0.1, a: 1}
+  bodyRadius: 0.5
+  carryIndicatorColor: {r: 0.95, g: 0.9, b: 0.2, a: 0.95}
+--- !u!114 &720007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 720001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3e5a7b9d1f2e4c6a8b0d3f5a7c9e1b4, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  bodyColor: {r: 0.95, g: 0.55, b: 0.1, a: 1}
+  bodyRadius: 0.5
+  carryIndicatorColor: {r: 0.95, g: 0.9, b: 0.2, a: 0.95}
+--- !u!114 &730007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 730001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3e5a7b9d1f2e4c6a8b0d3f5a7c9e1b4, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  bodyColor: {r: 0.95, g: 0.55, b: 0.1, a: 1}
+  bodyRadius: 0.5
+  carryIndicatorColor: {r: 0.95, g: 0.9, b: 0.2, a: 0.95}
+--- !u!114 &740007
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 740001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c3e5a7b9d1f2e4c6a8b0d3f5a7c9e1b4, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  bodyColor: {r: 0.95, g: 0.55, b: 0.1, a: 1}
+  bodyRadius: 0.5
+  carryIndicatorColor: {r: 0.95, g: 0.9, b: 0.2, a: 0.95}
