@@ -3,15 +3,15 @@ using UnityEngine;
 namespace Sportland.Sports.Demoball
 {
     /// <summary>
-    /// Routes keyboard / gamepad input to DemoballMovementController.
+    /// Routes keyboard / gamepad input to DemoballMovementController using
+    /// Unity's new Input System (see DemoballInputActions for bindings).
     ///
-    /// Controls (keyboard):
-    ///   WASD / Arrow Keys   — Move
-    ///   Left Shift          — Sprint (hold)
-    ///   E                   — Pick up nearest loose ball (if not carrying)
-    ///                         Pass to nearest teammate (if carrying)
-    ///   Q                   — Touch-down score (must be in scoring ring while carrying)
-    ///   T                   — Tackle nearest ball-carrier (Defenders only)
+    /// Controls:
+    ///   Left Stick / WASD / Arrows  — Move
+    ///   L2 / Left Shift             — Sprint (hold)
+    ///   Circle / E                  — Pick up nearest loose ball, or pass if carrying
+    ///   R1     / Q                  — Touch-down score (in scoring ring while carrying)
+    ///   Square / T                  — Tackle nearest ball-carrier (Defenders only)
     ///
     /// Set playerControlled = false (or swap at runtime) to hand off to AI.
     /// </summary>
@@ -34,6 +34,7 @@ namespace Sportland.Sports.Demoball
         // ──────────────────────────────────────────────
 
         private DemoballMovementController movement;
+        private DemoballInputActions controls;
 
         // ──────────────────────────────────────────────
         //  LIFECYCLE
@@ -42,6 +43,17 @@ namespace Sportland.Sports.Demoball
         private void Awake()
         {
             movement = GetComponent<DemoballMovementController>();
+            controls = new DemoballInputActions();
+        }
+
+        private void OnEnable()
+        {
+            if (playerControlled) controls.Enable();
+        }
+
+        private void OnDisable()
+        {
+            controls.Disable();
         }
 
         private void Update()
@@ -49,14 +61,15 @@ namespace Sportland.Sports.Demoball
             if (!playerControlled) return;
 
             // ── Locomotion ──
-            movement.SetMoveInput(new Vector2(
-                Input.GetAxisRaw("Horizontal"),
-                Input.GetAxisRaw("Vertical")));
+            Vector2 moveInput = controls.Move.ReadValue<Vector2>();
+            if (moveInput.sqrMagnitude > 1f) moveInput.Normalize();
+            movement.SetMoveInput(moveInput);
 
-            movement.SetSprinting(Input.GetKey(KeyCode.LeftShift));
+            // ── Sprint ──
+            movement.SetSprinting(controls.Sprint.IsPressed());
 
-            // ── Ball interaction: E ──
-            if (Input.GetKeyDown(KeyCode.E))
+            // ── Action: Circle / E — pickup or pass ──
+            if (controls.Action.WasPressedThisFrame())
             {
                 if (movement.IsCarryingBall)
                     movement.TryPass();
@@ -64,12 +77,12 @@ namespace Sportland.Sports.Demoball
                     TryPickUpNearest();
             }
 
-            // ── Touch-down: Q ──
-            if (Input.GetKeyDown(KeyCode.Q))
+            // ── Touch-down: R1 / Q ──
+            if (controls.TouchDown.WasPressedThisFrame())
                 movement.TryTouchDown();
 
-            // ── Tackle: T ──
-            if (Input.GetKeyDown(KeyCode.T))
+            // ── Tackle: Square / T ──
+            if (controls.Tackle.WasPressedThisFrame())
                 movement.TryTackle();
         }
 
@@ -106,8 +119,13 @@ namespace Sportland.Sports.Demoball
         public void SetPlayerControlled(bool controlled)
         {
             playerControlled = controlled;
-            if (!controlled)
+            if (controlled)
             {
+                controls.Enable();
+            }
+            else
+            {
+                controls.Disable();
                 // Clear any held inputs so the controller coasts to a stop
                 movement.SetMoveInput(Vector2.zero);
                 movement.SetSprinting(false);
