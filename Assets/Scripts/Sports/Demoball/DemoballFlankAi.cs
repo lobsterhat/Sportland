@@ -37,9 +37,14 @@ namespace Sportland.Sports.Demoball
         [Tooltip("If farther than this from the flank target, the AI sprints to catch up.")]
         [SerializeField] private float sprintDistance = 4f;
 
-        [Tooltip("Degrees per second the flank basis rotates toward the leader's facing. " +
-                 "Low values make flankers orbit smoothly instead of crisscrossing when the leader spins around.")]
+        [Tooltip("Degrees per second the flank basis rotates toward the leader's facing for gentle turns. " +
+                 "For turns larger than sideSwapAngle the flanker just swaps sides instead.")]
         [SerializeField] private float basisTurnRate = 120f;
+
+        [Tooltip("When the angle between the flanker's basis and the leader's facing exceeds this, " +
+                 "the flanker swaps sides (snap to new basis) rather than orbiting around. " +
+                 "90° is the break-even point where swapping is shorter than orbiting.")]
+        [SerializeField] private float sideSwapAngle = 90f;
 
         // ──────────────────────────────────────────────
         //  RUNTIME
@@ -68,11 +73,20 @@ namespace Sportland.Sports.Demoball
                 return;
             }
 
-            // Smooth-rotate our local basis toward the leader's facing so a sudden
-            // 180° turn makes the flanker orbit around the leader instead of
-            // teleporting its target to the opposite side.
+            // For gentle turns, rotate our local basis toward the leader so the
+            // flanker orbits to stay on their side. For a large turn it's
+            // shorter for the flanker to swap sides than to orbit, so snap the
+            // basis and flip the side flag.
             Vector2 leaderFacing = leader.GetFacingDirection();
-            flankBasis = RotateToward(flankBasis, leaderFacing, basisTurnRate * Time.deltaTime);
+            if (Vector2.Angle(flankBasis, leaderFacing) > sideSwapAngle)
+            {
+                side = -side;
+                flankBasis = leaderFacing;
+            }
+            else
+            {
+                flankBasis = RotateToward(flankBasis, leaderFacing, basisTurnRate * Time.deltaTime);
+            }
 
             // Vector2.Perpendicular rotates 90° CCW — that's the leader's LEFT.
             // -side * Perpendicular(basis):  side = -1 → leader's left, side = +1 → leader's right.
