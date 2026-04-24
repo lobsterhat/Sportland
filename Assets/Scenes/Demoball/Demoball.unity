@@ -1955,6 +1955,7 @@ MonoBehaviour:
   arriveTolerance: 0.15
   sprintDistance: 4
   basisTurnRate: 120
+  sideSwapAngle: 90
 --- !u!1 &840001
 GameObject:
   m_ObjectHideFlags: 0
@@ -2181,3 +2182,4 @@ MonoBehaviour:
   arriveTolerance: 0.15
   sprintDistance: 4
   basisTurnRate: 120
+  sideSwapAngle: 90
