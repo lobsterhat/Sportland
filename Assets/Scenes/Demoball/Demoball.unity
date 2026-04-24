@@ -1952,8 +1952,9 @@ MonoBehaviour:
   flankOffset: 1.8
   trailDistance: 0
   side: -1
-  arriveDistance: 0.15
+  arriveTolerance: 0.15
   sprintDistance: 4
+  basisTurnRate: 120
 --- !u!1 &840001
 GameObject:
   m_ObjectHideFlags: 0
@@ -2177,5 +2178,6 @@ MonoBehaviour:
   flankOffset: 1.8
   trailDistance: 0
   side: 1
-  arriveDistance: 0.15
+  arriveTolerance: 0.15
   sprintDistance: 4
+  basisTurnRate: 120
