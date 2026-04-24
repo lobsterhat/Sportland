@@ -30,21 +30,33 @@ namespace Sportland.Sports.Demoball
         [Tooltip("Which side of the leader to flank. -1 = leader's left, +1 = leader's right.")]
         [SerializeField] private float side = -1f;
 
-        [Tooltip("Within this distance of the flank target, the AI stops moving.")]
-        [SerializeField] private float arriveDistance = 0.15f;
+        [Tooltip("Tolerance (world units) around the stopping point. The AI stops commanding " +
+                 "movement this much before the target so the controller's deceleration lands it cleanly.")]
+        [SerializeField] private float arriveTolerance = 0.15f;
 
         [Tooltip("If farther than this from the flank target, the AI sprints to catch up.")]
         [SerializeField] private float sprintDistance = 4f;
+
+        [Tooltip("Degrees per second the flank basis rotates toward the leader's facing. " +
+                 "Low values make flankers orbit smoothly instead of crisscrossing when the leader spins around.")]
+        [SerializeField] private float basisTurnRate = 120f;
 
         // ──────────────────────────────────────────────
         //  RUNTIME
         // ──────────────────────────────────────────────
 
         private DemoballMovementController self;
+        private Vector2 flankBasis = Vector2.right;
 
         private void Awake()
         {
             self = GetComponent<DemoballMovementController>();
+        }
+
+        private void Start()
+        {
+            if (leader != null)
+                flankBasis = leader.GetFacingDirection();
         }
 
         private void Update()
@@ -56,18 +68,30 @@ namespace Sportland.Sports.Demoball
                 return;
             }
 
+            // Smooth-rotate our local basis toward the leader's facing so a sudden
+            // 180° turn makes the flanker orbit around the leader instead of
+            // teleporting its target to the opposite side.
             Vector2 leaderFacing = leader.GetFacingDirection();
+            flankBasis = RotateToward(flankBasis, leaderFacing, basisTurnRate * Time.deltaTime);
+
             // Vector2.Perpendicular rotates 90° CCW — that's the leader's LEFT.
-            // Multiplying by -side gives:  side = -1 → leader's left, side = +1 → leader's right.
-            Vector2 lateral = -side * Vector2.Perpendicular(leaderFacing);
+            // -side * Perpendicular(basis):  side = -1 → leader's left, side = +1 → leader's right.
+            Vector2 lateral = -side * Vector2.Perpendicular(flankBasis);
 
             Vector2 leaderPos = leader.transform.position;
-            Vector2 target    = leaderPos + lateral * flankOffset - leaderFacing * trailDistance;
+            Vector2 target    = leaderPos + lateral * flankOffset - flankBasis * trailDistance;
 
             Vector2 toTarget = target - (Vector2)transform.position;
             float dist = toTarget.magnitude;
 
-            if (dist < arriveDistance)
+            // Release the input early enough that the controller's natural
+            // deceleration carries us onto the target rather than overshooting,
+            // pivoting, and homing back in.
+            float speed        = self.GetCurrentSpeed();
+            float decel        = self.Profile != null ? self.Profile.deceleration : 20f;
+            float coastDistance = (speed * speed) / (2f * Mathf.Max(decel, 0.01f));
+
+            if (dist <= coastDistance + arriveTolerance)
             {
                 self.SetMoveInput(Vector2.zero);
                 self.SetSprinting(false);
@@ -77,6 +101,16 @@ namespace Sportland.Sports.Demoball
                 self.SetMoveInput(toTarget / dist);
                 self.SetSprinting(dist > sprintDistance);
             }
+        }
+
+        private static Vector2 RotateToward(Vector2 from, Vector2 to, float maxDegrees)
+        {
+            if (from.sqrMagnitude < 1e-6f) return to.normalized;
+            if (to.sqrMagnitude   < 1e-6f) return from;
+
+            float angle = Vector2.SignedAngle(from, to);
+            float step  = Mathf.Clamp(angle, -maxDegrees, maxDegrees);
+            return (Quaternion.Euler(0f, 0f, step) * from).normalized;
         }
     }
 }
