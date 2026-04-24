@@ -236,6 +236,12 @@ namespace Sportland.Sports.Demoball
         {
             if (spriteRenderer != null)
                 spriteRenderer.enabled = visible;
+
+            // Also toggle the GameObject so the ball fully leaves the field
+            // when carried / scored / out of play. BallCannon and pass logic
+            // still hold a reference and can call public methods to bring it back.
+            if (gameObject.activeSelf != visible)
+                gameObject.SetActive(visible);
         }
     }
 }

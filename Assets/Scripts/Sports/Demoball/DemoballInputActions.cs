@@ -7,7 +7,7 @@ namespace Sportland.Sports.Demoball
     ///
     /// Control Scheme:
     ///   Move        — Left Stick / WASD / Arrow Keys
-    ///   Sprint      — L3 click (toggle) / Left Shift (hold)
+    ///   Sprint      — L2 / Left Shift   (hold)
     ///   Action      — Circle / E        (pickup loose ball, or pass if carrying)
     ///   TouchDown   — R1     / Q        (score while in scoring ring and carrying)
     ///   Tackle      — Square / T        (Defenders only)
@@ -15,8 +15,7 @@ namespace Sportland.Sports.Demoball
     public class DemoballInputActions
     {
         public InputAction Move { get; private set; }
-        public InputAction SprintToggle { get; private set; }
-        public InputAction SprintHold { get; private set; }
+        public InputAction Sprint { get; private set; }
         public InputAction Action { get; private set; }
         public InputAction TouchDown { get; private set; }
         public InputAction Tackle { get; private set; }
@@ -41,12 +40,10 @@ namespace Sportland.Sports.Demoball
                 .With("Right", "<Keyboard>/rightArrow");
             Move.AddBinding("<Gamepad>/leftStick");
 
-            // Sprint — L3 toggle / Left Shift hold
-            SprintToggle = actionMap.AddAction("SprintToggle", InputActionType.Button);
-            SprintToggle.AddBinding("<Gamepad>/leftStickPress");
-
-            SprintHold = actionMap.AddAction("SprintHold", InputActionType.Button);
-            SprintHold.AddBinding("<Keyboard>/leftShift");
+            // Sprint — L2 / Left Shift (hold)
+            Sprint = actionMap.AddAction("Sprint", InputActionType.Button);
+            Sprint.AddBinding("<Keyboard>/leftShift");
+            Sprint.AddBinding("<Gamepad>/leftTrigger");
 
             // Action — Circle / E (pickup or pass)
             Action = actionMap.AddAction("Action", InputActionType.Button);

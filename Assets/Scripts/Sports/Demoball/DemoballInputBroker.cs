@@ -8,7 +8,7 @@ namespace Sportland.Sports.Demoball
     ///
     /// Controls:
     ///   Left Stick / WASD / Arrows  — Move
-    ///   L3 click / Left Shift       — Sprint (L3 = toggle, Shift = hold)
+    ///   L2 / Left Shift             — Sprint (hold)
     ///   Circle / E                  — Pick up nearest loose ball, or pass if carrying
     ///   R1     / Q                  — Touch-down score (in scoring ring while carrying)
     ///   Square / T                  — Tackle nearest ball-carrier (Defenders only)
@@ -35,7 +35,6 @@ namespace Sportland.Sports.Demoball
 
         private DemoballMovementController movement;
         private DemoballInputActions controls;
-        private bool sprintToggleState;
 
         // ──────────────────────────────────────────────
         //  LIFECYCLE
@@ -55,7 +54,6 @@ namespace Sportland.Sports.Demoball
         private void OnDisable()
         {
             controls.Disable();
-            sprintToggleState = false;
         }
 
         private void Update()
@@ -68,9 +66,7 @@ namespace Sportland.Sports.Demoball
             movement.SetMoveInput(moveInput);
 
             // ── Sprint ──
-            if (controls.SprintToggle.WasPressedThisFrame())
-                sprintToggleState = !sprintToggleState;
-            movement.SetSprinting(controls.SprintHold.IsPressed() || sprintToggleState);
+            movement.SetSprinting(controls.Sprint.IsPressed());
 
             // ── Action: Circle / E — pickup or pass ──
             if (controls.Action.WasPressedThisFrame())
@@ -130,7 +126,6 @@ namespace Sportland.Sports.Demoball
             else
             {
                 controls.Disable();
-                sprintToggleState = false;
                 // Clear any held inputs so the controller coasts to a stop
                 movement.SetMoveInput(Vector2.zero);
                 movement.SetSprinting(false);
