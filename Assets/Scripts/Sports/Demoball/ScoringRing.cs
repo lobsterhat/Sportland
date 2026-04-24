@@ -113,16 +113,25 @@ namespace Sportland.Sports.Demoball
         public bool IsPlayerInRing(DemoballMovementController player)
             => playersInRing.Contains(player);
 
-        private void OnTriggerEnter2D(Collider2D other)
+        private void OnTriggerStay2D(Collider2D other)
         {
             var player = other.GetComponent<DemoballMovementController>();
             if (player == null) return;
 
-            if (IsInRing(other.transform.position))
+            bool inAnnulus = IsInRing(other.transform.position);
+            bool tracked   = playersInRing.Contains(player);
+
+            if (inAnnulus && !tracked)
             {
                 playersInRing.Add(player);
                 player.EnterScoringRing(this);
                 OnPlayerEnterRing?.Invoke(player);
+            }
+            else if (!inAnnulus && tracked)
+            {
+                playersInRing.Remove(player);
+                player.ExitScoringRing();
+                OnPlayerExitRing?.Invoke(player);
             }
         }
 
