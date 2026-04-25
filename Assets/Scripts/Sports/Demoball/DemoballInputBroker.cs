@@ -39,6 +39,12 @@ namespace Sportland.Sports.Demoball
         [Tooltip("Right-stick magnitude below this is treated as no aim (no target highlighted).")]
         [SerializeField] private float aimDeadzone = 0.3f;
 
+        [Tooltip("Hold time below this counts as a tap (pitch). Above this counts as a hold (football).")]
+        [SerializeField] private float passTapThreshold = 0.18f;
+
+        [Tooltip("Hold time at or above this caps the pass at maximum (football) power.")]
+        [SerializeField] private float passMaxChargeTime = 0.6f;
+
         // ──────────────────────────────────────────────
         //  PUBLIC ACCESSORS
         // ──────────────────────────────────────────────
@@ -53,6 +59,8 @@ namespace Sportland.Sports.Demoball
         private DemoballMovementController movement;
         private DemoballInputActions controls;
         private DemoballMovementController currentPassTarget;
+        private float passPressTime;     // Time.time when Action was pressed while carrying
+        private bool passCharging;
 
         // ──────────────────────────────────────────────
         //  LIFECYCLE
@@ -90,13 +98,31 @@ namespace Sportland.Sports.Demoball
             // ── Pass target selection (right stick, only while carrying) ──
             UpdatePassTarget();
 
-            // ── Action: Circle / E — pickup or pass ──
+            // ── Action: R1 / E — context-sensitive ──
+            // Carrying: tap = pitch, hold = football pass. Pass fires on release.
+            // Not carrying: instant pickup attempt on press.
             if (controls.Action.WasPressedThisFrame())
             {
                 if (movement.IsCarryingBall)
-                    AttemptPass();
+                {
+                    passPressTime = Time.time;
+                    passCharging  = true;
+                }
                 else
+                {
                     TryPickUpNearest();
+                }
+            }
+
+            if (passCharging && controls.Action.WasReleasedThisFrame())
+            {
+                AttemptPass(Time.time - passPressTime);
+                passCharging = false;
+            }
+            // Drop the charge if we lose the ball mid-hold (tackled, etc.)
+            else if (passCharging && !movement.IsCarryingBall)
+            {
+                passCharging = false;
             }
 
             // ── Touch-down: R1 / Q ──
@@ -171,40 +197,56 @@ namespace Sportland.Sports.Demoball
         //  PASS EXECUTION + CONTROL HANDOFF
         // ──────────────────────────────────────────────
 
-        private void AttemptPass()
+        private void AttemptPass(float holdSeconds)
         {
             // Snapshot target then clear visual immediately — TryPass may swap
             // control, after which we'd otherwise lose the chance to clear it.
-            var target = currentPassTarget;
+            var target = currentPassTarget ?? FindNearestTeammate();
             ClearPassTarget();
+            if (target == null) return;
 
-            bool passed = target != null
-                ? movement.TryPass(target)
-                : movement.TryPass();          // fallback: nearest teammate
+            // Tap → pitch (power 0). Past the tap threshold the power ramps
+            // linearly toward 1 over passMaxChargeTime - passTapThreshold.
+            float power;
+            if (holdSeconds < passTapThreshold)
+            {
+                power = 0f;
+            }
+            else
+            {
+                float chargeRange = Mathf.Max(0.001f, passMaxChargeTime - passTapThreshold);
+                power = Mathf.Clamp01((holdSeconds - passTapThreshold) / chargeRange);
+            }
 
-            if (!passed) return;
+            if (!movement.TryPass(target, power)) return;
 
-            // Hand control to whichever broker now holds the ball.
-            DemoballInputBroker receiver =
-                  (target != null && target.IsCarryingBall) ? target.GetComponent<DemoballInputBroker>()
-                : FindCarrierBroker();
-
-            if (receiver != null && receiver != this)
+            // Transfer control to the receiver immediately on pass-fire so the
+            // user can steer them toward the catch (or chase a missed pass).
+            var receiverBroker = target.GetComponent<DemoballInputBroker>();
+            if (receiverBroker != null && receiverBroker != this)
             {
                 SetPlayerControlled(false);
-                receiver.SetPlayerControlled(true);
+                receiverBroker.SetPlayerControlled(true);
             }
         }
 
-        private DemoballInputBroker FindCarrierBroker()
+        private DemoballMovementController FindNearestTeammate()
         {
             if (teammates == null) return null;
+            DemoballMovementController best = null;
+            float bestSqr = float.MaxValue;
+            Vector2 selfPos = transform.position;
+
             foreach (var t in teammates)
             {
                 if (t == null || t == movement) continue;
-                if (t.IsCarryingBall) return t.GetComponent<DemoballInputBroker>();
+                if (t.Role == DemoballRole.Defender) continue;
+                if (t.NeedsTagUp || t.IsCarryingBall) continue;
+
+                float sqr = ((Vector2)t.transform.position - selfPos).sqrMagnitude;
+                if (sqr < bestSqr) { bestSqr = sqr; best = t; }
             }
-            return null;
+            return best;
         }
 
         // ──────────────────────────────────────────────

@@ -24,6 +24,7 @@ namespace Sportland.Sports.Demoball
         {
             Dormant,    // not yet activated; invisible and inert
             Launching,  // airborne from cannon — cannot be picked up
+            InFlight,   // mid-air pass between two players — cannot be picked up
             Loose,      // on the ground; pickup eligibility depends on role rules
             Carried,    // held by a player
             Scored,     // touched down successfully; triggers replacement countdown
@@ -60,6 +61,10 @@ namespace Sportland.Sports.Demoball
         public event Action<Ball> OnDropped;
         public event Action<Ball, bool> OnScored;           // bool = wasInBonusZone
         public event Action<Ball> OnRemovedFromPlay;
+        /// <summary>Fired when an in-flight pass is successfully caught. Argument = receiver.</summary>
+        public event Action<Ball, DemoballMovementController> OnPassCaught;
+        /// <summary>Fired when an in-flight pass lands without being caught and goes Loose.</summary>
+        public event Action<Ball> OnPassFailed;
 
         // ──────────────────────────────────────────────
         //  PRIVATE
@@ -69,6 +74,22 @@ namespace Sportland.Sports.Demoball
         private Vector3 launchStart;
         private Vector3 launchTarget;
         private SpriteRenderer spriteRenderer;
+
+        // Pass animation runtime
+        private float passTimer;
+        private float passDuration;
+        private float passPeakHeight;
+        private Vector3 passOrigin;
+        private Vector3 passDestination;
+        private DemoballMovementController passTarget;
+        private float currentHeight;     // Y offset above ground while airborne (0 on the field)
+
+        /// <summary>How high above the ground the ball currently is (world units). 0 when on the field.</summary>
+        public float Height => currentHeight;
+
+        /// <summary>Maximum distance from the target's current position at arrival that still counts as a catch.</summary>
+        [Tooltip("Catch radius: if the receiver is within this many world units of the ball at arrival, the catch lands.")]
+        [SerializeField] private float catchRadius = 1.2f;
 
         // ──────────────────────────────────────────────
         //  UNITY LIFECYCLE
@@ -82,18 +103,37 @@ namespace Sportland.Sports.Demoball
 
         private void Update()
         {
-            if (State != BallState.Launching) return;
+            switch (State)
+            {
+                case BallState.Launching: UpdateLaunching(); break;
+                case BallState.InFlight:  UpdateInFlight();  break;
+            }
+        }
 
+        private void UpdateLaunching()
+        {
             launchTimer += Time.deltaTime;
             float t = Mathf.Clamp01(launchTimer / launchDuration);
 
-            // Simple arc: lerp XZ, parabola on Y
             Vector3 flat = Vector3.Lerp(launchStart, launchTarget, t);
-            float arc    = Mathf.Sin(t * Mathf.PI) * 1.5f;  // peak height in world units
+            float arc    = Mathf.Sin(t * Mathf.PI) * 1.5f;
+            currentHeight = arc;
             transform.position = flat + new Vector3(0f, arc, 0f);
 
-            if (t >= 1f)
-                Land();
+            if (t >= 1f) Land();
+        }
+
+        private void UpdateInFlight()
+        {
+            passTimer += Time.deltaTime;
+            float t = Mathf.Clamp01(passTimer / passDuration);
+
+            Vector3 flat = Vector3.Lerp(passOrigin, passDestination, t);
+            float arc    = Mathf.Sin(t * Mathf.PI) * passPeakHeight;
+            currentHeight = arc;
+            transform.position = flat + new Vector3(0f, arc, 0f);
+
+            if (t >= 1f) ResolvePassArrival();
         }
 
         // ──────────────────────────────────────────────
@@ -190,15 +230,77 @@ namespace Sportland.Sports.Demoball
         }
 
         /// <summary>
-        /// Direct carrier handoff used by the pass mechanic. Bypasses the Loose-state
-        /// check in PickUp so the ball can move from one carrier to another without
-        /// a visible drop. Caller is responsible for updating the receiver's HeldBall.
+        /// Direct carrier handoff. Used both for instant transfers from the Carried
+        /// state and to land an in-flight pass on the receiver. Caller is responsible
+        /// for updating the receiver's HeldBall.
         /// </summary>
         public void TransferTo(DemoballMovementController newCarrier)
         {
-            if (State != BallState.Carried) return;
+            if (State != BallState.Carried && State != BallState.InFlight) return;
             Carrier = newCarrier;
-            // State stays Carried; SetVisible stays off — ball remains off-field.
+            State = BallState.Carried;
+            currentHeight = 0f;
+            SetVisible(false);
+        }
+
+        // ──────────────────────────────────────────────
+        //  PASS  (animated, may be caught or dropped)
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Launches the carried ball on an arc toward the target's current position.
+        /// On arrival the ball attempts a catch — success transfers possession to
+        /// the target; failure drops the ball at the destination as Loose.
+        ///
+        /// Caller is expected to clear the original carrier's HeldBall before calling.
+        /// </summary>
+        public void Pass(Vector3 fromPosition, DemoballMovementController target,
+                         float peakHeight, float duration)
+        {
+            if (State != BallState.Carried) return;
+            if (target == null) return;
+
+            passOrigin       = fromPosition;
+            passDestination  = target.transform.position;
+            passTarget       = target;
+            passPeakHeight   = Mathf.Max(0f, peakHeight);
+            passDuration     = Mathf.Max(0.05f, duration);
+            passTimer        = 0f;
+            currentHeight    = 0f;
+
+            Carrier = null;
+            State   = BallState.InFlight;
+            transform.position = fromPosition;
+            SetVisible(true);   // re-activates the GameObject so Update runs the arc
+        }
+
+        private void ResolvePassArrival()
+        {
+            var target = passTarget;
+            passTarget = null;
+            currentHeight = 0f;
+            transform.position = passDestination;
+
+            if (target != null && CanCatch(target))
+            {
+                target.ReceivePass(this);          // TransferTo + HeldBall + OnBallPickedUp
+                OnPassCaught?.Invoke(this, target);
+                return;
+            }
+
+            // Miss — ball lands as a loose ball at the destination
+            State = BallState.Loose;
+            // SpriteRenderer is already enabled and the GameObject is active from InFlight.
+            OnPassFailed?.Invoke(this);
+        }
+
+        private bool CanCatch(DemoballMovementController target)
+        {
+            if (target.NeedsTagUp || target.IsCarryingBall) return false;
+            if (target.Role == DemoballRole.Defender) return false;
+
+            float dist = Vector2.Distance(target.transform.position, transform.position);
+            return dist <= catchRadius;
         }
 
         // ──────────────────────────────────────────────

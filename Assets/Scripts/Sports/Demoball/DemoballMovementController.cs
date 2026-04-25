@@ -68,6 +68,19 @@ namespace Sportland.Sports.Demoball
         [Tooltip("Maximum pass range (world units).")]
         [SerializeField] private float maxPassRange = 8f;
 
+        [Header("=== DEMOBALL: PASS ARC ===")]
+        [Tooltip("Peak height of a tap (pitch) pass — world units above ground.")]
+        [SerializeField] private float pitchPeakHeight = 0.4f;
+
+        [Tooltip("Peak height of a held (football) pass — world units above ground.")]
+        [SerializeField] private float footballPeakHeight = 1.6f;
+
+        [Tooltip("Travel duration of a tap (pitch) pass — seconds.")]
+        [SerializeField] private float pitchDuration = 0.35f;
+
+        [Tooltip("Travel duration of a held (football) pass — seconds.")]
+        [SerializeField] private float footballDuration = 0.7f;
+
         // ──────────────────────────────────────────────
         //  RUNTIME STATE
         // ──────────────────────────────────────────────
@@ -166,10 +179,9 @@ namespace Sportland.Sports.Demoball
         // ──────────────────────────────────────────────
 
         /// <summary>
-        /// Passes the held ball to the best available teammate in range — used as
-        /// a fallback when no explicit target was selected by the input layer.
-        /// Scorers and Blockers carrying the ball may pass; Defenders may not.
-        /// Returns true if a pass was made.
+        /// Passes the held ball to the best available teammate in range using a
+        /// pitch-style arc. Used as a fallback when no explicit target was
+        /// selected by the input layer.
         /// </summary>
         public bool TryPass()
         {
@@ -179,16 +191,16 @@ namespace Sportland.Sports.Demoball
             var target = FindPassTarget();
             if (target == null) return false;
 
-            ExecutePass(target);
+            ExecutePass(target, 0f);
             return true;
         }
 
         /// <summary>
         /// Passes the held ball to a specific target (selected by the input layer
-        /// via aim direction). Validates that the target is eligible. Returns
-        /// true if the pass succeeded.
+        /// via aim direction). `power` blends pitch (0) → football (1): a tap
+        /// produces a low fast arc, a held button produces a high slower arc.
         /// </summary>
-        public bool TryPass(DemoballMovementController target)
+        public bool TryPass(DemoballMovementController target, float power = 0f)
         {
             if (!IsCarryingBall)              return false;
             if (role == DemoballRole.Defender) return false;
@@ -196,7 +208,7 @@ namespace Sportland.Sports.Demoball
             if (target.Role == DemoballRole.Defender) return false;
             if (target.NeedsTagUp || target.IsCarryingBall) return false;
 
-            ExecutePass(target);
+            ExecutePass(target, Mathf.Clamp01(power));
             return true;
         }
 
@@ -221,14 +233,18 @@ namespace Sportland.Sports.Demoball
             return best;
         }
 
-        private void ExecutePass(DemoballMovementController target)
+        private void ExecutePass(DemoballMovementController target, float power)
         {
             Ball ball = HeldBall;
             HeldBall = null;
             OnBallDropped?.Invoke(ball);
 
-            // TODO: animate ball arc + interception window before confirming receipt
-            target.ReceivePass(ball);
+            float peakHeight = Mathf.Lerp(pitchPeakHeight, footballPeakHeight, power);
+            float duration   = Mathf.Lerp(pitchDuration,   footballDuration,   power);
+
+            // The ball owns the flight: it animates the arc and resolves the
+            // catch on arrival (see Ball.ResolvePassArrival).
+            ball.Pass(transform.position, target, peakHeight, duration);
         }
 
         /// <summary>Called on the receiver of a pass.</summary>

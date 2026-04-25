@@ -28,6 +28,12 @@ namespace Sportland.Sports.Demoball
         [Tooltip("If farther than this from the target, the defender sprints to close the gap.")]
         [SerializeField] private float sprintDistance = 4f;
 
+        [Tooltip("Pickup radius — when this close to a loose ball the defender attempts to recover it.")]
+        [SerializeField] private float ballPickupRadius = 1.0f;
+
+        [Tooltip("Maximum range at which a loose ball outranks an opposing player as a target.")]
+        [SerializeField] private float looseBallChaseRange = 16f;
+
         // ──────────────────────────────────────────────
         //  RUNTIME
         // ──────────────────────────────────────────────
@@ -50,6 +56,15 @@ namespace Sportland.Sports.Demoball
                 return;
             }
 
+            // Loose ball recovery takes priority when no opponent is carrying:
+            // intercepting a ball before it gets picked back up is huge for the
+            // defense, since a defender pickup removes the ball from play.
+            if (!AnyOpponentCarrying())
+            {
+                Ball loose = FindClosestLooseBall();
+                if (loose != null) { ChaseLooseBall(loose); return; }
+            }
+
             var target = FindTarget();
             if (target == null)
             {
@@ -67,6 +82,55 @@ namespace Sportland.Sports.Demoball
             if (dist > 0.05f)
             {
                 self.SetMoveInput(toTarget / dist);
+                self.SetSprinting(dist > sprintDistance);
+            }
+            else
+            {
+                self.SetMoveInput(Vector2.zero);
+                self.SetSprinting(false);
+            }
+        }
+
+        private bool AnyOpponentCarrying()
+        {
+            if (opponents == null) return false;
+            foreach (var o in opponents)
+                if (o != null && o.IsCarryingBall) return true;
+            return false;
+        }
+
+        private Ball FindClosestLooseBall()
+        {
+            // Single OverlapCircleAll is cheap enough at this scale and avoids
+            // tracking ball references on the AI itself.
+            var hits = Physics2D.OverlapCircleAll(transform.position, looseBallChaseRange);
+            Ball best = null;
+            float bestSqr = float.MaxValue;
+            foreach (var hit in hits)
+            {
+                var ball = hit.GetComponent<Ball>();
+                if (ball == null) continue;
+                if (ball.State != Ball.BallState.Loose) continue;
+
+                float sqr = ((Vector2)ball.transform.position - (Vector2)transform.position).sqrMagnitude;
+                if (sqr < bestSqr) { bestSqr = sqr; best = ball; }
+            }
+            return best;
+        }
+
+        private void ChaseLooseBall(Ball ball)
+        {
+            Vector2 toBall = (Vector2)ball.transform.position - (Vector2)transform.position;
+            float dist = toBall.magnitude;
+
+            if (dist <= ballPickupRadius)
+            {
+                self.TryPickUpBall(ball);   // defender pickup → ball goes OutOfPlay
+            }
+
+            if (dist > 0.05f)
+            {
+                self.SetMoveInput(toBall / dist);
                 self.SetSprinting(dist > sprintDistance);
             }
             else
