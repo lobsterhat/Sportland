@@ -19,8 +19,10 @@ namespace Sportland.Sports.Demoball
         //  CONFIGURATION
         // ──────────────────────────────────────────────
 
-        [Tooltip("The player to flank. Usually the human-controlled scorer.")]
-        [SerializeField] private DemoballMovementController leader;
+        [Tooltip("Possible leaders. Each frame the flanker follows whichever teammate is " +
+                 "currently player-controlled, so a pass and control swap retargets the " +
+                 "flank automatically. Self may be included; it is filtered at runtime.")]
+        [SerializeField] private List<DemoballMovementController> teammates;
 
         [Tooltip("Lateral offset from the leader (world units), perpendicular to leader facing.")]
         [SerializeField] private float flankOffset = 1.8f;
@@ -66,23 +68,30 @@ namespace Sportland.Sports.Demoball
         // ──────────────────────────────────────────────
 
         private DemoballMovementController self;
+        private DemoballInputBroker selfBroker;
+        private DemoballMovementController leader;
         private Vector2 flankBasis = Vector2.right;
 
         private void Awake()
         {
-            self = GetComponent<DemoballMovementController>();
-        }
-
-        private void Start()
-        {
-            if (leader != null)
-                flankBasis = leader.GetFacingDirection();
+            self       = GetComponent<DemoballMovementController>();
+            selfBroker = GetComponent<DemoballInputBroker>();
         }
 
         private void Update()
         {
             // Engagement system owns movement while we're locked up.
             if (self.IsEngaged) return;
+
+            // Defer to player input on this character.
+            if (selfBroker != null && selfBroker.IsPlayerControlled) return;
+
+            DemoballMovementController newLeader = ResolveLeader();
+            if (newLeader != leader)
+            {
+                leader = newLeader;
+                if (leader != null) flankBasis = leader.GetFacingDirection();
+            }
 
             if (leader == null)
             {
@@ -161,6 +170,18 @@ namespace Sportland.Sports.Demoball
                 self.SetMoveInput(toTarget / dist);
                 self.SetSprinting(dist > sprintDistance);
             }
+        }
+
+        private DemoballMovementController ResolveLeader()
+        {
+            if (teammates == null) return null;
+            foreach (var t in teammates)
+            {
+                if (t == null || t == self) continue;
+                var b = t.GetComponent<DemoballInputBroker>();
+                if (b != null && b.IsPlayerControlled) return t;
+            }
+            return null;
         }
 
         private DemoballMovementController FindThreat(Vector2 leaderPos)

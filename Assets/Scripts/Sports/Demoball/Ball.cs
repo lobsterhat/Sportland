@@ -189,6 +189,18 @@ namespace Sportland.Sports.Demoball
             OnDropped?.Invoke(this);
         }
 
+        /// <summary>
+        /// Direct carrier handoff used by the pass mechanic. Bypasses the Loose-state
+        /// check in PickUp so the ball can move from one carrier to another without
+        /// a visible drop. Caller is responsible for updating the receiver's HeldBall.
+        /// </summary>
+        public void TransferTo(DemoballMovementController newCarrier)
+        {
+            if (State != BallState.Carried) return;
+            Carrier = newCarrier;
+            // State stays Carried; SetVisible stays off — ball remains off-field.
+        }
+
         // ──────────────────────────────────────────────
         //  SCORE / REMOVE
         // ──────────────────────────────────────────────

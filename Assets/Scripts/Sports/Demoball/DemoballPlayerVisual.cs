@@ -26,12 +26,16 @@ namespace Sportland.Sports.Demoball
         [Tooltip("Colour of the carry-indicator ring shown when this player holds a ball.")]
         [SerializeField] private Color carryIndicatorColor = new Color(0.95f, 0.9f, 0.2f, 0.95f);
 
+        [Tooltip("Colour of the pass-target ring shown when the carrier is aiming at this player.")]
+        [SerializeField] private Color passTargetIndicatorColor = new Color(0.25f, 0.95f, 0.35f, 0.95f);
+
         // ──────────────────────────────────────────────
         //  RUNTIME
         // ──────────────────────────────────────────────
 
         private DemoballMovementController movement;
         private LineRenderer carryRing;
+        private LineRenderer passTargetRing;
 
         // ──────────────────────────────────────────────
         //  LIFECYCLE
@@ -45,8 +49,9 @@ namespace Sportland.Sports.Demoball
 
         private void Update()
         {
-            if (carryRing == null) return;
-            carryRing.enabled = movement != null && movement.IsCarryingBall;
+            if (movement == null) return;
+            if (carryRing != null)      carryRing.enabled      = movement.IsCarryingBall;
+            if (passTargetRing != null) passTargetRing.enabled = movement.IsPassTarget;
         }
 
         // ──────────────────────────────────────────────
@@ -64,6 +69,12 @@ namespace Sportland.Sports.Demoball
             CreateFilledCircle("Body",    bodyRadius,        bodyColor,    0f,   sortOrder: 20);
             carryRing = CreateLineRing("CarryRing", bodyRadius + 0.18f, carryIndicatorColor, 0f, sortOrder: 22);
             carryRing.enabled = false;
+
+            // Pass-target ring sits a bit further out so it stays visible if the
+            // same player is somehow both carrying and being aimed at.
+            passTargetRing = CreateLineRing("PassTargetRing", bodyRadius + 0.34f,
+                                            passTargetIndicatorColor, 0f, sortOrder: 21);
+            passTargetRing.enabled = false;
         }
 
         // ──────────────────────────────────────────────

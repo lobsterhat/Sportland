@@ -88,6 +88,13 @@ namespace Sportland.Sports.Demoball
 
         private float stunTimer;
 
+        /// <summary>
+        /// Visual flag set by the carrier's input layer to mark this player as the
+        /// currently selected pass target. Drives the green target ring on
+        /// DemoballPlayerVisual.
+        /// </summary>
+        public bool IsPassTarget { get; set; }
+
         // Engagement state — set when this player is locked into a block / grapple.
         // Voluntary movement is suspended for both participants for the duration.
         public bool IsEngaged => engagedWith != null;
@@ -159,7 +166,8 @@ namespace Sportland.Sports.Demoball
         // ──────────────────────────────────────────────
 
         /// <summary>
-        /// Passes the held ball to the best available teammate in range.
+        /// Passes the held ball to the best available teammate in range — used as
+        /// a fallback when no explicit target was selected by the input layer.
         /// Scorers and Blockers carrying the ball may pass; Defenders may not.
         /// Returns true if a pass was made.
         /// </summary>
@@ -170,6 +178,23 @@ namespace Sportland.Sports.Demoball
 
             var target = FindPassTarget();
             if (target == null) return false;
+
+            ExecutePass(target);
+            return true;
+        }
+
+        /// <summary>
+        /// Passes the held ball to a specific target (selected by the input layer
+        /// via aim direction). Validates that the target is eligible. Returns
+        /// true if the pass succeeded.
+        /// </summary>
+        public bool TryPass(DemoballMovementController target)
+        {
+            if (!IsCarryingBall)              return false;
+            if (role == DemoballRole.Defender) return false;
+            if (target == null || target == this) return false;
+            if (target.Role == DemoballRole.Defender) return false;
+            if (target.NeedsTagUp || target.IsCarryingBall) return false;
 
             ExecutePass(target);
             return true;
@@ -209,7 +234,7 @@ namespace Sportland.Sports.Demoball
         /// <summary>Called on the receiver of a pass.</summary>
         public void ReceivePass(Ball ball)
         {
-            ball.PickUp(this);
+            ball.TransferTo(this);
             HeldBall = ball;
             OnBallPickedUp?.Invoke(ball);
         }

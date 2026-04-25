@@ -1274,6 +1274,7 @@ GameObject:
   - component: {fileID: 810006}
   - component: {fileID: 810007}
   - component: {fileID: 810008}
+  - component: {fileID: 810009}
   m_Layer: 7
   m_Name: Player_A1
   m_TagString: Untagged
@@ -1450,6 +1451,11 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   playerControlled: 1
   pickupRadius: 1.2
+  teammates:
+  - {fileID: 810006}
+  - {fileID: 830006}
+  - {fileID: 840006}
+  aimDeadzone: 0.3
 --- !u!1 &820001
 GameObject:
   m_ObjectHideFlags: 0
@@ -1924,6 +1930,11 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   playerControlled: 0
   pickupRadius: 1.2
+  teammates:
+  - {fileID: 810006}
+  - {fileID: 830006}
+  - {fileID: 840006}
+  aimDeadzone: 0.3
 --- !u!114 &830008
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -1951,7 +1962,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d4, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  leader: {fileID: 810006}
+  teammates:
+  - {fileID: 810006}
+  - {fileID: 830006}
+  - {fileID: 840006}
   flankOffset: 1.8
   trailDistance: 0
   side: -1
@@ -2158,6 +2172,11 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   playerControlled: 0
   pickupRadius: 1.2
+  teammates:
+  - {fileID: 810006}
+  - {fileID: 830006}
+  - {fileID: 840006}
+  aimDeadzone: 0.3
 --- !u!114 &840008
 MonoBehaviour:
   m_ObjectHideFlags: 0
@@ -2185,7 +2204,10 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d4, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  leader: {fileID: 810006}
+  teammates:
+  - {fileID: 810006}
+  - {fileID: 830006}
+  - {fileID: 840006}
   flankOffset: 1.8
   trailDistance: 0
   side: 1
@@ -2668,3 +2690,33 @@ MonoBehaviour:
   - {fileID: 840006}
   tackleRange: 1.4
   sprintDistance: 4
+--- !u!114 &810009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 810001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: a4b6c8d0e2f4a6b8c0d2e4f6a8b0c2d4, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  teammates:
+  - {fileID: 810006}
+  - {fileID: 830006}
+  - {fileID: 840006}
+  flankOffset: 1.8
+  trailDistance: 0
+  side: -1
+  arriveTolerance: 0.15
+  sprintDistance: 4
+  basisTurnRate: 120
+  sideSwapAngle: 90
+  opponents:
+  - {fileID: 820006}
+  - {fileID: 850006}
+  - {fileID: 860006}
+  threatRange: 6
+  blockStandoff: 1
+  engageDistance: 0.7
