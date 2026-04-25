@@ -1463,6 +1463,7 @@ GameObject:
   - component: {fileID: 820006}
   - component: {fileID: 820007}
   - component: {fileID: 820008}
+  - component: {fileID: 820009}
   m_Layer: 7
   m_Name: Player_B1
   m_TagString: Untagged
@@ -1956,6 +1957,11 @@ MonoBehaviour:
   sprintDistance: 4
   basisTurnRate: 120
   sideSwapAngle: 90
+  opponents:
+  - {fileID: 820006}
+  threatRange: 6
+  blockStandoff: 1
+  engageDistance: 0.7
 --- !u!1 &840001
 GameObject:
   m_ObjectHideFlags: 0
@@ -2183,3 +2189,26 @@ MonoBehaviour:
   sprintDistance: 4
   basisTurnRate: 120
   sideSwapAngle: 90
+  opponents:
+  - {fileID: 820006}
+  threatRange: 6
+  blockStandoff: 1
+  engageDistance: 0.7
+--- !u!114 &820009
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 820001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: e7f9a1b3c5d7e9f1a3b5c7d9e1f3a5b7, type: 3}
+  m_Name:
+  m_EditorClassIdentifier:
+  opponents:
+  - {fileID: 810006}
+  - {fileID: 830006}
+  - {fileID: 840006}
+  tackleRange: 1.4
+  sprintDistance: 4

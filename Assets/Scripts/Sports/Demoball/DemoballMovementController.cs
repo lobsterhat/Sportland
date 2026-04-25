@@ -52,6 +52,15 @@ namespace Sportland.Sports.Demoball
         [SerializeField] private float tackleStunsFor = 0.5f;
 
         // ──────────────────────────────────────────────
+        //  ENGAGEMENT CONFIG
+        // ──────────────────────────────────────────────
+
+        [Header("=== DEMOBALL: ENGAGEMENT ===")]
+        [Tooltip("Default engagement duration (seconds) when no specific value is supplied. " +
+                 "Future per-character stats will replace this fixed timer.")]
+        [SerializeField] private float defaultEngagementDuration = 2f;
+
+        // ──────────────────────────────────────────────
         //  PASS CONFIG
         // ──────────────────────────────────────────────
 
@@ -79,6 +88,14 @@ namespace Sportland.Sports.Demoball
 
         private float stunTimer;
 
+        // Engagement state — set when this player is locked into a block / grapple.
+        // Voluntary movement is suspended for both participants for the duration.
+        public bool IsEngaged => engagedWith != null;
+        public DemoballMovementController EngagedWith => engagedWith;
+        public float EngagementTimeRemaining => engagementTimer;
+        private DemoballMovementController engagedWith;
+        private float engagementTimer;
+
         // ──────────────────────────────────────────────
         //  EVENTS
         // ──────────────────────────────────────────────
@@ -89,6 +106,10 @@ namespace Sportland.Sports.Demoball
         public event Action<Ball, bool>                 OnTouchDown;
         public event Action<DemoballMovementController> OnTackled;
         public event Action                             OnTaggedUp;
+        /// <summary>Fired when this player locks into an engagement. Argument = the other participant.</summary>
+        public event Action<DemoballMovementController> OnEngagementStarted;
+        /// <summary>Fired when this player's engagement ends. Argument = the (now ex-)opponent.</summary>
+        public event Action<DemoballMovementController> OnEngagementEnded;
 
         // ──────────────────────────────────────────────
         //  UNITY LIFECYCLE
@@ -98,6 +119,7 @@ namespace Sportland.Sports.Demoball
         {
             base.Update();
             TickStunTimer();
+            TickEngagement();
         }
 
         // ──────────────────────────────────────────────
@@ -307,6 +329,70 @@ namespace Sportland.Sports.Demoball
         }
 
         // ──────────────────────────────────────────────
+        //  ENGAGEMENT  (blocker × defender lock)
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Attempts to lock this player and `other` into an engagement (e.g. a
+        /// blocker grappling a defender). Both characters' voluntary movement
+        /// is suspended via the Stunned state for `duration` seconds; pass a
+        /// negative value to use the configured default.
+        ///
+        /// Future stat-driven logic will plug into the OnEngagement* events to
+        /// determine actual duration, push direction, and knockdown outcomes.
+        /// </summary>
+        public bool TryStartEngagement(DemoballMovementController other, float duration = -1f)
+        {
+            if (other == null || other == this) return false;
+            if (IsEngaged || other.IsEngaged)   return false;
+            if (NeedsTagUp || other.NeedsTagUp) return false;
+
+            float d = duration < 0f ? defaultEngagementDuration : duration;
+            BeginEngagement(other, d);
+            other.BeginEngagement(this, d);
+            return true;
+        }
+
+        private void BeginEngagement(DemoballMovementController other, float duration)
+        {
+            engagedWith     = other;
+            engagementTimer = duration;
+            SetState(MovementState.Stunned);
+            OnEngagementStarted?.Invoke(other);
+        }
+
+        /// <summary>
+        /// Ends this engagement immediately. Safe to call on either participant —
+        /// the partner is released as well. Called automatically when the timer
+        /// expires; future code can also trigger early breakouts.
+        /// </summary>
+        public void EndEngagement()
+        {
+            if (!IsEngaged) return;
+
+            var partner = engagedWith;
+            engagedWith     = null;
+            engagementTimer = 0f;
+
+            // Don't override Stunned if the player is also recovering from a tackle
+            if (CurrentState == MovementState.Stunned && !NeedsTagUp)
+                SetState(MovementState.Idle);
+
+            OnEngagementEnded?.Invoke(partner);
+
+            if (partner != null && partner.IsEngaged)
+                partner.EndEngagement();
+        }
+
+        private void TickEngagement()
+        {
+            if (!IsEngaged) return;
+            engagementTimer -= Time.deltaTime;
+            if (engagementTimer <= 0f)
+                EndEngagement();
+        }
+
+        // ──────────────────────────────────────────────
         //  SPEED OVERRIDE  (carry penalty)
         // ──────────────────────────────────────────────
 
@@ -333,6 +419,7 @@ namespace Sportland.Sports.Demoball
             IsInScoringRing    = false;
             currentScoringRing = null;
             stunTimer          = 0f;
+            if (IsEngaged) EndEngagement();
             SetState(MovementState.Idle);
         }
     }
