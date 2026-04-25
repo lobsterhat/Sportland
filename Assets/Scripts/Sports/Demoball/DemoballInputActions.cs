@@ -9,8 +9,9 @@ namespace Sportland.Sports.Demoball
     ///   Move        — Left Stick / WASD / Arrow Keys
     ///   Aim         — Right Stick                  (selects pass target while carrying)
     ///   Sprint      — L2 / Left Shift              (hold)
-    ///   Action      — Circle / E                   (pickup loose ball, or pass if carrying)
-    ///   TouchDown   — R1     / Q                   (score while in scoring ring and carrying)
+    ///   Action      — R1     / E                   (pickup loose ball, or pass if carrying;
+    ///                                               R1 keeps the right thumb free for the right stick)
+    ///   TouchDown   — Circle / Q                   (score while in scoring ring and carrying)
     ///   Tackle      — Square / T                   (Defenders only)
     /// </summary>
     public class DemoballInputActions
@@ -51,15 +52,15 @@ namespace Sportland.Sports.Demoball
             Sprint.AddBinding("<Keyboard>/leftShift");
             Sprint.AddBinding("<Gamepad>/leftTrigger");
 
-            // Action — Circle / E (pickup or pass)
+            // Action — R1 / E (pickup or pass; R1 leaves the right thumb on the aim stick)
             Action = actionMap.AddAction("Action", InputActionType.Button);
             Action.AddBinding("<Keyboard>/e");
-            Action.AddBinding("<Gamepad>/buttonEast");
+            Action.AddBinding("<Gamepad>/rightShoulder");
 
-            // TouchDown — R1 / Q
+            // TouchDown — Circle / Q
             TouchDown = actionMap.AddAction("TouchDown", InputActionType.Button);
             TouchDown.AddBinding("<Keyboard>/q");
-            TouchDown.AddBinding("<Gamepad>/rightShoulder");
+            TouchDown.AddBinding("<Gamepad>/buttonEast");
 
             // Tackle — Square / T
             Tackle = actionMap.AddAction("Tackle", InputActionType.Button);

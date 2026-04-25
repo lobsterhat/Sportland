@@ -11,8 +11,8 @@ namespace Sportland.Sports.Demoball
     ///   Left Stick / WASD / Arrows  — Move
     ///   Right Stick                 — Aim a pass while carrying (selects target)
     ///   L2 / Left Shift             — Sprint (hold)
-    ///   Circle / E                  — Pick up nearest loose ball, or pass if carrying
-    ///   R1     / Q                  — Touch-down score (in scoring ring while carrying)
+    ///   R1     / E                  — Pick up nearest loose ball, or pass if carrying
+    ///   Circle / Q                  — Touch-down score (in scoring ring while carrying)
     ///   Square / T                  — Tackle nearest ball-carrier (Defenders only)
     ///
     /// On a successful pass, control is transferred to the receiver's broker
