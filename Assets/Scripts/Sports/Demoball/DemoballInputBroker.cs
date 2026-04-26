@@ -46,6 +46,16 @@ namespace Sportland.Sports.Demoball
         [Tooltip("Hold time at or above this caps the pass at maximum (football) power.")]
         [SerializeField] private float passMaxChargeTime = 0.6f;
 
+        [Header("=== PLAYS ===")]
+        [Tooltip("Forward distance (along leader facing) the route receivers run to.")]
+        [SerializeField] private float passingPlayForward = 5f;
+
+        [Tooltip("Lateral spread (perpendicular to leader facing) of the two route receivers.")]
+        [SerializeField] private float passingPlayLateral = 3f;
+
+        [Tooltip("How long the route stays active before blockers revert to flanking.")]
+        [SerializeField] private float passingPlayDuration = 6f;
+
         // ──────────────────────────────────────────────
         //  PUBLIC ACCESSORS
         // ──────────────────────────────────────────────
@@ -134,6 +144,10 @@ namespace Sportland.Sports.Demoball
             if (controls.Tackle.WasPressedThisFrame())
                 movement.TryTackle();
 
+            // ── Call Play: L1 / Tab (carrier only) — peel blockers into routes ──
+            if (movement.IsCarryingBall && controls.CallPlay.WasPressedThisFrame())
+                CallPassingPlay();
+
             // ── Debug: D-pad Up / R reloads the scene ──
             if (controls.DebugReset.WasPressedThisFrame())
                 SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
@@ -142,6 +156,50 @@ namespace Sportland.Sports.Demoball
             if (controls.DebugSpawnBall.WasPressedThisFrame())
                 FireExtraBall();
         }
+
+        // ──────────────────────────────────────────────
+        //  PLAY CALLING
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Sends the two non-carrier teammates on a passing route — one to a
+        /// forward-left spot, one forward-right of the carrier's current
+        /// position and facing. They sprint to those spots and hold there
+        /// until the play timer expires (or a pass + control swap ends it).
+        /// </summary>
+        private void CallPassingPlay()
+        {
+            if (teammates == null) return;
+
+            Vector2 origin  = transform.position;
+            Vector2 facing  = movement.GetFacingDirection();
+            if (facing.sqrMagnitude < 0.001f) facing = Vector2.right;
+            Vector2 left    = Vector2.Perpendicular(facing); // 90° CCW = leader's left
+
+            int assigned = 0;
+            foreach (var t in teammates)
+            {
+                if (t == null || t == movement) continue;
+                if (t.NeedsTagUp || t.IsCarryingBall) continue;
+
+                var ai = t.GetComponent<DemoballFlankAi>();
+                if (ai == null) continue;
+
+                // First receiver runs left, second runs right. Beyond two we
+                // fall through — only two routes in this play.
+                float lateralSign = assigned == 0 ? 1f : -1f;
+                Vector2 dest = origin + facing * passingPlayForward
+                                      + left   * passingPlayLateral * lateralSign;
+
+                ai.RunRoute(dest, passingPlayDuration);
+                assigned++;
+                if (assigned >= 2) break;
+            }
+        }
+
+        // ──────────────────────────────────────────────
+        //  DEBUG SHORTCUTS
+        // ──────────────────────────────────────────────
 
         private BallCannon cachedCannon;
 

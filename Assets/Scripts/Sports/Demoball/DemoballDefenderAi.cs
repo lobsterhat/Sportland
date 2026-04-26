@@ -41,6 +41,11 @@ namespace Sportland.Sports.Demoball
         [Tooltip("How far the defender will look for a fresh ball to back away from (default covers the arena).")]
         [SerializeField] private float freshBallSearchRange = 24f;
 
+        [Header("=== TARGETING ===")]
+        [Tooltip("Effective-distance bias for the ball-carrier. < 1 means the carrier looks closer than they really " +
+                 "are, so defenders favour rushing them but will peel off to cover a clearly closer receiver.")]
+        [SerializeField] private float carrierDistanceBias = 0.85f;
+
         // ──────────────────────────────────────────────
         //  RUNTIME
         // ──────────────────────────────────────────────
@@ -190,22 +195,24 @@ namespace Sportland.Sports.Demoball
 
         private DemoballMovementController FindTarget()
         {
-            DemoballMovementController carrier = null;
-            DemoballMovementController nearest = null;
-            float nearestDist = float.MaxValue;
+            // Pick the opponent with the lowest "effective distance" — the
+            // carrier is biased to look closer than they really are, so a
+            // defender naturally peels off to cover a route receiver only
+            // when that receiver is meaningfully closer than the carrier.
+            DemoballMovementController best = null;
+            float bestEff = float.MaxValue;
 
             foreach (var o in opponents)
             {
                 if (o == null) continue;
                 if (o.IsEngaged || o.NeedsTagUp) continue;
 
-                if (o.IsCarryingBall && carrier == null) carrier = o;
-
-                float d = Vector2.Distance(transform.position, o.transform.position);
-                if (d < nearestDist) { nearestDist = d; nearest = o; }
+                float d   = Vector2.Distance(transform.position, o.transform.position);
+                float eff = o.IsCarryingBall ? d * carrierDistanceBias : d;
+                if (eff < bestEff) { bestEff = eff; best = o; }
             }
 
-            return carrier != null ? carrier : nearest;
+            return best;
         }
     }
 }

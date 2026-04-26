@@ -24,6 +24,7 @@ namespace Sportland.Sports.Demoball
         public InputAction Action { get; private set; }
         public InputAction TouchDown { get; private set; }
         public InputAction Tackle { get; private set; }
+        public InputAction CallPlay { get; private set; }
         public InputAction DebugReset { get; private set; }
         public InputAction DebugSpawnBall { get; private set; }
 
@@ -70,6 +71,11 @@ namespace Sportland.Sports.Demoball
             Tackle = actionMap.AddAction("Tackle", InputActionType.Button);
             Tackle.AddBinding("<Keyboard>/t");
             Tackle.AddBinding("<Gamepad>/buttonWest");
+
+            // Call Play — L1 / Tab (carrier only): peels blockers off into receiver routes
+            CallPlay = actionMap.AddAction("CallPlay", InputActionType.Button);
+            CallPlay.AddBinding("<Keyboard>/tab");
+            CallPlay.AddBinding("<Gamepad>/leftShoulder");
 
             // Debug: reload the scene — D-pad Up / R
             DebugReset = actionMap.AddAction("DebugReset", InputActionType.Button);

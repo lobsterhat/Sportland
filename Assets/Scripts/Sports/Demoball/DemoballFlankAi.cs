@@ -64,6 +64,36 @@ namespace Sportland.Sports.Demoball
         [SerializeField] private float engageDistance = 0.7f;
 
         // ──────────────────────────────────────────────
+        //  PLAY MODES
+        // ──────────────────────────────────────────────
+
+        public enum AiMode { Flank, RunRoute }
+        public AiMode CurrentMode => mode;
+
+        private AiMode mode = AiMode.Flank;
+        private Vector2 routeDestination;   // world-space target while running a route
+        private float routeTimer;
+
+        /// <summary>
+        /// Switches this blocker into a fixed-destination route until the
+        /// timer expires or the leader changes (e.g. via a pass + control
+        /// swap). The blocker sprints to `worldDestination` and holds.
+        /// </summary>
+        public void RunRoute(Vector2 worldDestination, float duration)
+        {
+            mode = AiMode.RunRoute;
+            routeDestination = worldDestination;
+            routeTimer = Mathf.Max(0.05f, duration);
+        }
+
+        /// <summary>Cancel any active route and revert to flank behaviour.</summary>
+        public void EndRoute()
+        {
+            mode = AiMode.Flank;
+            routeTimer = 0f;
+        }
+
+        // ──────────────────────────────────────────────
         //  RUNTIME
         // ──────────────────────────────────────────────
 
@@ -91,6 +121,8 @@ namespace Sportland.Sports.Demoball
             {
                 leader = newLeader;
                 if (leader != null) flankBasis = leader.GetFacingDirection();
+                // A control swap (typically a pass) ends the play for this AI.
+                EndRoute();
             }
 
             if (leader == null)
@@ -98,6 +130,24 @@ namespace Sportland.Sports.Demoball
                 self.SetMoveInput(Vector2.zero);
                 self.SetSprinting(false);
                 return;
+            }
+
+            // Route mode: head to a fixed spot for `routeTimer` seconds, then
+            // fall back to flank behaviour. Threats and engagements still take
+            // priority — they handle the "blocker tries to catch but gets hit"
+            // scenario without us re-implementing it here.
+            if (mode == AiMode.RunRoute)
+            {
+                routeTimer -= Time.deltaTime;
+                if (routeTimer <= 0f)
+                {
+                    EndRoute();
+                }
+                else
+                {
+                    SeekTarget(routeDestination);
+                    return;
+                }
             }
 
             // For gentle turns, rotate our local basis toward the leader so the
@@ -150,6 +200,11 @@ namespace Sportland.Sports.Demoball
                 target = leaderPos + lateral * flankOffset - flankBasis * trailDistance;
             }
 
+            SeekTarget(target);
+        }
+
+        private void SeekTarget(Vector2 target)
+        {
             Vector2 toTarget = target - (Vector2)transform.position;
             float dist = toTarget.magnitude;
 
