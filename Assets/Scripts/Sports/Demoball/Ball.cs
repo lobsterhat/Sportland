@@ -38,6 +38,10 @@ namespace Sportland.Sports.Demoball
         [Tooltip("Duration of the launch arc animation before the ball lands (seconds).")]
         [SerializeField] private float launchDuration = 0.6f;
 
+        [Tooltip("Time (seconds, including the launch arc) during which a fresh ball is " +
+                 "off-limits to the defense. Lifts as soon as offense touches the ball.")]
+        [SerializeField] private float freshWindowDuration = 4f;
+
         // ──────────────────────────────────────────────
         //  RUNTIME STATE
         // ──────────────────────────────────────────────
@@ -49,6 +53,18 @@ namespace Sportland.Sports.Demoball
         /// Unlocks pickup for Blockers if the ball is subsequently dropped.
         /// </summary>
         public bool WasEverCarried { get; private set; }
+
+        /// <summary>
+        /// True while the offense's setup window is active — ball has been
+        /// introduced but no offensive player has touched it yet, and the
+        /// freshWindowDuration timer has not expired. The defense is forbidden
+        /// from picking up the ball during this window, and DefenderAi keeps
+        /// its minimum exclusion distance.
+        /// </summary>
+        public bool IsFresh => !WasEverCarried && freshTimer > 0f;
+
+        /// <summary>Seconds remaining on the fresh-ball window (0 once expired).</summary>
+        public float FreshTimeRemaining => Mathf.Max(0f, freshTimer);
 
         /// <summary>The player currently carrying this ball, or null.</summary>
         public DemoballMovementController Carrier { get; private set; }
@@ -74,6 +90,7 @@ namespace Sportland.Sports.Demoball
         private Vector3 launchStart;
         private Vector3 launchTarget;
         private SpriteRenderer spriteRenderer;
+        private float freshTimer;
 
         // Pass animation runtime
         private float passTimer;
@@ -103,6 +120,11 @@ namespace Sportland.Sports.Demoball
 
         private void Update()
         {
+            // Fresh-ball window ticks while the ball is on the field
+            // (Launching or Loose) — the GameObject is inactive in other
+            // states so Update wouldn't run anyway.
+            if (freshTimer > 0f) freshTimer -= Time.deltaTime;
+
             switch (State)
             {
                 case BallState.Launching: UpdateLaunching(); break;
@@ -151,6 +173,11 @@ namespace Sportland.Sports.Demoball
             launchTarget = toPosition;
             launchTimer  = 0f;
 
+            // Fresh window covers the airborne arc plus the configured setup
+            // time once the ball lands, so the offense gets the full window
+            // counted from when they could realistically reach the ball.
+            freshTimer   = freshWindowDuration + launchDuration;
+
             transform.position = fromPosition;
             SetVisible(true);
             State = BallState.Launching;
@@ -178,7 +205,8 @@ namespace Sportland.Sports.Demoball
             switch (player.Role)
             {
                 case DemoballRole.Defender:
-                    return true; // defense recovers → ball out of play
+                    // Defense is locked out during the offense's setup window.
+                    return !IsFresh;
 
                 case DemoballRole.Scorer:
                     return true; // scorers can always initiate
@@ -338,6 +366,7 @@ namespace Sportland.Sports.Demoball
         {
             Carrier = null;
             WasEverCarried = false;
+            freshTimer = 0f;
             State = BallState.Dormant;
             SetVisible(false);
         }

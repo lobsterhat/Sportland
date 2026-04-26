@@ -34,6 +34,13 @@ namespace Sportland.Sports.Demoball
         [Tooltip("Maximum range at which a loose ball outranks an opposing player as a target.")]
         [SerializeField] private float looseBallChaseRange = 16f;
 
+        [Header("=== FRESH BALL EXCLUSION ===")]
+        [Tooltip("During the offense's setup window, defenders must stay at least this far from the fresh ball.")]
+        [SerializeField] private float freshBallExclusionRadius = 4f;
+
+        [Tooltip("How far the defender will look for a fresh ball to back away from (default covers the arena).")]
+        [SerializeField] private float freshBallSearchRange = 24f;
+
         // ──────────────────────────────────────────────
         //  RUNTIME
         // ──────────────────────────────────────────────
@@ -55,6 +62,13 @@ namespace Sportland.Sports.Demoball
                 self.SetSprinting(false);
                 return;
             }
+
+            // Fresh-ball exclusion takes priority over everything else: while
+            // the offense's setup window is active the defender must hold
+            // exclusionRadius from the ball. Push away if too close, otherwise
+            // idle in place (don't pursue offense yet either, that's the rule).
+            Ball fresh = FindFreshBall();
+            if (fresh != null) { HoldExclusion(fresh); return; }
 
             // Loose ball recovery takes priority when no opponent is carrying:
             // intercepting a ball before it gets picked back up is huge for the
@@ -116,6 +130,40 @@ namespace Sportland.Sports.Demoball
                 if (sqr < bestSqr) { bestSqr = sqr; best = ball; }
             }
             return best;
+        }
+
+        private Ball FindFreshBall()
+        {
+            var hits = Physics2D.OverlapCircleAll(transform.position, freshBallSearchRange);
+            Ball best = null;
+            float bestSqr = float.MaxValue;
+            foreach (var hit in hits)
+            {
+                var ball = hit.GetComponent<Ball>();
+                if (ball == null || !ball.IsFresh) continue;
+
+                float sqr = ((Vector2)ball.transform.position - (Vector2)transform.position).sqrMagnitude;
+                if (sqr < bestSqr) { bestSqr = sqr; best = ball; }
+            }
+            return best;
+        }
+
+        private void HoldExclusion(Ball ball)
+        {
+            Vector2 toBall = (Vector2)ball.transform.position - (Vector2)transform.position;
+            float dist = toBall.magnitude;
+
+            if (dist < freshBallExclusionRadius)
+            {
+                Vector2 away = dist > 0.01f ? -toBall / dist : Vector2.right;
+                self.SetMoveInput(away);
+                self.SetSprinting(false);
+            }
+            else
+            {
+                self.SetMoveInput(Vector2.zero);
+                self.SetSprinting(false);
+            }
         }
 
         private void ChaseLooseBall(Ball ball)
