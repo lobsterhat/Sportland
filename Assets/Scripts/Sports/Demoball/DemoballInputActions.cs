@@ -13,6 +13,8 @@ namespace Sportland.Sports.Demoball
     ///                                               R1 keeps the right thumb free for the right stick)
     ///   TouchDown   — Circle / Q                   (score while in scoring ring and carrying)
     ///   Tackle      — Square / T                   (Defenders only)
+    ///   DebugReset  — D-pad Up    / R              (debug: reload the scene)
+    ///   DebugBall   — D-pad Down  / B              (debug: fire another ball from the cannon)
     /// </summary>
     public class DemoballInputActions
     {
@@ -22,6 +24,8 @@ namespace Sportland.Sports.Demoball
         public InputAction Action { get; private set; }
         public InputAction TouchDown { get; private set; }
         public InputAction Tackle { get; private set; }
+        public InputAction DebugReset { get; private set; }
+        public InputAction DebugSpawnBall { get; private set; }
 
         private readonly InputActionMap actionMap;
 
@@ -66,6 +70,16 @@ namespace Sportland.Sports.Demoball
             Tackle = actionMap.AddAction("Tackle", InputActionType.Button);
             Tackle.AddBinding("<Keyboard>/t");
             Tackle.AddBinding("<Gamepad>/buttonWest");
+
+            // Debug: reload the scene — D-pad Up / R
+            DebugReset = actionMap.AddAction("DebugReset", InputActionType.Button);
+            DebugReset.AddBinding("<Keyboard>/r");
+            DebugReset.AddBinding("<Gamepad>/dpad/up");
+
+            // Debug: fire another ball — D-pad Down / B
+            DebugSpawnBall = actionMap.AddAction("DebugSpawnBall", InputActionType.Button);
+            DebugSpawnBall.AddBinding("<Keyboard>/b");
+            DebugSpawnBall.AddBinding("<Gamepad>/dpad/down");
         }
 
         public void Enable()  => actionMap.Enable();

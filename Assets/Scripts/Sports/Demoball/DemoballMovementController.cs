@@ -37,6 +37,10 @@ namespace Sportland.Sports.Demoball
         [Tooltip("Top-speed multiplier while carrying a ball. < 1 = slower.")]
         [SerializeField] private float carrySpeedMultiplier = 0.85f;
 
+        [Tooltip("Debug speed scalar applied to every Demoball player so the action stays " +
+                 "readable while we tune AI. Set to 1.0 for production speed.")]
+        [SerializeField] private float debugSpeedMultiplier = 0.7f;
+
         // ──────────────────────────────────────────────
         //  TACKLE CONFIG
         // ──────────────────────────────────────────────
@@ -441,6 +445,7 @@ namespace Sportland.Sports.Demoball
         {
             float speed = base.GetEffectiveTopSpeed();
             if (IsCarryingBall) speed *= carrySpeedMultiplier;
+            speed *= debugSpeedMultiplier;
             return speed;
         }
 

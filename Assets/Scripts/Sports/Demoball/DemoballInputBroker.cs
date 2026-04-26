@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.SceneManagement;
 
 namespace Sportland.Sports.Demoball
 {
@@ -132,6 +133,23 @@ namespace Sportland.Sports.Demoball
             // ── Tackle: Square / T ──
             if (controls.Tackle.WasPressedThisFrame())
                 movement.TryTackle();
+
+            // ── Debug: D-pad Up / R reloads the scene ──
+            if (controls.DebugReset.WasPressedThisFrame())
+                SceneManager.LoadScene(SceneManager.GetActiveScene().buildIndex);
+
+            // ── Debug: D-pad Down / B fires another ball ──
+            if (controls.DebugSpawnBall.WasPressedThisFrame())
+                FireExtraBall();
+        }
+
+        private BallCannon cachedCannon;
+
+        private void FireExtraBall()
+        {
+            if (cachedCannon == null)
+                cachedCannon = Object.FindFirstObjectByType<BallCannon>();
+            if (cachedCannon != null) cachedCannon.Fire();
         }
 
         // ──────────────────────────────────────────────
