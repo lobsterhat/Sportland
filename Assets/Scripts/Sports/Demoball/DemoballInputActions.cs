@@ -13,6 +13,9 @@ namespace Sportland.Sports.Demoball
     ///                                               R1 keeps the right thumb free for the right stick)
     ///   TouchDown   — Circle / Q                   (score while in scoring ring and carrying)
     ///   Tackle      — Square / T                   (Defenders only)
+    ///   Block play       — L1           / 1        (both blockers flank-and-block the carrier)
+    ///   Release left     — D-pad Left   / 2        (both blockers release left; lead blocker = right-stick-aligned)
+    ///   Release right    — D-pad Right  / 3        (both blockers release right; lead blocker = right-stick-aligned)
     ///   DebugReset  — D-pad Up    / R              (debug: reload the scene)
     ///   DebugBall   — D-pad Down  / B              (debug: fire another ball from the cannon)
     /// </summary>
@@ -24,7 +27,9 @@ namespace Sportland.Sports.Demoball
         public InputAction Action { get; private set; }
         public InputAction TouchDown { get; private set; }
         public InputAction Tackle { get; private set; }
-        public InputAction CallPlay { get; private set; }
+        public InputAction BlockPlay { get; private set; }
+        public InputAction ReleaseLeftPlay { get; private set; }
+        public InputAction ReleaseRightPlay { get; private set; }
         public InputAction DebugReset { get; private set; }
         public InputAction DebugSpawnBall { get; private set; }
 
@@ -72,10 +77,22 @@ namespace Sportland.Sports.Demoball
             Tackle.AddBinding("<Keyboard>/t");
             Tackle.AddBinding("<Gamepad>/buttonWest");
 
-            // Call Play — L1 / Tab (carrier only): peels blockers off into receiver routes
-            CallPlay = actionMap.AddAction("CallPlay", InputActionType.Button);
-            CallPlay.AddBinding("<Keyboard>/tab");
-            CallPlay.AddBinding("<Gamepad>/leftShoulder");
+            // Plays — carrier-only. Right-stick direction at call time decides
+            // which blocker becomes the lead vs. the primary receiver.
+            //   BlockPlay         — L1 / 1     (both blockers stay flank-and-block)
+            //   ReleaseLeftPlay   — D-pad Left / 2
+            //   ReleaseRightPlay  — D-pad Right / 3
+            BlockPlay = actionMap.AddAction("BlockPlay", InputActionType.Button);
+            BlockPlay.AddBinding("<Keyboard>/1");
+            BlockPlay.AddBinding("<Gamepad>/leftShoulder");
+
+            ReleaseLeftPlay = actionMap.AddAction("ReleaseLeftPlay", InputActionType.Button);
+            ReleaseLeftPlay.AddBinding("<Keyboard>/2");
+            ReleaseLeftPlay.AddBinding("<Gamepad>/dpad/left");
+
+            ReleaseRightPlay = actionMap.AddAction("ReleaseRightPlay", InputActionType.Button);
+            ReleaseRightPlay.AddBinding("<Keyboard>/3");
+            ReleaseRightPlay.AddBinding("<Gamepad>/dpad/right");
 
             // Debug: reload the scene — D-pad Up / R
             DebugReset = actionMap.AddAction("DebugReset", InputActionType.Button);

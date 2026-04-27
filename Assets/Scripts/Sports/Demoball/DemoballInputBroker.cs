@@ -47,14 +47,20 @@ namespace Sportland.Sports.Demoball
         [SerializeField] private float passMaxChargeTime = 0.6f;
 
         [Header("=== PLAYS ===")]
-        [Tooltip("Forward distance (along leader facing) the route receivers run to.")]
-        [SerializeField] private float passingPlayForward = 5f;
+        [Tooltip("Forward depth of the lead blocker on a release play (along the carrier's facing).")]
+        [SerializeField] private float leadBlockerForward = 2f;
 
-        [Tooltip("Lateral spread (perpendicular to leader facing) of the two route receivers.")]
-        [SerializeField] private float passingPlayLateral = 3f;
+        [Tooltip("Lateral offset of the lead blocker on a release play (toward the chosen side).")]
+        [SerializeField] private float leadBlockerLateral = 3f;
 
-        [Tooltip("How long the route stays active before blockers revert to flanking.")]
-        [SerializeField] private float passingPlayDuration = 6f;
+        [Tooltip("Forward depth of the primary receiver on a release play.")]
+        [SerializeField] private float receiverForward = 6f;
+
+        [Tooltip("Lateral offset of the primary receiver on a release play.")]
+        [SerializeField] private float receiverLateral = 4.5f;
+
+        [Tooltip("How long routes stay active before blockers revert to flanking.")]
+        [SerializeField] private float playDuration = 6f;
 
         // ──────────────────────────────────────────────
         //  PUBLIC ACCESSORS
@@ -144,9 +150,13 @@ namespace Sportland.Sports.Demoball
             if (controls.Tackle.WasPressedThisFrame())
                 movement.TryTackle();
 
-            // ── Call Play: L1 / Tab (carrier only) — peel blockers into routes ──
-            if (movement.IsCarryingBall && controls.CallPlay.WasPressedThisFrame())
-                CallPassingPlay();
+            // ── Plays (carrier only) ──
+            if (movement.IsCarryingBall)
+            {
+                if      (controls.BlockPlay.WasPressedThisFrame())        CallBlockPlay();
+                else if (controls.ReleaseLeftPlay.WasPressedThisFrame())  CallReleasePlay( 1f);
+                else if (controls.ReleaseRightPlay.WasPressedThisFrame()) CallReleasePlay(-1f);
+            }
 
             // ── Debug: D-pad Up / R reloads the scene ──
             if (controls.DebugReset.WasPressedThisFrame())
@@ -162,39 +172,80 @@ namespace Sportland.Sports.Demoball
         // ──────────────────────────────────────────────
 
         /// <summary>
-        /// Sends the two non-carrier teammates on a passing route — one to a
-        /// forward-left spot, one forward-right of the carrier's current
-        /// position and facing. They sprint to those spots and hold there
-        /// until the play timer expires (or a pass + control swap ends it).
+        /// Block play — cancel any active routes so all blockers revert to
+        /// flank-and-block on the carrier.
         /// </summary>
-        private void CallPassingPlay()
+        private void CallBlockPlay()
+        {
+            if (teammates == null) return;
+            foreach (var t in teammates)
+            {
+                if (t == null || t == movement) continue;
+                var ai = t.GetComponent<DemoballFlankAi>();
+                if (ai != null) ai.EndRoute();
+            }
+        }
+
+        /// <summary>
+        /// Release play — both blockers release to one side of the carrier.
+        /// `lateralSign` is +1 for the carrier's left, -1 for the carrier's
+        /// right (perpendicular to facing direction).
+        ///
+        /// The blocker most aligned with the right-stick aim direction (from
+        /// the carrier's perspective) is the lead blocker and gets the
+        /// shallower route; the other becomes the primary receiver and gets
+        /// the deeper route. With no aim input we default to the carrier's
+        /// facing so the player closest to "in front" leads.
+        /// </summary>
+        private void CallReleasePlay(float lateralSign)
         {
             if (teammates == null) return;
 
-            Vector2 origin  = transform.position;
-            Vector2 facing  = movement.GetFacingDirection();
+            Vector2 origin = transform.position;
+            Vector2 facing = movement.GetFacingDirection();
             if (facing.sqrMagnitude < 0.001f) facing = Vector2.right;
-            Vector2 left    = Vector2.Perpendicular(facing); // 90° CCW = leader's left
+            Vector2 lateral = Vector2.Perpendicular(facing) * lateralSign; // +1 = left, -1 = right
 
-            int assigned = 0;
+            // Snapshot aim — fall back to facing if right-stick is centred.
+            Vector2 aim = controls.Aim.ReadValue<Vector2>();
+            if (aim.sqrMagnitude < aimDeadzone * aimDeadzone) aim = facing;
+            aim.Normalize();
+
+            // Collect eligible blockers.
+            DemoballMovementController bestLead = null;
+            DemoballMovementController other    = null;
+            float bestAlign = float.NegativeInfinity;
+
             foreach (var t in teammates)
             {
                 if (t == null || t == movement) continue;
                 if (t.NeedsTagUp || t.IsCarryingBall) continue;
+                if (t.GetComponent<DemoballFlankAi>() == null) continue;
 
-                var ai = t.GetComponent<DemoballFlankAi>();
-                if (ai == null) continue;
+                Vector2 toBlocker = (Vector2)t.transform.position - origin;
+                if (toBlocker.sqrMagnitude < 0.0001f) continue;
+                float align = Vector2.Dot(toBlocker.normalized, aim);
 
-                // First receiver runs left, second runs right. Beyond two we
-                // fall through — only two routes in this play.
-                float lateralSign = assigned == 0 ? 1f : -1f;
-                Vector2 dest = origin + facing * passingPlayForward
-                                      + left   * passingPlayLateral * lateralSign;
-
-                ai.RunRoute(dest, passingPlayDuration);
-                assigned++;
-                if (assigned >= 2) break;
+                if (align > bestAlign)
+                {
+                    if (bestLead != null) other = bestLead; // demoted to receiver
+                    bestLead = t;
+                    bestAlign = align;
+                }
+                else if (other == null)
+                {
+                    other = t;
+                }
             }
+
+            if (bestLead == null) return;
+
+            Vector2 leadDest     = origin + facing * leadBlockerForward + lateral * leadBlockerLateral;
+            Vector2 receiverDest = origin + facing * receiverForward    + lateral * receiverLateral;
+
+            bestLead.GetComponent<DemoballFlankAi>().RunRoute(leadDest, playDuration);
+            if (other != null)
+                other.GetComponent<DemoballFlankAi>().RunRoute(receiverDest, playDuration);
         }
 
         // ──────────────────────────────────────────────
