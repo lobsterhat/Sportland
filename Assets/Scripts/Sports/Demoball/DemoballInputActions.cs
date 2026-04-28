@@ -13,6 +13,7 @@ namespace Sportland.Sports.Demoball
     ///                                               R1 keeps the right thumb free for the right stick)
     ///   TouchDown   — Circle / Q                   (score while in scoring ring and carrying)
     ///   Tackle      — Square / T                   (Defenders only)
+    ///   Shove       — Triangle / G                 (engaged blockers and defenders; rolls a shove outcome)
     ///   Block play       — L1           / 1        (both blockers flank-and-block the carrier)
     ///   Release left     — D-pad Left   / 2        (both blockers release left; lead blocker = right-stick-aligned)
     ///   Release right    — D-pad Right  / 3        (both blockers release right; lead blocker = right-stick-aligned)
@@ -27,6 +28,7 @@ namespace Sportland.Sports.Demoball
         public InputAction Action { get; private set; }
         public InputAction TouchDown { get; private set; }
         public InputAction Tackle { get; private set; }
+        public InputAction Shove { get; private set; }
         public InputAction BlockPlay { get; private set; }
         public InputAction ReleaseLeftPlay { get; private set; }
         public InputAction ReleaseRightPlay { get; private set; }
@@ -76,6 +78,11 @@ namespace Sportland.Sports.Demoball
             Tackle = actionMap.AddAction("Tackle", InputActionType.Button);
             Tackle.AddBinding("<Keyboard>/t");
             Tackle.AddBinding("<Gamepad>/buttonWest");
+
+            // Shove — Triangle / G (engaged blockers and defenders only)
+            Shove = actionMap.AddAction("Shove", InputActionType.Button);
+            Shove.AddBinding("<Keyboard>/g");
+            Shove.AddBinding("<Gamepad>/buttonNorth");
 
             // Plays — carrier-only. Right-stick direction at call time decides
             // which blocker becomes the lead vs. the primary receiver.

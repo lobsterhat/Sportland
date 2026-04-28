@@ -65,6 +65,56 @@ namespace Sportland.Sports.Demoball
         [SerializeField] private float defaultEngagementDuration = 2f;
 
         // ──────────────────────────────────────────────
+        //  SHOVE CONFIG
+        // ──────────────────────────────────────────────
+
+        [Header("=== DEMOBALL: SHOVE ===")]
+        [Tooltip("Cooldown (seconds) between shove attempts. Prevents spam-shoving while engaged.")]
+        [SerializeField] private float shoveCooldown = 0.4f;
+
+        [Tooltip("Loser is held prone (extended stun) for this duration on a Knockdown outcome.")]
+        [SerializeField] private float knockdownProneDuration = 1.5f;
+
+        [Tooltip("Brief mutual stun applied to both players after a Collide outcome.")]
+        [SerializeField] private float collideStunDuration = 0.4f;
+
+        [Tooltip("Initial speed of the knockback impulse on a PushBack.")]
+        [SerializeField] private float pushBackSpeed = 6f;
+
+        [Tooltip("Duration of the PushBack knockback before velocity decays out (seconds).")]
+        [SerializeField] private float pushBackDuration = 0.35f;
+
+        [Tooltip("Initial speed of the bump impulse applied to the defender on a ChipBlock.")]
+        [SerializeField] private float chipBlockBumpSpeed = 3f;
+
+        [Tooltip("Duration of the ChipBlock bump (seconds).")]
+        [SerializeField] private float chipBlockBumpDuration = 0.2f;
+
+        [Tooltip("Distance the defender ends up past the blocker on a SwimThrough (world units).")]
+        [SerializeField] private float swimThroughDistance = 1.2f;
+
+        [Tooltip("Distance the defender slides off-axis on a SpinOff (world units).")]
+        [SerializeField] private float spinOffDistance = 1.5f;
+
+        [Tooltip("Search radius used to locate the ball carrier when resolving SpinOff / SwimThrough geometry.")]
+        [SerializeField] private float carrierSearchRadius = 30f;
+
+        [Header("=== SHOVE WEIGHTS: DEFENDER ===")]
+        [SerializeField] private float defWeightHold        = 35f;
+        [SerializeField] private float defWeightCollide     = 10f;
+        [SerializeField] private float defWeightKnockdown   = 5f;
+        [SerializeField] private float defWeightPushBack    = 25f;
+        [SerializeField] private float defWeightSpinOff     = 15f;
+        [SerializeField] private float defWeightSwimThrough = 10f;
+
+        [Header("=== SHOVE WEIGHTS: BLOCKER ===")]
+        [SerializeField] private float blkWeightHold      = 40f;
+        [SerializeField] private float blkWeightCollide   = 10f;
+        [SerializeField] private float blkWeightKnockdown = 5f;
+        [SerializeField] private float blkWeightPushBack  = 25f;
+        [SerializeField] private float blkWeightChipBlock = 20f;
+
+        // ──────────────────────────────────────────────
         //  PASS CONFIG
         // ──────────────────────────────────────────────
 
@@ -120,6 +170,21 @@ namespace Sportland.Sports.Demoball
         private DemoballMovementController engagedWith;
         private float engagementTimer;
 
+        // Shove state — cooldown between attempts, prone window after a knockdown,
+        // and a knockback impulse that overrides locomotion velocity for a moment.
+        public bool IsProne => proneTimer > 0f;
+        public bool CanShove =>
+            IsEngaged
+            && !IsCarryingBall
+            && !NeedsTagUp
+            && shoveCooldownTimer <= 0f
+            && (role == DemoballRole.Defender || role == DemoballRole.Blocker);
+        private float shoveCooldownTimer;
+        private float proneTimer;
+        private float knockbackTimer;
+        private Vector2 knockbackVelocity;
+        private float knockbackDecel;
+
         // ──────────────────────────────────────────────
         //  EVENTS
         // ──────────────────────────────────────────────
@@ -134,6 +199,8 @@ namespace Sportland.Sports.Demoball
         public event Action<DemoballMovementController> OnEngagementStarted;
         /// <summary>Fired when this player's engagement ends. Argument = the (now ex-)opponent.</summary>
         public event Action<DemoballMovementController> OnEngagementEnded;
+        /// <summary>Fired on the initiator after a shove resolves. Argument = the rolled outcome.</summary>
+        public event Action<ShoveOutcome> OnShoveResolved;
 
         // ──────────────────────────────────────────────
         //  UNITY LIFECYCLE
@@ -144,6 +211,26 @@ namespace Sportland.Sports.Demoball
             base.Update();
             TickStunTimer();
             TickEngagement();
+            TickProneTimer();
+            TickShoveCooldown();
+        }
+
+        protected override void FixedUpdate()
+        {
+            base.FixedUpdate();
+
+            // Knockback impulse overrides whatever velocity the base movement
+            // step just wrote. Decays linearly to zero over knockbackDuration.
+            if (knockbackTimer > 0f)
+            {
+                knockbackTimer -= Time.fixedDeltaTime;
+                rb.linearVelocity = knockbackVelocity;
+                knockbackVelocity = Vector2.MoveTowards(
+                    knockbackVelocity, Vector2.zero, knockbackDecel * Time.fixedDeltaTime);
+
+                if (knockbackTimer <= 0f)
+                    knockbackVelocity = Vector2.zero;
+            }
         }
 
         // ──────────────────────────────────────────────
@@ -366,11 +453,22 @@ namespace Sportland.Sports.Demoball
         {
             if (stunTimer <= 0f) return;
             stunTimer -= Time.deltaTime;
-            if (stunTimer <= 0f && CurrentState == MovementState.Stunned && NeedsTagUp)
+            if (stunTimer <= 0f && CurrentState == MovementState.Stunned && !IsEngaged)
             {
-                // Stun expired — player can now move toward the tag-up zone
+                // Stun expired — return to Idle. NeedsTagUp persists if set;
+                // the player can now move toward the tag-up zone.
                 SetState(MovementState.Idle);
             }
+        }
+
+        private void TickProneTimer()
+        {
+            if (proneTimer > 0f) proneTimer -= Time.deltaTime;
+        }
+
+        private void TickShoveCooldown()
+        {
+            if (shoveCooldownTimer > 0f) shoveCooldownTimer -= Time.deltaTime;
         }
 
         // ──────────────────────────────────────────────
@@ -438,6 +536,176 @@ namespace Sportland.Sports.Demoball
         }
 
         // ──────────────────────────────────────────────
+        //  SHOVE  (engagement breakouts and counters)
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Attempts a shove against the currently-engaged partner. Rolls a
+        /// role-specific outcome from the configured weight tables and applies
+        /// its effects to both participants. Returns true if a shove was
+        /// resolved; outcome receives the rolled result. Returns false if the
+        /// player is not eligible to shove (not engaged, on cooldown, carrying,
+        /// recovering from a tackle, or wrong role).
+        /// </summary>
+        public bool TryShove(out ShoveOutcome outcome)
+        {
+            outcome = ShoveOutcome.Hold;
+            if (!CanShove) return false;
+
+            var partner = engagedWith;
+            if (partner == null) return false;
+
+            outcome = RollShoveOutcome();
+            ApplyShoveOutcome(outcome, partner);
+            shoveCooldownTimer = shoveCooldown;
+            OnShoveResolved?.Invoke(outcome);
+            return true;
+        }
+
+        private ShoveOutcome RollShoveOutcome()
+        {
+            if (role == DemoballRole.Defender)
+            {
+                float total = defWeightHold + defWeightCollide + defWeightKnockdown
+                            + defWeightPushBack + defWeightSpinOff + defWeightSwimThrough;
+                float r = UnityEngine.Random.value * Mathf.Max(0.0001f, total);
+                if ((r -= defWeightHold)        < 0f) return ShoveOutcome.Hold;
+                if ((r -= defWeightCollide)     < 0f) return ShoveOutcome.Collide;
+                if ((r -= defWeightKnockdown)   < 0f) return ShoveOutcome.Knockdown;
+                if ((r -= defWeightPushBack)    < 0f) return ShoveOutcome.PushBack;
+                if ((r -= defWeightSpinOff)     < 0f) return ShoveOutcome.SpinOff;
+                return ShoveOutcome.SwimThrough;
+            }
+            else // Blocker
+            {
+                float total = blkWeightHold + blkWeightCollide + blkWeightKnockdown
+                            + blkWeightPushBack + blkWeightChipBlock;
+                float r = UnityEngine.Random.value * Mathf.Max(0.0001f, total);
+                if ((r -= blkWeightHold)      < 0f) return ShoveOutcome.Hold;
+                if ((r -= blkWeightCollide)   < 0f) return ShoveOutcome.Collide;
+                if ((r -= blkWeightKnockdown) < 0f) return ShoveOutcome.Knockdown;
+                if ((r -= blkWeightPushBack)  < 0f) return ShoveOutcome.PushBack;
+                return ShoveOutcome.ChipBlock;
+            }
+        }
+
+        private void ApplyShoveOutcome(ShoveOutcome outcome, DemoballMovementController partner)
+        {
+            Vector2 selfPos    = transform.position;
+            Vector2 partnerPos = partner.transform.position;
+            // Axis points away from the initiator (toward the partner). Used as
+            // the push direction for impulses and the line for SwimThrough.
+            Vector2 axis = (partnerPos - selfPos);
+            if (axis.sqrMagnitude < 0.0001f) axis = GetFacingDirection();
+            axis.Normalize();
+
+            switch (outcome)
+            {
+                case ShoveOutcome.Hold:
+                    // Failed shove. Engagement continues, cooldown applied.
+                    break;
+
+                case ShoveOutcome.Collide:
+                    EndEngagement();
+                    ApplyStun(collideStunDuration);
+                    partner.ApplyStun(collideStunDuration);
+                    break;
+
+                case ShoveOutcome.Knockdown:
+                    EndEngagement();
+                    partner.ApplyProne(knockdownProneDuration);
+                    break;
+
+                case ShoveOutcome.PushBack:
+                    EndEngagement();
+                    partner.ApplyKnockback(axis, pushBackSpeed, pushBackDuration);
+                    partner.ApplyStun(pushBackDuration);
+                    break;
+
+                case ShoveOutcome.SpinOff:
+                {
+                    Vector2 carrierPos = FindCarrierPosition();
+                    int side = ChooseSideTowardCarrier(selfPos, axis, carrierPos);
+                    Vector2 perp = Vector2.Perpendicular(axis) * side;
+                    EndEngagement();
+                    transform.position = selfPos + perp * spinOffDistance;
+                    break;
+                }
+
+                case ShoveOutcome.SwimThrough:
+                {
+                    Vector2 carrierPos = FindCarrierPosition();
+                    Vector2 toCarrier  = carrierPos - partnerPos;
+                    Vector2 swimDir    = toCarrier.sqrMagnitude > 0.01f
+                        ? toCarrier.normalized
+                        : axis;
+                    EndEngagement();
+                    transform.position = partnerPos + swimDir * swimThroughDistance;
+                    break;
+                }
+
+                case ShoveOutcome.ChipBlock:
+                    EndEngagement();
+                    partner.ApplyKnockback(axis, chipBlockBumpSpeed, chipBlockBumpDuration);
+                    partner.ApplyStun(chipBlockBumpDuration);
+                    break;
+            }
+        }
+
+        /// <summary>Brief stun. Sets the Stunned state until stunTimer expires.</summary>
+        public void ApplyStun(float duration)
+        {
+            if (duration <= 0f) return;
+            stunTimer = Mathf.Max(stunTimer, duration);
+            if (CurrentState != MovementState.Stunned)
+                SetState(MovementState.Stunned);
+        }
+
+        /// <summary>Extended stun (knockdown). Sets IsProne for the duration.</summary>
+        public void ApplyProne(float duration)
+        {
+            if (duration <= 0f) return;
+            proneTimer = Mathf.Max(proneTimer, duration);
+            ApplyStun(duration);
+        }
+
+        /// <summary>
+        /// Applies a velocity impulse in `direction` that decays linearly to
+        /// zero over `duration`. Used for PushBack and ChipBlock outcomes.
+        /// Overrides locomotion velocity each FixedUpdate while active.
+        /// </summary>
+        public void ApplyKnockback(Vector2 direction, float speed, float duration)
+        {
+            if (direction.sqrMagnitude < 0.0001f || speed <= 0f || duration <= 0f) return;
+            knockbackVelocity = direction.normalized * speed;
+            knockbackTimer    = duration;
+            knockbackDecel    = speed / duration;
+        }
+
+        private Vector2 FindCarrierPosition()
+        {
+            var hits = Physics2D.OverlapCircleAll(transform.position, carrierSearchRadius, playerLayer);
+            foreach (var hit in hits)
+            {
+                var p = hit.GetComponent<DemoballMovementController>();
+                if (p != null && p != this && p.IsCarryingBall) return p.transform.position;
+            }
+            // No carrier found — fall back to the partner's position so SpinOff /
+            // SwimThrough degrade gracefully (axis-aligned movement).
+            return engagedWith != null ? (Vector2)engagedWith.transform.position : (Vector2)transform.position;
+        }
+
+        // Returns +1 or -1: the perpendicular sign that lands the defender
+        // closer to the ball carrier (relative to the engagement axis).
+        private int ChooseSideTowardCarrier(Vector2 selfPos, Vector2 axis, Vector2 carrierPos)
+        {
+            Vector2 perp = Vector2.Perpendicular(axis);
+            Vector2 destA = selfPos + perp * spinOffDistance;
+            Vector2 destB = selfPos - perp * spinOffDistance;
+            return (destA - carrierPos).sqrMagnitude < (destB - carrierPos).sqrMagnitude ? 1 : -1;
+        }
+
+        // ──────────────────────────────────────────────
         //  SPEED OVERRIDE  (carry penalty)
         // ──────────────────────────────────────────────
 
@@ -465,6 +733,10 @@ namespace Sportland.Sports.Demoball
             IsInScoringRing    = false;
             currentScoringRing = null;
             stunTimer          = 0f;
+            proneTimer         = 0f;
+            shoveCooldownTimer = 0f;
+            knockbackTimer     = 0f;
+            knockbackVelocity  = Vector2.zero;
             if (IsEngaged) EndEngagement();
             SetState(MovementState.Idle);
         }

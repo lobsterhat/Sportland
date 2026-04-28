@@ -15,6 +15,7 @@ namespace Sportland.Sports.Demoball
     ///   R1     / E                  — Pick up nearest loose ball, or pass if carrying
     ///   Circle / Q                  — Touch-down score (in scoring ring while carrying)
     ///   Square / T                  — Tackle nearest ball-carrier (Defenders only)
+    ///   Triangle / G                — Shove engaged opponent (Blockers and Defenders, when engaged)
     ///
     /// On a successful pass, control is transferred to the receiver's broker
     /// automatically.
@@ -149,6 +150,10 @@ namespace Sportland.Sports.Demoball
             // ── Tackle: Square / T ──
             if (controls.Tackle.WasPressedThisFrame())
                 movement.TryTackle();
+
+            // ── Shove: Triangle / G ── (CanShove gates role + engagement + cooldown)
+            if (controls.Shove.WasPressedThisFrame() && movement.CanShove)
+                movement.TryShove(out _);
 
             // ── Plays (carrier only) ──
             if (movement.IsCarryingBall)
