@@ -63,6 +63,20 @@ namespace Sportland.Sports.Demoball
         [Tooltip("Distance to the threat at which the blocker initiates an engagement.")]
         [SerializeField] private float engageDistance = 0.7f;
 
+        [Header("=== SEPARATION ===")]
+        [Tooltip("Personal-space radius. Pushes away from same-team players within this distance to prevent bunching.")]
+        [SerializeField] private float separationRadius = 1.4f;
+
+        [Tooltip("How strongly the separation vector blends into the desired direction.")]
+        [SerializeField] private float separationWeight = 1.2f;
+
+        [Header("=== SHOVE AI ===")]
+        [Tooltip("Minimum delay between shove attempts while engaged (seconds).")]
+        [SerializeField] private float shoveAttemptMin = 0.4f;
+
+        [Tooltip("Maximum delay between shove attempts while engaged (seconds).")]
+        [SerializeField] private float shoveAttemptMax = 1.2f;
+
         // ──────────────────────────────────────────────
         //  PLAY MODES
         // ──────────────────────────────────────────────
@@ -101,6 +115,7 @@ namespace Sportland.Sports.Demoball
         private DemoballInputBroker selfBroker;
         private DemoballMovementController leader;
         private Vector2 flankBasis = Vector2.right;
+        private float shoveAttemptTimer;
 
         private void Awake()
         {
@@ -110,8 +125,19 @@ namespace Sportland.Sports.Demoball
 
         private void Update()
         {
-            // Engagement system owns movement while we're locked up.
-            if (self.IsEngaged) return;
+            // Engagement: voluntary movement is suspended, but the AI still
+            // ticks shove attempts to try and break or convert the hold.
+            // Skipped when the player is driving this character — their input
+            // broker handles shoves directly.
+            if (self.IsEngaged)
+            {
+                if (selfBroker == null || !selfBroker.IsPlayerControlled)
+                    TickAiShove();
+                return;
+            }
+
+            // Reset shove cadence so the next engagement starts with a fresh delay.
+            shoveAttemptTimer = Random.Range(shoveAttemptMin, shoveAttemptMax);
 
             // Defer to player input on this character.
             if (selfBroker != null && selfBroker.IsPlayerControlled) return;
@@ -222,8 +248,57 @@ namespace Sportland.Sports.Demoball
             }
             else
             {
-                self.SetMoveInput(toTarget / dist);
+                self.SetMoveInput(BlendSeparation(toTarget / dist));
                 self.SetSprinting(dist > sprintDistance);
+            }
+        }
+
+        // Adds a teammate-separation steering vector to the desired direction.
+        // Same-team players within separationRadius push us away with a force
+        // that scales linearly with how close they are.
+        private Vector2 BlendSeparation(Vector2 desired)
+        {
+            Vector2 sep = ComputeTeammateSeparation();
+            if (sep.sqrMagnitude < 0.0001f) return desired;
+            Vector2 blended = desired + sep * separationWeight;
+            return blended.sqrMagnitude > 0.0001f ? blended.normalized : desired;
+        }
+
+        private Vector2 ComputeTeammateSeparation()
+        {
+            if (separationRadius <= 0f) return Vector2.zero;
+            var hits = Physics2D.OverlapCircleAll(transform.position, separationRadius);
+            Vector2 sum = Vector2.zero;
+            foreach (var hit in hits)
+            {
+                var t = hit.GetComponent<DemoballMovementController>();
+                if (t == null || t == self) continue;
+                if (!IsSameTeam(t)) continue;
+
+                Vector2 away = (Vector2)transform.position - (Vector2)t.transform.position;
+                float d = away.magnitude;
+                if (d > 0.01f && d < separationRadius)
+                    sum += (away / d) * (1f - d / separationRadius);
+            }
+            return sum;
+        }
+
+        private bool IsSameTeam(DemoballMovementController other)
+        {
+            // Defender vs non-defender splits the two sides of the ball.
+            bool selfIsDefense  = self.Role  == DemoballRole.Defender;
+            bool otherIsDefense = other.Role == DemoballRole.Defender;
+            return selfIsDefense == otherIsDefense;
+        }
+
+        private void TickAiShove()
+        {
+            if (!self.CanShove) return;
+            shoveAttemptTimer -= Time.deltaTime;
+            if (shoveAttemptTimer <= 0f)
+            {
+                self.TryShove(out _);
+                shoveAttemptTimer = Random.Range(shoveAttemptMin, shoveAttemptMax);
             }
         }
 
