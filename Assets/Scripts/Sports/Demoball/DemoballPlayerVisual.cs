@@ -17,8 +17,16 @@ namespace Sportland.Sports.Demoball
         //  CONFIGURATION
         // ──────────────────────────────────────────────
 
-        [Tooltip("Main body colour. Set per-player to distinguish teams.")]
+        [Tooltip("Main body colour. Set per-player to distinguish teams. " +
+                 "For offensive (non-defender) players this is overridden each frame by " +
+                 "playerControlledColor / aiTeammateColor based on who currently has control.")]
         [SerializeField] private Color bodyColor = new Color(0.2f, 0.45f, 0.9f, 1f);
+
+        [Tooltip("Body colour applied to the offensive player who currently has control.")]
+        [SerializeField] private Color playerControlledColor = new Color(0.55f, 0.85f, 1.0f, 1f);
+
+        [Tooltip("Body colour applied to offensive AI teammates of the player-controlled character.")]
+        [SerializeField] private Color aiTeammateColor = new Color(0.10f, 0.25f, 0.55f, 1f);
 
         [Tooltip("Radius of the player circle (world units). Should match CircleCollider2D.")]
         [SerializeField] private float bodyRadius = 0.45f;
@@ -34,8 +42,10 @@ namespace Sportland.Sports.Demoball
         // ──────────────────────────────────────────────
 
         private DemoballMovementController movement;
+        private DemoballInputBroker broker;
         private LineRenderer carryRing;
         private LineRenderer passTargetRing;
+        private Material bodyMaterial;
 
         // ──────────────────────────────────────────────
         //  LIFECYCLE
@@ -44,6 +54,7 @@ namespace Sportland.Sports.Demoball
         private void Awake()
         {
             movement = GetComponent<DemoballMovementController>();
+            broker   = GetComponent<DemoballInputBroker>();
             BuildVisuals();
         }
 
@@ -52,6 +63,50 @@ namespace Sportland.Sports.Demoball
             if (movement == null) return;
             if (carryRing != null)      carryRing.enabled      = movement.IsCarryingBall;
             if (passTargetRing != null) passTargetRing.enabled = movement.IsPassTarget;
+            UpdateTeamTint();
+        }
+
+        // Offensive players are re-tinted each frame: the player-controlled
+        // character is light blue and same-team AI players are dark blue.
+        // Defenders keep their configured bodyColor untouched.
+        private void UpdateTeamTint()
+        {
+            if (bodyMaterial == null) return;
+            if (movement.Role == DemoballRole.Defender)
+            {
+                if (bodyMaterial.color != bodyColor) bodyMaterial.color = bodyColor;
+                return;
+            }
+
+            Color target;
+            if (broker != null && broker.IsPlayerControlled)
+            {
+                target = playerControlledColor;
+            }
+            else if (AnyOffensiveTeammatePlayerControlled())
+            {
+                target = aiTeammateColor;
+            }
+            else
+            {
+                target = bodyColor;
+            }
+
+            if (bodyMaterial.color != target) bodyMaterial.color = target;
+        }
+
+        private bool AnyOffensiveTeammatePlayerControlled()
+        {
+            var brokers = DemoballInputBroker.All;
+            for (int i = 0; i < brokers.Count; i++)
+            {
+                var b = brokers[i];
+                if (b == null || !b.IsPlayerControlled) continue;
+                var m = b.GetComponent<DemoballMovementController>();
+                if (m == null || m == movement) continue;
+                if (m.Role != DemoballRole.Defender) return true;
+            }
+            return false;
         }
 
         // ──────────────────────────────────────────────
@@ -66,7 +121,8 @@ namespace Sportland.Sports.Demoball
                                            bodyColor.b * 0.55f, 1f);
 
             // z-offsets so layers stack correctly (camera at z = -10)
-            CreateFilledCircle("Body",    bodyRadius,        bodyColor,    0f,   sortOrder: 20);
+            var bodyRenderer = CreateFilledCircle("Body", bodyRadius, bodyColor, 0f, sortOrder: 20);
+            bodyMaterial = bodyRenderer.sharedMaterial;
             carryRing = CreateLineRing("CarryRing", bodyRadius + 0.18f, carryIndicatorColor, 0f, sortOrder: 22);
             carryRing.enabled = false;
 
@@ -81,7 +137,7 @@ namespace Sportland.Sports.Demoball
         //  MESH HELPERS
         // ──────────────────────────────────────────────
 
-        private void CreateFilledCircle(string goName, float radius, Color colour,
+        private MeshRenderer CreateFilledCircle(string goName, float radius, Color colour,
                                          float z, int sortOrder)
         {
             var go = new GameObject(goName);
@@ -110,6 +166,7 @@ namespace Sportland.Sports.Demoball
             var mesh = new Mesh { name = goName, vertices = verts, triangles = tris };
             mesh.RecalculateNormals();
             mf.mesh = mesh;
+            return mr;
         }
 
         private LineRenderer CreateLineRing(string goName, float radius, Color colour,

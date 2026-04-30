@@ -84,6 +84,9 @@ namespace Sportland.Sports.Demoball
         //  LIFECYCLE
         // ──────────────────────────────────────────────
 
+        /// <summary>Active brokers in the scene. Visuals iterate this to find the player-controlled teammate.</summary>
+        public static readonly List<DemoballInputBroker> All = new List<DemoballInputBroker>();
+
         private void Awake()
         {
             movement = GetComponent<DemoballMovementController>();
@@ -92,11 +95,13 @@ namespace Sportland.Sports.Demoball
 
         private void OnEnable()
         {
+            if (!All.Contains(this)) All.Add(this);
             if (playerControlled) controls.Enable();
         }
 
         private void OnDisable()
         {
+            All.Remove(this);
             controls.Disable();
             ClearPassTarget();
         }

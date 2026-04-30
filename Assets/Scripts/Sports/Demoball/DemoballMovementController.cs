@@ -493,6 +493,7 @@ namespace Sportland.Sports.Demoball
             float d = duration < 0f ? defaultEngagementDuration : duration;
             BeginEngagement(other, d);
             other.BeginEngagement(this, d);
+            BlockingAiLog.Log($"<b>Engage</b>: {name} ↔ {other.name}");
             return true;
         }
 
@@ -559,6 +560,7 @@ namespace Sportland.Sports.Demoball
             ApplyShoveOutcome(outcome, partner);
             shoveCooldownTimer = shoveCooldown;
             OnShoveResolved?.Invoke(outcome);
+            BlockingAiLog.Log($"<b>Shove</b>: {name} → <color=#ffd54f>{outcome}</color> (vs {partner.name})");
             return true;
         }
 
