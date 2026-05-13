@@ -31,8 +31,15 @@ namespace Sportland.Sports.Dodgeball
 
         // --- Runtime state ---------------------------------------------------
         public bool IsInZone { get; private set; } = true;
-        public bool HasBall { get; set; }
+        public Ball HeldBall { get; set; }
+        public bool HasBall => HeldBall != null;
         public bool HasActiveWarning { get; private set; }
+
+        /// <summary>
+        /// Live registry of trackers in the scene. Used by Ball for pickup
+        /// proximity checks. Maintained in OnEnable/OnDisable.
+        /// </summary>
+        public static readonly List<PlayerZoneTracker> All = new List<PlayerZoneTracker>();
 
         // Time the player went out-of-zone. Negative when in-zone.
         private float outOfZoneSince = -1f;
@@ -61,6 +68,9 @@ namespace Sportland.Sports.Dodgeball
             movement = GetComponent<PlayerMovement>();
             movement.OnLanded += HandleLanded;
         }
+
+        private void OnEnable() => All.Add(this);
+        private void OnDisable() => All.Remove(this);
 
         private void OnDestroy()
         {

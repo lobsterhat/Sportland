@@ -14,9 +14,16 @@ namespace Sportland.Sports.Dodgeball
     public class PlayerMovement : MonoBehaviour
     {
         [Header("Movement")]
-        [SerializeField] private float moveSpeed = 6f;     // units/sec
+        [SerializeField] private float moveSpeed = 6f;     // units/sec at walk
+        [SerializeField] private float sprintSpeed = 9f;   // units/sec while sprinting
         [SerializeField] private float jumpHeight = 1.5f;  // peak hop height
         [SerializeField] private float jumpDuration = 0.6f;
+
+        /// <summary>
+        /// When true, ApplyMove scales by sprintSpeed instead of moveSpeed.
+        /// The input layer flips this on each L2 press (toggle).
+        /// </summary>
+        public bool IsSprinting { get; set; }
 
         private Rigidbody2D rb;
         private float jumpTimer = -1f;
@@ -42,12 +49,14 @@ namespace Sportland.Sports.Dodgeball
         }
 
         /// <summary>
-        /// Move the player by a normalized input vector. Call from your input handler.
+        /// Move the player by an analog input vector. Magnitude (0..1) scales
+        /// speed; vectors over length 1 (e.g. keyboard diagonals) are clamped.
         /// </summary>
         public void ApplyMove(Vector2 input)
         {
-            Vector2 vel = input.normalized * moveSpeed;
-            rb.linearVelocity = vel;
+            Vector2 clamped = input.sqrMagnitude > 1f ? input.normalized : input;
+            float speed = IsSprinting ? sprintSpeed : moveSpeed;
+            rb.linearVelocity = clamped * speed;
         }
 
         public void TryJump()

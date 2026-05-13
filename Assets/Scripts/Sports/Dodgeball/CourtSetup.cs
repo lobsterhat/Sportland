@@ -67,6 +67,15 @@ namespace Sportland.Sports.Dodgeball
         {
             BuildCourt();
             SpawnAllPlayers();
+            SpawnBall();
+        }
+
+        private void SpawnBall()
+        {
+            var ballGO = new GameObject("Ball");
+            ballGO.transform.SetParent(transform, false);
+            ballGO.transform.position = Vector3.zero;
+            ballGO.AddComponent<Ball>();
         }
 
         private void BuildCourt()
