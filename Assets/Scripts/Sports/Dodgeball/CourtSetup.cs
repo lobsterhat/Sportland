@@ -46,7 +46,12 @@ namespace Sportland.Sports.Dodgeball
         public const float SideOutfielderX = 4.5f;
 
         [Header("Prefabs")]
-        [SerializeField] private GameObject playerPrefab;
+        // Sprite to use as the player's visual child. We always build the player
+        // root in code (Rigidbody2D + PlayerMovement + PlayerZoneTracker) and
+        // attach this prefab — or a procedural circle if null — as child[0],
+        // which PlayerMovement bobs for the jump arc. Team tint is applied at
+        // runtime via DodgeballPlayerVisual.
+        [SerializeField] private GameObject spritePrefab;
         [SerializeField] private GameObject courtPrefab;       // optional: visual court sprite
         [SerializeField] private GameObject centerLinePrefab;  // optional: visual divider
 
@@ -88,22 +93,9 @@ namespace Sportland.Sports.Dodgeball
 
         private void SpawnPlayer(PlayerSpawn spawn)
         {
-            GameObject go;
-            if (playerPrefab != null)
-            {
-                go = Instantiate(
-                    playerPrefab,
-                    new Vector3(spawn.position.x, spawn.position.y, 0f),
-                    Quaternion.identity,
-                    transform
-                );
-            }
-            else
-            {
-                go = BuildProceduralPlayer();
-                go.transform.position = new Vector3(spawn.position.x, spawn.position.y, 0f);
-            }
+            var go = BuildPlayer();
             go.name = spawn.id;
+            go.transform.position = new Vector3(spawn.position.x, spawn.position.y, 0f);
 
             var tracker = go.GetComponent<PlayerZoneTracker>();
             if (tracker == null) tracker = go.AddComponent<PlayerZoneTracker>();
@@ -115,19 +107,32 @@ namespace Sportland.Sports.Dodgeball
             spawnedPlayers.Add(go);
         }
 
-        // Builds a self-contained player when no prefab is assigned. The visual
-        // lives on a child GameObject because PlayerMovement bobs child[0] for
-        // the jump arc.
-        private GameObject BuildProceduralPlayer()
+        // Builds the player root in code and attaches the sprite (or a
+        // procedural placeholder) as the Visual child. PlayerMovement bobs
+        // child[0] for the jump arc, so the visual must live there.
+        private GameObject BuildPlayer()
         {
             var go = new GameObject("DodgeballPlayer");
             go.transform.SetParent(transform, false);
 
-            var visualGO = new GameObject("Visual");
-            visualGO.transform.SetParent(go.transform, false);
-            visualGO.AddComponent<DodgeballPlayerVisual>();
+            GameObject visualGO;
+            if (spritePrefab != null)
+            {
+                visualGO = Instantiate(spritePrefab, go.transform);
+                visualGO.name = "Visual";
+                visualGO.transform.localPosition = Vector3.zero;
+            }
+            else
+            {
+                visualGO = new GameObject("Visual");
+                visualGO.transform.SetParent(go.transform, false);
+            }
+
+            if (visualGO.GetComponent<DodgeballPlayerVisual>() == null)
+                visualGO.AddComponent<DodgeballPlayerVisual>();
 
             // PlayerMovement RequireComponent pulls in Rigidbody2D automatically.
+            // Added after the visual child exists so PlayerMovement.Awake sees it.
             go.AddComponent<PlayerMovement>();
 
             return go;

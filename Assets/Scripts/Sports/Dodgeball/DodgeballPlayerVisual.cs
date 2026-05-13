@@ -3,12 +3,15 @@ using UnityEngine;
 namespace Sportland.Sports.Dodgeball
 {
     /// <summary>
-    /// Procedural sprite for a Dodgeball player. Attached to the "Visual" child
-    /// of a player root (the same child PlayerMovement bobs for the jump arc).
+    /// Visual for a Dodgeball player. Lives on the "Visual" child of a player
+    /// root (the same child PlayerMovement bobs for the jump arc).
     ///
-    /// Body color = team. A small inner dot marks role (filled = infielder,
-    /// outline only = outfielder). Optional out-of-zone tint when the tracker
-    /// reports the player is outside their assigned zone.
+    /// If a SpriteRenderer is present (e.g. when CourtSetup instantiated a
+    /// sprite prefab as the visual), its color is tinted per team. Otherwise
+    /// a procedural circle + role mark is built as a fallback.
+    ///
+    /// When the player is outside their assigned zone, the visual is tinted
+    /// with outOfZoneTint to make the violation legible.
     /// </summary>
     public class DodgeballPlayerVisual : MonoBehaviour
     {
@@ -18,6 +21,7 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private Color outOfZoneTint = new Color(1f, 0.85f, 0.2f, 1f);
 
         private Material bodyMaterial;
+        private SpriteRenderer spriteRenderer;
         private PlayerZoneTracker tracker;
         private Color baseColor;
 
@@ -26,15 +30,31 @@ namespace Sportland.Sports.Dodgeball
             tracker = zoneTracker;
             baseColor = team == Team.A ? teamAColor : teamBColor;
 
-            BuildBody(baseColor);
-            BuildRoleMark(role, baseColor);
+            spriteRenderer = GetComponentInChildren<SpriteRenderer>();
+            if (spriteRenderer != null)
+            {
+                spriteRenderer.color = baseColor;
+            }
+            else
+            {
+                BuildBody(baseColor);
+                BuildRoleMark(role, baseColor);
+            }
         }
 
         private void Update()
         {
-            if (tracker == null || bodyMaterial == null) return;
+            if (tracker == null) return;
             Color target = tracker.IsInZone ? baseColor : outOfZoneTint;
-            if (bodyMaterial.color != target) bodyMaterial.color = target;
+
+            if (spriteRenderer != null)
+            {
+                if (spriteRenderer.color != target) spriteRenderer.color = target;
+            }
+            else if (bodyMaterial != null)
+            {
+                if (bodyMaterial.color != target) bodyMaterial.color = target;
+            }
         }
 
         private void BuildBody(Color color)

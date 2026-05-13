@@ -250,7 +250,7 @@ MonoBehaviour:
   m_Script: {fileID: 11500000, guid: 8aba76e091175464bb07b8105e9c2935, type: 3}
   m_Name:
   m_EditorClassIdentifier:
-  playerPrefab: {fileID: 0}
+  spritePrefab: {fileID: 4757217570519896899, guid: 4adc7eabe311b964a92f8c7f53624d2d, type: 3}
   courtPrefab: {fileID: 0}
   centerLinePrefab: {fileID: 0}
   spawnedPlayers: []
