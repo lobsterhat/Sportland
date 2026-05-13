@@ -253,6 +253,7 @@ MonoBehaviour:
   spritePrefab: {fileID: 4757217570519896899, guid: 4adc7eabe311b964a92f8c7f53624d2d, type: 3}
   courtPrefab: {fileID: 0}
   centerLinePrefab: {fileID: 0}
+  playerControlledId: A_In_2
   spawnedPlayers: []
 --- !u!114 &1000004
 MonoBehaviour:

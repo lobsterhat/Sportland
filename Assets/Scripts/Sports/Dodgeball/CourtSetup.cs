@@ -55,6 +55,11 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private GameObject courtPrefab;       // optional: visual court sprite
         [SerializeField] private GameObject centerLinePrefab;  // optional: visual divider
 
+        [Header("Player Control")]
+        // Spawn ID of the human-driven character. A_In_2 is Team A's center
+        // infielder at (-4.5, 0).
+        [SerializeField] private string playerControlledId = "A_In_2";
+
         [Header("Runtime")]
         [SerializeField] private List<GameObject> spawnedPlayers = new List<GameObject>();
 
@@ -103,6 +108,11 @@ namespace Sportland.Sports.Dodgeball
 
             var visual = go.GetComponentInChildren<DodgeballPlayerVisual>();
             if (visual != null) visual.Configure(spawn.team, spawn.role, tracker);
+
+            if (spawn.id == playerControlledId)
+            {
+                go.AddComponent<DodgeballPlayerInput>();
+            }
 
             spawnedPlayers.Add(go);
         }
