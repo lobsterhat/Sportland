@@ -142,6 +142,13 @@ namespace Sportland.Sports.Demoball
             // Defer to player input on this character.
             if (selfBroker != null && selfBroker.IsPlayerControlled) return;
 
+            // Dead-ball setup: walk to the assigned formation slot.
+            if (self.HasSetupTarget && !DemoballGameManager.IsPlayLive)
+            {
+                SeekSetupTarget();
+                return;
+            }
+
             DemoballMovementController newLeader = ResolveLeader();
             if (newLeader != leader)
             {
@@ -300,6 +307,26 @@ namespace Sportland.Sports.Demoball
                 self.TryShove(out _);
                 shoveAttemptTimer = Random.Range(shoveAttemptMin, shoveAttemptMax);
             }
+        }
+
+        // Walks toward the assigned formation slot during a dead-ball window.
+        // Stops once close enough so the player settles instead of jittering.
+        private void SeekSetupTarget()
+        {
+            Vector2 target  = self.SetupTarget;
+            Vector2 toTarget = target - (Vector2)transform.position;
+            float dist = toTarget.magnitude;
+
+            const float arriveTolerance = 0.25f;
+            if (dist <= arriveTolerance)
+            {
+                self.SetMoveInput(Vector2.zero);
+                self.SetSprinting(false);
+                return;
+            }
+
+            self.SetMoveInput(BlendSeparation(toTarget / dist));
+            self.SetSprinting(false); // jog-pace setup, not a sprint
         }
 
         private DemoballMovementController ResolveLeader()

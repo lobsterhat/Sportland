@@ -36,6 +36,33 @@ namespace Sportland.Sports.Demoball
         [Tooltip("Arc width of the bonus zone in degrees. 90 = one quarter of the ring.")]
         [SerializeField] private float bonusZoneArcDegrees = 90f;
 
+        [Header("=== INNER EXCLUSION ===")]
+        [Tooltip("Radius of the central no-go zone for defenders during dead-ball windows " +
+                 "(kickoff and post-score countdowns). Defenders may roam outside this circle " +
+                 "but cannot enter it until the ball launches.")]
+        [SerializeField] private float innerExclusionRadius = 4f;
+
+        [Tooltip("Width of the inner-exclusion indicator ring (line thickness, world units).")]
+        [SerializeField] private float innerExclusionLineWidth = 0.12f;
+
+        [Tooltip("Colour of the inner-exclusion indicator ring.")]
+        [SerializeField] private Color innerExclusionColour = new Color(0.95f, 0.55f, 0.25f, 0.85f);
+
+        [Header("=== QUADRANTS ===")]
+        [Tooltip("Quadrant the offense starts in. This quadrant is locked (un-scorable) " +
+                 "until a score is registered elsewhere; then the just-scored quadrant locks " +
+                 "and this one re-opens.")]
+        [SerializeField] private ScoringQuadrant initialLockedQuadrant = ScoringQuadrant.Q1;
+
+        [Tooltip("Width of the quadrant indicator arc (line thickness, world units).")]
+        [SerializeField] private float quadrantArcWidth = 0.55f;
+
+        [Tooltip("Colour of an open (scorable) quadrant arc.")]
+        [SerializeField] private Color openQuadrantColour = new Color(0.45f, 0.95f, 0.55f, 0.85f);
+
+        [Tooltip("Colour of the locked (un-scorable) quadrant arc.")]
+        [SerializeField] private Color lockedQuadrantColour = new Color(0.4f, 0.4f, 0.4f, 0.85f);
+
         [Header("=== VISUALS ===")]
         [SerializeField] private Color ringGizmoColor  = new Color(0.2f, 0.9f, 0.2f, 0.4f);
         [SerializeField] private Color bonusGizmoColor = new Color(1f,   0.85f, 0f,   0.45f);
@@ -47,8 +74,26 @@ namespace Sportland.Sports.Demoball
         /// <summary>Centre angle of the active bonus zone (degrees, 0 = right / east, CCW positive).</summary>
         public float BonusZoneCentreAngle { get; private set; }
 
+        /// <summary>The quadrant currently locked from scoring. Defaults to initialLockedQuadrant on reset.</summary>
+        public ScoringQuadrant LockedQuadrant { get; private set; } = ScoringQuadrant.Q1;
+
+        /// <summary>Outer radius of the scoring ring (= the field perimeter).</summary>
+        public float RingOuterRadius => ringRadius;
+
+        /// <summary>Inner edge of the scoring ring annulus.</summary>
+        public float RingInnerRadius => ringRadius * innerEdgeFraction;
+
+        /// <summary>Midpoint between the inner and outer radii — anchor for placing players in the endzone.</summary>
+        public float RingMidRadius   => ringRadius * (innerEdgeFraction + 1f) * 0.5f;
+
+        /// <summary>Radius of the central defenders-only-after-launch exclusion zone.</summary>
+        public float InnerExclusionRadius => innerExclusionRadius;
+
         private readonly HashSet<DemoballMovementController> playersInRing =
             new HashSet<DemoballMovementController>();
+
+        private readonly LineRenderer[] quadrantArcs = new LineRenderer[4];
+        private LineRenderer innerExclusionRing;
 
         // ──────────────────────────────────────────────
         //  EVENTS
@@ -57,6 +102,7 @@ namespace Sportland.Sports.Demoball
         public event Action<DemoballMovementController> OnPlayerEnterRing;
         public event Action<DemoballMovementController> OnPlayerExitRing;
         public event Action<float> OnBonusZoneRotated; // passes new centre angle
+        public event Action<ScoringQuadrant> OnLockedQuadrantChanged;
 
         // ──────────────────────────────────────────────
         //  UNITY LIFECYCLE
@@ -67,6 +113,11 @@ namespace Sportland.Sports.Demoball
             var col = GetComponent<CircleCollider2D>();
             col.isTrigger = true;
             col.radius    = ringRadius;
+
+            LockedQuadrant = initialLockedQuadrant;
+            BuildQuadrantArcs();
+            RefreshQuadrantArcColours();
+            BuildInnerExclusionRing();
         }
 
         // ──────────────────────────────────────────────
@@ -104,6 +155,78 @@ namespace Sportland.Sports.Demoball
         {
             float dist = Vector2.Distance(worldPosition, transform.position);
             return dist >= ringRadius * innerEdgeFraction && dist <= ringRadius;
+        }
+
+        // ──────────────────────────────────────────────
+        //  QUADRANTS
+        // ──────────────────────────────────────────────
+
+        /// <summary>
+        /// Returns which 90° quadrant of the ring the given world position falls in.
+        /// Q1 = NE (0-90°), Q2 = NW (90-180°), Q3 = SW (180-270°), Q4 = SE (270-360°),
+        /// measured CCW from +X (standard math convention).
+        /// </summary>
+        public ScoringQuadrant GetQuadrantAt(Vector2 worldPosition)
+        {
+            Vector2 dir = worldPosition - (Vector2)transform.position;
+            float angle = Mathf.Atan2(dir.y, dir.x) * Mathf.Rad2Deg;
+            if (angle < 0f) angle += 360f;
+
+            if (angle < 90f)  return ScoringQuadrant.Q1;
+            if (angle < 180f) return ScoringQuadrant.Q2;
+            if (angle < 270f) return ScoringQuadrant.Q3;
+            return ScoringQuadrant.Q4;
+        }
+
+        /// <summary>True if the position falls inside the currently-locked quadrant.</summary>
+        public bool IsInLockedQuadrant(Vector2 worldPosition)
+            => GetQuadrantAt(worldPosition) == LockedQuadrant;
+
+        /// <summary>The centre angle of a quadrant, in degrees CCW from +X.</summary>
+        public static float GetQuadrantCentreAngle(ScoringQuadrant q)
+        {
+            switch (q)
+            {
+                case ScoringQuadrant.Q1: return  45f;
+                case ScoringQuadrant.Q2: return 135f;
+                case ScoringQuadrant.Q3: return 225f;
+                default:                 return 315f; // Q4
+            }
+        }
+
+        /// <summary>The quadrant 180° opposite the given one.</summary>
+        public static ScoringQuadrant GetOppositeQuadrant(ScoringQuadrant q)
+        {
+            switch (q)
+            {
+                case ScoringQuadrant.Q1: return ScoringQuadrant.Q3;
+                case ScoringQuadrant.Q2: return ScoringQuadrant.Q4;
+                case ScoringQuadrant.Q3: return ScoringQuadrant.Q1;
+                default:                 return ScoringQuadrant.Q2; // Q4 → Q2
+            }
+        }
+
+        /// <summary>
+        /// Called after a successful score. Locks the quadrant the carrier scored in,
+        /// re-opening whichever quadrant was previously locked.
+        /// </summary>
+        public void RegisterScore(Vector2 carrierPosition)
+        {
+            ScoringQuadrant scored = GetQuadrantAt(carrierPosition);
+            if (scored == LockedQuadrant) return; // shouldn't happen — TryTouchDown gates
+            LockedQuadrant = scored;
+            RefreshQuadrantArcColours();
+            OnLockedQuadrantChanged?.Invoke(LockedQuadrant);
+            BlockingAiLog.Log($"<b>Quadrant locked</b>: {LockedQuadrant} — others now open");
+        }
+
+        /// <summary>Resets the locked quadrant to the configured initial value (period reset).</summary>
+        public void ResetLockedQuadrant()
+        {
+            if (LockedQuadrant == initialLockedQuadrant) return;
+            LockedQuadrant = initialLockedQuadrant;
+            RefreshQuadrantArcColours();
+            OnLockedQuadrantChanged?.Invoke(LockedQuadrant);
         }
 
         // ──────────────────────────────────────────────
@@ -145,6 +268,87 @@ namespace Sportland.Sports.Demoball
                 player.ExitScoringRing();
                 OnPlayerExitRing?.Invoke(player);
             }
+        }
+
+        // ──────────────────────────────────────────────
+        //  QUADRANT VISUAL ARCS
+        // ──────────────────────────────────────────────
+
+        private void BuildQuadrantArcs()
+        {
+            float arcRadius = ringRadius - quadrantArcWidth * 0.5f;
+            const int segs = 24;
+            for (int q = 0; q < 4; q++)
+            {
+                var go = new GameObject($"QuadrantArc_{(ScoringQuadrant)q}");
+                go.transform.SetParent(transform, false);
+                go.transform.localPosition = new Vector3(0f, 0f, -0.05f);
+
+                var lr = go.AddComponent<LineRenderer>();
+                lr.useWorldSpace  = false;
+                lr.loop           = false;
+                lr.positionCount  = segs + 1;
+                lr.startWidth     = quadrantArcWidth;
+                lr.endWidth       = quadrantArcWidth;
+                lr.material       = new Material(Shader.Find("Sprites/Default"));
+                lr.sortingOrder   = 5;
+                lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+                lr.receiveShadows = false;
+
+                float startDeg = q * 90f + 2f;        // small gap between quadrants for clarity
+                float endDeg   = q * 90f + 90f - 2f;
+                for (int i = 0; i <= segs; i++)
+                {
+                    float t   = (float)i / segs;
+                    float deg = Mathf.Lerp(startDeg, endDeg, t);
+                    float rad = deg * Mathf.Deg2Rad;
+                    lr.SetPosition(i, new Vector3(Mathf.Cos(rad) * arcRadius,
+                                                  Mathf.Sin(rad) * arcRadius, 0f));
+                }
+                quadrantArcs[q] = lr;
+            }
+        }
+
+        private void RefreshQuadrantArcColours()
+        {
+            for (int q = 0; q < 4; q++)
+            {
+                var lr = quadrantArcs[q];
+                if (lr == null) continue;
+                Color c = (ScoringQuadrant)q == LockedQuadrant ? lockedQuadrantColour : openQuadrantColour;
+                lr.startColor = c;
+                lr.endColor   = c;
+                if (lr.material != null) lr.material.color = c;
+            }
+        }
+
+        private void BuildInnerExclusionRing()
+        {
+            const int segs = 48;
+            var go = new GameObject("InnerExclusionRing");
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = new Vector3(0f, 0f, -0.05f);
+
+            var lr = go.AddComponent<LineRenderer>();
+            lr.useWorldSpace  = false;
+            lr.loop           = true;
+            lr.positionCount  = segs;
+            lr.startWidth     = innerExclusionLineWidth;
+            lr.endWidth       = innerExclusionLineWidth;
+            lr.material       = new Material(Shader.Find("Sprites/Default")) { color = innerExclusionColour };
+            lr.startColor     = innerExclusionColour;
+            lr.endColor       = innerExclusionColour;
+            lr.sortingOrder   = 4;
+            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lr.receiveShadows = false;
+
+            for (int i = 0; i < segs; i++)
+            {
+                float a = i * Mathf.PI * 2f / segs;
+                lr.SetPosition(i, new Vector3(Mathf.Cos(a) * innerExclusionRadius,
+                                              Mathf.Sin(a) * innerExclusionRadius, 0f));
+            }
+            innerExclusionRing = lr;
         }
 
         // ──────────────────────────────────────────────

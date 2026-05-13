@@ -170,6 +170,20 @@ namespace Sportland.Sports.Demoball
         private DemoballMovementController engagedWith;
         private float engagementTimer;
 
+        // Setup target — non-null during dead-ball windows. The AI steers
+        // toward this point so players walk into formation rather than snapping.
+        // Player-controlled characters ignore it (the human has full agency).
+        public bool HasSetupTarget { get; private set; }
+        public Vector2 SetupTarget { get; private set; }
+
+        public void SetSetupTarget(Vector2 worldPosition)
+        {
+            SetupTarget = worldPosition;
+            HasSetupTarget = true;
+        }
+
+        public void ClearSetupTarget() => HasSetupTarget = false;
+
         // Shove state — cooldown between attempts, prone window after a knockdown,
         // and a knockback impulse that overrides locomotion velocity for a moment.
         public bool IsProne => proneTimer > 0f;
@@ -363,12 +377,15 @@ namespace Sportland.Sports.Demoball
             if (!IsCarryingBall)   return false;
             if (!IsInScoringRing)  return false;
             if (NeedsTagUp)        return false;
+            // Locked quadrant cannot be scored in until another quadrant is scored.
+            if (currentScoringRing.IsInLockedQuadrant(transform.position)) return false;
 
             bool inBonus = currentScoringRing.IsInBonusZone(transform.position);
             Ball ball    = HeldBall;
             HeldBall     = null;
 
             ball.Score(inBonus);
+            currentScoringRing.RegisterScore(transform.position);
             OnTouchDown?.Invoke(ball, inBonus);
             return true;
         }
@@ -489,6 +506,8 @@ namespace Sportland.Sports.Demoball
             if (other == null || other == this) return false;
             if (IsEngaged || other.IsEngaged)   return false;
             if (NeedsTagUp || other.NeedsTagUp) return false;
+            // No new engagements during a dead-ball window — wait for next ball-in-play.
+            if (!DemoballGameManager.IsPlayLive)  return false;
 
             float d = duration < 0f ? defaultEngagementDuration : duration;
             BeginEngagement(other, d);

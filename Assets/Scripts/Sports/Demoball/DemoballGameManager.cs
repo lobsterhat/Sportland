@@ -64,6 +64,15 @@ namespace Sportland.Sports.Demoball
         [Tooltip("All players on Team B (roster of up to 10; 6 active at once).")]
         [SerializeField] private List<DemoballMovementController> teamB;
 
+        [Header("=== KICKOFF FORMATION ===")]
+        [Tooltip("Radial offset added to ScoringRing.RingMidRadius when computing each team's cluster " +
+                 "centre. 0 = players' bodies sit on the mid-ring (feet in the endzone). " +
+                 "Negative pulls them toward field centre, positive pushes them outward.")]
+        [SerializeField] private float formationRadialOffset = 0f;
+
+        [Tooltip("Lateral spacing between teammates along the endzone arc.")]
+        [SerializeField] private float playerSpacing = 1.5f;
+
         // ──────────────────────────────────────────────
         //  GAME STATE
         // ──────────────────────────────────────────────
@@ -111,6 +120,12 @@ namespace Sportland.Sports.Demoball
         // ──────────────────────────────────────────────
 
         private readonly List<Ball> activeBalls = new List<Ball>();
+
+        /// <summary>
+        /// True only when at least one ball is in play and the period is active.
+        /// New engagements are blocked while this is false (dead-ball windows).
+        /// </summary>
+        public static bool IsPlayLive { get; private set; }
 
         // ──────────────────────────────────────────────
         //  HUD (runtime-built stubs — flesh out alongside PlayerInfoBar)
@@ -172,15 +187,22 @@ namespace Sportland.Sports.Demoball
             teamASubsLeft = teamBSubsLeft = SubsPerPeriod;
 
             periodTimeRemaining = periodDuration;
-            ballActivationTimer = 0f;   // fire first ball immediately at kick-off
+            // Count down to the first ball with the same dead-ball window as a
+            // post-score replacement. Defenders may leave their endzone during
+            // this window but cannot enter the inner exclusion circle.
+            ballActivationTimer = ballActivationInterval;
             bonusZoneTimer      = bonusZoneRotationInterval;
+            replacementTimer    = ballReplacementDelay;
+            IsPlayLive          = false;
 
             cannon.ResetPool();
             AssignRolesForPeriod();
             scoringRing.RotateBonusZone();
             ResetAllPlayers();
+            RepositionPlayersForPlay();   // hard teleport into endzones
+            AssignSetupTargets();         // soft pull defense forward to the inner-circle edge
 
-            phase = Phase.PeriodActive;
+            phase = Phase.BallReplacement;
             Debug.Log($"[Demoball] Period {currentPeriod} started — " +
                       $"Offense: {(teamAOnOffense ? "Team A" : "Team B")}");
         }
@@ -287,6 +309,10 @@ namespace Sportland.Sports.Demoball
             ball.OnScored          += HandleBallScored;
             ball.OnRemovedFromPlay += HandleBallRemoved;
             activeBalls.Add(ball);
+
+            // Ball is in play — engagements re-enabled, setup targets released.
+            IsPlayLive = true;
+            ClearAllSetupTargets();
         }
 
         private void HandleBallScored(Ball ball, bool inBonusZone)
@@ -308,8 +334,13 @@ namespace Sportland.Sports.Demoball
                       $"({(inBonusZone ? "BONUS" : "standard")}) — " +
                       $"A: {teamAScore}  B: {teamBScore}");
 
+            // Play is dead — kick off the 5s replacement timer and force-disengage everyone.
+            // Players walk to their setup positions during the window (no teleport).
             replacementTimer = ballReplacementDelay;
-            phase = Phase.BallReplacement;
+            phase            = Phase.BallReplacement;
+            IsPlayLive       = false;
+            EndAllEngagements();
+            AssignSetupTargets();
         }
 
         private void HandleBallRemoved(Ball ball)
@@ -317,6 +348,17 @@ namespace Sportland.Sports.Demoball
             UnsubscribeBall(ball);
             activeBalls.Remove(ball);
             Debug.Log("[Demoball] Ball removed from play by defense.");
+
+            // If that was the last ball, treat as a dead play: 5s replacement
+            // window, force-disengage, players walk to setup, next ball auto-fires.
+            if (activeBalls.Count == 0 && phase == Phase.PeriodActive)
+            {
+                replacementTimer = ballReplacementDelay;
+                phase            = Phase.BallReplacement;
+                IsPlayLive       = false;
+                EndAllEngagements();
+                AssignSetupTargets();
+            }
         }
 
         private void UnsubscribeBall(Ball ball)
@@ -333,6 +375,17 @@ namespace Sportland.Sports.Demoball
                 ball.RemoveFromPlay();
             }
             activeBalls.Clear();
+            IsPlayLive = false;
+        }
+
+        // Forces every player on either roster to break any active engagement.
+        // Used when a play ends so locked pairs don't carry into the dead-ball window.
+        private void EndAllEngagements()
+        {
+            for (int i = 0; i < teamA.Count; i++)
+                if (teamA[i] != null && teamA[i].IsEngaged) teamA[i].EndEngagement();
+            for (int i = 0; i < teamB.Count; i++)
+                if (teamB[i] != null && teamB[i].IsEngaged) teamB[i].EndEngagement();
         }
 
         // ──────────────────────────────────────────────
@@ -410,6 +463,116 @@ namespace Sportland.Sports.Demoball
         {
             foreach (var p in teamA) p.ResetForNewPeriod();
             foreach (var p in teamB) p.ResetForNewPeriod();
+        }
+
+        // ──────────────────────────────────────────────
+        //  KICKOFF FORMATION
+        // ──────────────────────────────────────────────
+
+        // Hard reset for a clean kickoff (game start / period start). Snaps both
+        // teams onto their formation positions and zeros velocity. Use the soft
+        // variant (AssignSetupTargets) for post-score dead-ball windows.
+        private void RepositionPlayersForPlay()
+        {
+            if (scoringRing == null) return;
+
+            ResolveFormation(out ScoringQuadrant offQuad, out ScoringQuadrant defQuad,
+                             out var offense, out var defense, out Vector2 fieldCentre);
+
+            PlaceTeam(offense, fieldCentre, offQuad);
+            PlaceTeam(defense, fieldCentre, defQuad);
+
+            BlockingAiLog.Log($"<b>Kickoff</b>: offense → {offQuad}, defense → {defQuad}");
+        }
+
+        // Soft variant for the dead-ball window. Each player gets a setup target;
+        // their AI steers them there over the 5-second replacement timer, and the
+        // target is cleared when the next ball fires.
+        //
+        // Offense holds in their endzone (the locked quadrant). Defense walks
+        // forward to the inner-exclusion edge in their own quadrant — they leave
+        // their starting zone but cannot cross into the central no-go circle
+        // until the ball launches.
+        private void AssignSetupTargets()
+        {
+            if (scoringRing == null) return;
+
+            ResolveFormation(out ScoringQuadrant offQuad, out ScoringQuadrant defQuad,
+                             out var offense, out var defense, out Vector2 fieldCentre);
+
+            float endzoneRadius      = scoringRing.RingMidRadius + formationRadialOffset;
+            float defenseLineRadius  = scoringRing.InnerExclusionRadius + 0.5f; // sit just outside the no-go circle
+
+            AssignTeamTargets(offense, fieldCentre, offQuad, endzoneRadius);
+            AssignTeamTargets(defense, fieldCentre, defQuad, defenseLineRadius);
+
+            BlockingAiLog.Log($"<b>Setup</b>: offense → {offQuad}, defense → inner edge ({defQuad} side)");
+        }
+
+        private void ClearAllSetupTargets()
+        {
+            for (int i = 0; i < teamA.Count; i++) if (teamA[i] != null) teamA[i].ClearSetupTarget();
+            for (int i = 0; i < teamB.Count; i++) if (teamB[i] != null) teamB[i].ClearSetupTarget();
+        }
+
+        private void ResolveFormation(out ScoringQuadrant offQuad, out ScoringQuadrant defQuad,
+                                      out List<DemoballMovementController> offense,
+                                      out List<DemoballMovementController> defense,
+                                      out Vector2 fieldCentre)
+        {
+            offQuad     = scoringRing.LockedQuadrant;
+            defQuad     = ScoringRing.GetOppositeQuadrant(offQuad);
+            fieldCentre = scoringRing.transform.position;
+            offense     = teamAOnOffense ? teamA : teamB;
+            defense     = teamAOnOffense ? teamB : teamA;
+        }
+
+        private Vector2 ComputeFormationSlot(Vector2 fieldCentre, ScoringQuadrant quad,
+                                             int slotIndex, int slotCount, float radius)
+        {
+            float angleRad  = ScoringRing.GetQuadrantCentreAngle(quad) * Mathf.Deg2Rad;
+            Vector2 quadDir = new Vector2(Mathf.Cos(angleRad), Mathf.Sin(angleRad));
+            Vector2 perp    = Vector2.Perpendicular(quadDir);
+            Vector2 centre  = fieldCentre + quadDir * radius;
+
+            float halfSpread = (slotCount - 1) * 0.5f * playerSpacing;
+            return centre + perp * (slotIndex * playerSpacing - halfSpread);
+        }
+
+        // Hard placement uses the endzone radius for both teams — every player
+        // starts the period with feet in the scoring ring annulus.
+        private void PlaceTeam(List<DemoballMovementController> team,
+                               Vector2 fieldCentre,
+                               ScoringQuadrant quad)
+        {
+            float radius = scoringRing.RingMidRadius + formationRadialOffset;
+            for (int i = 0; i < team.Count; i++)
+            {
+                var p = team[i];
+                if (p == null) continue;
+
+                Vector2 pos = ComputeFormationSlot(fieldCentre, quad, i, team.Count, radius);
+                p.transform.position = pos;
+                p.ClearSetupTarget();
+
+                var rb = p.GetComponent<Rigidbody2D>();
+                if (rb != null) rb.linearVelocity = Vector2.zero;
+            }
+        }
+
+        private void AssignTeamTargets(List<DemoballMovementController> team,
+                                       Vector2 fieldCentre,
+                                       ScoringQuadrant quad,
+                                       float radius)
+        {
+            for (int i = 0; i < team.Count; i++)
+            {
+                var p = team[i];
+                if (p == null) continue;
+
+                Vector2 pos = ComputeFormationSlot(fieldCentre, quad, i, team.Count, radius);
+                p.SetSetupTarget(pos);
+            }
         }
 
         // ──────────────────────────────────────────────

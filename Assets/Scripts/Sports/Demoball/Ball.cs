@@ -137,10 +137,10 @@ namespace Sportland.Sports.Demoball
             launchTimer += Time.deltaTime;
             float t = Mathf.Clamp01(launchTimer / launchDuration);
 
-            Vector3 flat = Vector3.Lerp(launchStart, launchTarget, t);
-            float arc    = Mathf.Sin(t * Mathf.PI) * 1.5f;
-            currentHeight = arc;
-            transform.position = flat + new Vector3(0f, arc, 0f);
+            // Flat slide from cannon to landing target — keeps the collider at
+            // ground level so a Scorer can pick the ball up the moment it's visible.
+            transform.position = Vector3.Lerp(launchStart, launchTarget, t);
+            currentHeight = 0f;
 
             if (t >= 1f) Land();
         }
@@ -200,7 +200,9 @@ namespace Sportland.Sports.Demoball
         /// </summary>
         public bool CanBePickedUpBy(DemoballMovementController player)
         {
-            if (State != BallState.Loose) return false;
+            // The ball is pickable as soon as it's visible on the field — during
+            // the cannon arc (Launching) and once it has landed (Loose).
+            if (State != BallState.Loose && State != BallState.Launching) return false;
 
             switch (player.Role)
             {
