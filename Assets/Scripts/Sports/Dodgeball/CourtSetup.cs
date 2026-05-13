@@ -88,25 +88,49 @@ namespace Sportland.Sports.Dodgeball
 
         private void SpawnPlayer(PlayerSpawn spawn)
         {
-            if (playerPrefab == null)
+            GameObject go;
+            if (playerPrefab != null)
             {
-                Debug.LogWarning($"[CourtSetup] playerPrefab not assigned; skipping spawn for {spawn.id}");
-                return;
+                go = Instantiate(
+                    playerPrefab,
+                    new Vector3(spawn.position.x, spawn.position.y, 0f),
+                    Quaternion.identity,
+                    transform
+                );
             }
-
-            var go = Instantiate(
-                playerPrefab,
-                new Vector3(spawn.position.x, spawn.position.y, 0f),
-                Quaternion.identity,
-                transform
-            );
+            else
+            {
+                go = BuildProceduralPlayer();
+                go.transform.position = new Vector3(spawn.position.x, spawn.position.y, 0f);
+            }
             go.name = spawn.id;
 
             var tracker = go.GetComponent<PlayerZoneTracker>();
             if (tracker == null) tracker = go.AddComponent<PlayerZoneTracker>();
             tracker.Initialize(spawn);
 
+            var visual = go.GetComponentInChildren<DodgeballPlayerVisual>();
+            if (visual != null) visual.Configure(spawn.team, spawn.role, tracker);
+
             spawnedPlayers.Add(go);
+        }
+
+        // Builds a self-contained player when no prefab is assigned. The visual
+        // lives on a child GameObject because PlayerMovement bobs child[0] for
+        // the jump arc.
+        private GameObject BuildProceduralPlayer()
+        {
+            var go = new GameObject("DodgeballPlayer");
+            go.transform.SetParent(transform, false);
+
+            var visualGO = new GameObject("Visual");
+            visualGO.transform.SetParent(go.transform, false);
+            visualGO.AddComponent<DodgeballPlayerVisual>();
+
+            // PlayerMovement RequireComponent pulls in Rigidbody2D automatically.
+            go.AddComponent<PlayerMovement>();
+
+            return go;
         }
 
         /// <summary>
