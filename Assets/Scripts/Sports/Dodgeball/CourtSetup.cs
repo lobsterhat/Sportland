@@ -102,10 +102,9 @@ namespace Sportland.Sports.Dodgeball
             );
             go.name = spawn.id;
 
-            // Optional: attach a DodgeballPlayer component to carry team/role
-            // var dp = go.GetComponent<DodgeballPlayer>() ?? go.AddComponent<DodgeballPlayer>();
-            // dp.Team = spawn.team;
-            // dp.Role = spawn.role;
+            var tracker = go.GetComponent<PlayerZoneTracker>();
+            if (tracker == null) tracker = go.AddComponent<PlayerZoneTracker>();
+            tracker.Initialize(spawn);
 
             spawnedPlayers.Add(go);
         }

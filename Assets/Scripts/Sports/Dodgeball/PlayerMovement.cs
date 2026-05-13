@@ -25,6 +25,8 @@ namespace Sportland.Sports.Dodgeball
 
         public bool IsAirborne => jumpTimer >= 0f;
 
+        public System.Action<PlayerMovement> OnLanded;
+
         private void Awake()
         {
             rb = GetComponent<Rigidbody2D>();
@@ -64,6 +66,7 @@ namespace Sportland.Sports.Dodgeball
                     jumpTimer = -1f;
                     if (spriteChild != null)
                         spriteChild.localPosition = new Vector3(0f, spriteBaseY, 0f);
+                    OnLanded?.Invoke(this);
                 }
                 else if (spriteChild != null)
                 {

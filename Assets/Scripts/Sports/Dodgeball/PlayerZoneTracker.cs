@@ -37,6 +37,10 @@ namespace Sportland.Sports.Dodgeball
         // Time the player went out-of-zone. Negative when in-zone.
         private float outOfZoneSince = -1f;
 
+        // True once the return-grace timer has expired on the current trip
+        // out of zone. Reset when the player gets back in zone.
+        private bool returnExpiryFired;
+
         // Timestamps of recent crossings (entering out-of-zone state).
         // Pruned to the rolling window each frame.
         private readonly Queue<float> crossingTimestamps = new Queue<float>();
@@ -55,6 +59,12 @@ namespace Sportland.Sports.Dodgeball
         private void Awake()
         {
             movement = GetComponent<PlayerMovement>();
+            movement.OnLanded += HandleLanded;
+        }
+
+        private void OnDestroy()
+        {
+            if (movement != null) movement.OnLanded -= HandleLanded;
         }
 
         public void Initialize(PlayerSpawn spawn)
@@ -63,6 +73,17 @@ namespace Sportland.Sports.Dodgeball
             AssignedZone = ZoneFactory.For(spawn);
             IsInZone = AssignedZone.Contains(transform.position);
             outOfZoneSince = IsInZone ? -1f : Time.time;
+            returnExpiryFired = false;
+        }
+
+        private void HandleLanded(PlayerMovement _)
+        {
+            // The airborne exception ends here: if we land out-of-zone still
+            // holding the ball, it's a turnover.
+            if (!IsInZone && HasBall)
+            {
+                OnTurnoverFromOutOfZoneWithBall?.Invoke(this);
+            }
         }
 
         private void Update()
@@ -81,6 +102,7 @@ namespace Sportland.Sports.Dodgeball
                 // Just returned.
                 IsInZone = true;
                 outOfZoneSince = -1f;
+                returnExpiryFired = false;
                 OnReturnedToZone?.Invoke(this);
             }
             else if (!inZoneNow && IsInZone)
@@ -92,9 +114,8 @@ namespace Sportland.Sports.Dodgeball
 
                 // Holding the ball while out of zone is a turnover —
                 // UNLESS the player is airborne (jump-over-line exception).
-                // If they release the ball before landing, no turnover.
-                // If they're still holding when they land while out of zone,
-                // the landing handler (or HasBall setter) should re-check.
+                // The airborne case is re-checked in HandleLanded: release
+                // before landing = no turnover; still holding on landing = turnover.
                 if (HasBall && !movement.IsAirborne)
                 {
                     OnTurnoverFromOutOfZoneWithBall?.Invoke(this);
@@ -130,14 +151,23 @@ namespace Sportland.Sports.Dodgeball
             {
                 crossingTimestamps.Dequeue();
             }
+
+            // Warning lifts once the rolling window no longer holds enough
+            // crossings to justify it. Re-crossing the threshold later issues
+            // a fresh warning rather than jumping straight to penalty.
+            if (HasActiveWarning && crossingTimestamps.Count < crossingsForWarning)
+            {
+                HasActiveWarning = false;
+            }
         }
 
         private void CheckReturnTimer()
         {
-            if (IsInZone || outOfZoneSince < 0f) return;
+            if (IsInZone || outOfZoneSince < 0f || returnExpiryFired) return;
 
             if (Time.time - outOfZoneSince >= returnGraceSeconds)
             {
+                returnExpiryFired = true;
                 OnReturnTimerExpired?.Invoke(this);
 
                 // If still holding the ball at expiry, that's also a turnover
@@ -147,11 +177,6 @@ namespace Sportland.Sports.Dodgeball
                 {
                     OnTurnoverFromOutOfZoneWithBall?.Invoke(this);
                 }
-
-                // Reset the grace timer so we don't spam the event every frame.
-                // The player is still out of zone; effectively they're now
-                // "in violation" until they return.
-                outOfZoneSince = Time.time;
             }
         }
 
