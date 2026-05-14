@@ -21,7 +21,7 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>
         /// When true, ApplyMove scales by sprintSpeed instead of moveSpeed.
-        /// The input layer flips this on each L2 press (toggle).
+        /// The input layer mirrors L2 / Left Shift pressed state into this.
         /// </summary>
         public bool IsSprinting { get; set; }
 

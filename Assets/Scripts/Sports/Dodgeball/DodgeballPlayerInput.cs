@@ -18,7 +18,6 @@ namespace Sportland.Sports.Dodgeball
         private PlayerZoneTracker tracker;
         private DodgeballInputActions actions;
 
-        private bool sprintMode;
         private Vector2 lastMoveDirection = Vector2.right;
 
         private void Awake()
@@ -26,7 +25,6 @@ namespace Sportland.Sports.Dodgeball
             movement = GetComponent<PlayerMovement>();
             tracker = GetComponent<PlayerZoneTracker>();
             actions = new DodgeballInputActions();
-            actions.Sprint.performed += OnSprintPressed;
             actions.Jump.performed   += OnJumpPressed;
             actions.Throw.performed  += OnThrowPressed;
         }
@@ -37,7 +35,6 @@ namespace Sportland.Sports.Dodgeball
         private void OnDestroy()
         {
             if (actions == null) return;
-            actions.Sprint.performed -= OnSprintPressed;
             actions.Jump.performed   -= OnJumpPressed;
             actions.Throw.performed  -= OnThrowPressed;
             actions.Disable();
@@ -48,12 +45,11 @@ namespace Sportland.Sports.Dodgeball
             Vector2 input = actions.Move.ReadValue<Vector2>();
             if (input.sqrMagnitude > 0.04f) lastMoveDirection = input.normalized;
 
-            movement.IsSprinting = sprintMode;
+            movement.IsSprinting = actions.Sprint.IsPressed();
             movement.ApplyMove(input);
         }
 
-        private void OnSprintPressed(InputAction.CallbackContext _) => sprintMode = !sprintMode;
-        private void OnJumpPressed(InputAction.CallbackContext _)   => movement.TryJump();
+        private void OnJumpPressed(InputAction.CallbackContext _) => movement.TryJump();
 
         private void OnThrowPressed(InputAction.CallbackContext _)
         {

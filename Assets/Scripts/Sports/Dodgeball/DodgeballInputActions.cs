@@ -7,7 +7,7 @@ namespace Sportland.Sports.Dodgeball
     ///
     /// Control scheme:
     ///   Move    — Left Stick / WASD / Arrow Keys   (analog magnitude respected)
-    ///   Sprint  — L2 / Left Shift                  (press to toggle sprint mode)
+    ///   Sprint  — L2 / Left Shift                  (hold)
     ///   Jump    — Cross / Space
     ///   Throw   — Circle / Q                       (only fires while holding the ball)
     /// </summary>
