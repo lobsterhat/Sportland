@@ -80,6 +80,7 @@ namespace Sportland.Sports.Dodgeball
 
         private Rigidbody2D rb;
         private PlayerZoneTracker carrier;
+        private PlayerMovement carrierMovement;
         private PlayerZoneTracker recentThrower;
         private float throwerCooldownRemaining;
 
@@ -168,7 +169,8 @@ namespace Sportland.Sports.Dodgeball
         private void UpdateCarried()
         {
             transform.position = carrier.transform.position;
-            Height = carryHeight;
+            float jumpBob = carrierMovement != null ? carrierMovement.CurrentJumpHeight : 0f;
+            Height = carryHeight + jumpBob;
         }
 
         private void UpdatePassing()
@@ -349,6 +351,7 @@ namespace Sportland.Sports.Dodgeball
         private void AttachTo(PlayerZoneTracker t)
         {
             carrier = t;
+            carrierMovement = t != null ? t.GetComponent<PlayerMovement>() : null;
             t.HeldBall = this;
             rb.linearVelocity = Vector2.zero;
             rb.simulated = false;
@@ -367,6 +370,7 @@ namespace Sportland.Sports.Dodgeball
             {
                 carrier.HeldBall = null;
                 carrier = null;
+                carrierMovement = null;
             }
             recentThrower = null;
             throwerCooldownRemaining = 0f;
@@ -387,6 +391,7 @@ namespace Sportland.Sports.Dodgeball
             throwerCooldownRemaining = throwerPickupCooldown;
             carrier.HeldBall = null;
             carrier = null;
+            carrierMovement = null;
 
             rb.simulated = true;
             rb.linearVelocity = direction.normalized * power;
@@ -412,6 +417,7 @@ namespace Sportland.Sports.Dodgeball
             throwerCooldownRemaining = throwerPickupCooldown;
             carrier.HeldBall = null;
             carrier = null;
+            carrierMovement = null;
 
             passStart = start;
             passEnd = target;

@@ -35,6 +35,9 @@ namespace Sportland.Sports.Dodgeball
 
         public bool IsAirborne => jumpTimer >= 0f;
 
+        /// <summary>Current vertical offset of the jump arc above the player's ground position (0 when grounded).</summary>
+        public float CurrentJumpHeight { get; private set; }
+
         public System.Action<PlayerMovement> OnLanded;
 
         private void Awake()
@@ -80,15 +83,17 @@ namespace Sportland.Sports.Dodgeball
                 if (t >= 1f)
                 {
                     jumpTimer = -1f;
+                    CurrentJumpHeight = 0f;
                     if (spriteChild != null)
                         spriteChild.localPosition = new Vector3(0f, spriteBaseY, 0f);
                     OnLanded?.Invoke(this);
                 }
-                else if (spriteChild != null)
+                else
                 {
                     // Parabolic arc: 4*t*(1-t) peaks at t=0.5 with value 1.
-                    float h = 4f * t * (1f - t) * jumpHeight;
-                    spriteChild.localPosition = new Vector3(0f, spriteBaseY + h, 0f);
+                    CurrentJumpHeight = 4f * t * (1f - t) * jumpHeight;
+                    if (spriteChild != null)
+                        spriteChild.localPosition = new Vector3(0f, spriteBaseY + CurrentJumpHeight, 0f);
                 }
             }
         }
