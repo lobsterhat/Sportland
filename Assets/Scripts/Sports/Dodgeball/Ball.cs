@@ -36,7 +36,7 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float pickupMaxHeight = 0.7f;
 
         [Header("Physics")]
-        [SerializeField] private float linearDamping = 0.5f;
+        [SerializeField] private float linearDamping = 1.4f;
 
         [Header("Height")]
         [SerializeField] private float carryHeight = 0.5f;
@@ -66,6 +66,16 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField, Range(0f, 1f)] private float limbBounceFactor = 0.35f;
         [SerializeField] private float limbBounceArcApex = 0.15f;
         [SerializeField] private float limbBounceArcDuration = 0.25f;
+
+        [Header("Bounce chain")]
+        [Tooltip("Apex multiplier per ground bounce (coefficient of restitution).")]
+        [SerializeField, Range(0f, 1f)] private float bounceRestitution = 0.5f;
+        [Tooltip("Lateral velocity multiplier applied at each ground bounce.")]
+        [SerializeField, Range(0f, 1f)] private float bounceLateralFriction = 0.65f;
+        [Tooltip("When the next bounce apex would be below this, the ball stops bouncing and rolls.")]
+        [SerializeField] private float minBounceApex = 0.08f;
+        [Tooltip("After flight (throw/pass/bounce chain ends), Height drops to 0 at this rate.")]
+        [SerializeField] private float looseFallRate = 3f;
 
         [Header("Shadow")]
         [Tooltip("Ball Height at which the shadow has fully shrunk to shadowMinScale.")]
@@ -207,13 +217,31 @@ namespace Sportland.Sports.Dodgeball
             float t = Mathf.Clamp01(bounceArcTimer / bounceArcDuration);
             Height = Mathf.Lerp(bounceStartHeight, 0f, t)
                    + bounceArcApex * Mathf.Sin(t * Mathf.PI);
-            if (t >= 1f) EnterLoose();
+            if (t < 1f) return;
+
+            // Hit the ground. Bleed lateral velocity and start the next, smaller
+            // bounce — or roll if it would be too short to read.
+            rb.linearVelocity *= bounceLateralFriction;
+            float nextApex = bounceArcApex * bounceRestitution;
+            if (nextApex < minBounceApex)
+            {
+                Height = 0f;
+                EnterLoose();
+                return;
+            }
+            bounceStartHeight = 0f;
+            bounceArcApex = nextApex;
+            // Period of a parabolic arc scales ~sqrt(apex), so duration shrinks
+            // proportionally — bounces speed up as they get shorter.
+            bounceArcDuration = Mathf.Max(0.05f, bounceArcDuration * Mathf.Sqrt(bounceRestitution));
+            bounceArcTimer = 0f;
         }
 
         private void UpdateLoose()
         {
-            bool moving = rb.linearVelocity.sqrMagnitude > 0.01f;
-            Height = moving ? carryHeight : 0f;
+            // Ball settles to the floor and rolls; linearDamping does the friction work.
+            if (Height > 0f)
+                Height = Mathf.MoveTowards(Height, 0f, looseFallRate * Time.deltaTime);
             TryPickup();
         }
 

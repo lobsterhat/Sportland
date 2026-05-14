@@ -49,7 +49,7 @@ Rigidbody2D:
   m_UseFullKinematicContacts: 0
   m_UseAutoMass: 0
   m_Mass: 0.3
-  m_LinearDamping: 0.5
+  m_LinearDamping: 1.4
   m_AngularDamping: 0
   m_GravityScale: 0
   m_Material: {fileID: 0}
@@ -114,7 +114,7 @@ MonoBehaviour:
   pickupRadius: 0.6
   throwerPickupCooldown: 0.4
   pickupMaxHeight: 0.7
-  linearDamping: 0.5
+  linearDamping: 1.4
   carryHeight: 0.5
   lobApex: 1.2
   headZoneMinHeight: 0.9
@@ -129,6 +129,10 @@ MonoBehaviour:
   limbBounceFactor: 0.35
   limbBounceArcApex: 0.15
   limbBounceArcDuration: 0.25
+  bounceRestitution: 0.5
+  bounceLateralFriction: 0.65
+  minBounceApex: 0.08
+  looseFallRate: 3
   shadowFalloffHeight: 1.5
   shadowMinScale: 0.4
   ballRadius: 0.12
