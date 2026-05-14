@@ -258,15 +258,28 @@ namespace Sportland.Sports.Dodgeball
                 var p = visualTransform.localPosition;
                 visualTransform.localPosition = new Vector3(p.x, Height, p.z);
             }
-            if (shadowTransform != null && shadowFalloffHeight > 0f)
+            if (shadowTransform != null)
             {
-                float t = Mathf.Clamp01(Height / shadowFalloffHeight);
-                float scale = Mathf.Lerp(1f, shadowMinScale, t);
-                shadowTransform.localScale = new Vector3(
-                    shadowBaseScale.x * scale,
-                    shadowBaseScale.y * scale,
-                    shadowBaseScale.z
-                );
+                // Carrier's transform sits at their sprite center, so the floor
+                // under their feet is FootOffset below the ball's root. Drop the
+                // shadow that far when carried so it lands at the feet.
+                float shadowY = shadowOffset.y;
+                if (state == State.Carried && carrierMovement != null)
+                    shadowY += carrierMovement.FootOffset;
+
+                var sp = shadowTransform.localPosition;
+                shadowTransform.localPosition = new Vector3(shadowOffset.x, shadowY, sp.z);
+
+                if (shadowFalloffHeight > 0f)
+                {
+                    float t = Mathf.Clamp01(Height / shadowFalloffHeight);
+                    float scale = Mathf.Lerp(1f, shadowMinScale, t);
+                    shadowTransform.localScale = new Vector3(
+                        shadowBaseScale.x * scale,
+                        shadowBaseScale.y * scale,
+                        shadowBaseScale.z
+                    );
+                }
             }
         }
 

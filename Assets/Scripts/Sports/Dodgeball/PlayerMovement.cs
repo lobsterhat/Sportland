@@ -13,6 +13,14 @@ namespace Sportland.Sports.Dodgeball
     [RequireComponent(typeof(Rigidbody2D))]
     public class PlayerMovement : MonoBehaviour
     {
+        [Header("Visual layout")]
+        [Tooltip("Distance from the player root down to the visual feet. " +
+                 "Roughly -(sprite height / 2) for a center-pivoted sprite.")]
+        [SerializeField] private float footOffset = -0.79f;
+
+        /// <summary>Local Y offset from the root down to where the floor visually sits under this player.</summary>
+        public float FootOffset => footOffset;
+
         [Header("Movement")]
         [SerializeField] private float moveSpeed = 4f;     // units/sec at walk
         [SerializeField] private float sprintSpeed = 6f;   // units/sec while sprinting
