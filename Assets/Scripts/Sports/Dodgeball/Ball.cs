@@ -41,6 +41,8 @@ namespace Sportland.Sports.Dodgeball
         [Header("Height")]
         [SerializeField] private float carryHeight = 0.5f;
         [SerializeField] private float lobApex = 1.2f;
+        [Tooltip("After a Throw, Height decays from launch height back toward carryHeight at this rate (units/sec).")]
+        [SerializeField] private float throwHeightFallRate = 2.5f;
 
         [Header("Throw bounce zones")]
         [Tooltip("Ball Height at/above this lands in the head zone.")]
@@ -96,6 +98,7 @@ namespace Sportland.Sports.Dodgeball
         private float passDurationCurrent;
         private Vector2 passStart;
         private Vector2 passEnd;
+        private float passLaunchHeight;
 
         // Bouncing state.
         private float bounceArcTimer;
@@ -178,9 +181,10 @@ namespace Sportland.Sports.Dodgeball
             passTimer += Time.deltaTime;
             float t = Mathf.Clamp01(passTimer / passDurationCurrent);
             transform.position = Vector2.Lerp(passStart, passEnd, t);
+            float baseline = Mathf.Lerp(passLaunchHeight, carryHeight, t);
             Height = passIsLob
-                ? carryHeight + lobApex * Mathf.Sin(t * Mathf.PI)
-                : carryHeight;
+                ? baseline + lobApex * Mathf.Sin(t * Mathf.PI)
+                : baseline;
             TryPickup();
             if (state != State.Passing) return;  // pickup may have transitioned us
             if (t >= 1f) EnterLoose();
@@ -188,7 +192,7 @@ namespace Sportland.Sports.Dodgeball
 
         private void UpdateThrown()
         {
-            Height = carryHeight;
+            Height = Mathf.MoveTowards(Height, carryHeight, throwHeightFallRate * Time.deltaTime);
             TryThrownInteraction();
             if (state != State.Thrown) return;
             if (rb.linearVelocity.sqrMagnitude < thrownToLooseSpeed * thrownToLooseSpeed)
@@ -424,6 +428,9 @@ namespace Sportland.Sports.Dodgeball
             passDurationCurrent = dist / Mathf.Max(0.01f, lateralSpeed);
             passTimer = 0f;
             passIsLob = isLob;
+            // Capture the visual height at the moment of release so the
+            // trajectory's baseline starts there, not at carryHeight.
+            passLaunchHeight = Height;
             state = State.Passing;
 
             rb.simulated = false;
