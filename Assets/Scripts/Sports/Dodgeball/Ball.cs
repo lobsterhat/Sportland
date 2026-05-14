@@ -78,7 +78,7 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float shadowWidth = 0.18f;
         [SerializeField] private float shadowHeight = 0.06f;
         [SerializeField] private Vector2 shadowOffset = new Vector2(0f, -0.08f);
-        [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, 0.4f);
+        [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, 0.65f);
 
         private Rigidbody2D rb;
         private PlayerZoneTracker carrier;

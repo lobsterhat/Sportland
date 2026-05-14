@@ -34,41 +34,48 @@ namespace Sportland.Sports.Dodgeball
             BuildCourt();
         }
 
+        // Sorting layout (low to high):
+        //   -10  half-court fills (deepest background)
+        //    -5  outfielder strip outlines
+        //    -3  court boundary
+        //    -2  center line
+        //   (everything else renders above)
+        private const int HalfFillOrder     = -10;
+        private const int StripOutlineOrder = -5;
+        private const int BoundaryOrder     = -3;
+        private const int CenterLineOrder   = -2;
+
         private void BuildCourt()
         {
             float hw = CourtSetup.HalfWidth;
             float hh = CourtSetup.HalfHeight;
             float strip = ZoneFactory.StripDepth;
 
-            // Half-court fills (z behind everything else).
-            CreateRectFill("HalfA", new Vector2(-hw, -hh), new Vector2(0f, hh), teamAHalfColor, 0.5f);
-            CreateRectFill("HalfB", new Vector2(0f, -hh), new Vector2(hw, hh), teamBHalfColor, 0.5f);
+            CreateRectFill("HalfA", new Vector2(-hw, -hh), new Vector2(0f, hh), teamAHalfColor, HalfFillOrder);
+            CreateRectFill("HalfB", new Vector2(0f, -hh), new Vector2(hw, hh), teamBHalfColor, HalfFillOrder);
 
-            // Outfielder strip outlines: A surrounds B's half (right), B surrounds A's half (left).
-            // Team A strips
-            CreateRectOutline("A_Back",   new Vector2(hw, -hh),  new Vector2(hw + strip, hh),  teamAStripColor, 0.3f);
-            CreateRectOutline("A_Top",    new Vector2(0f, hh),   new Vector2(hw, hh + strip), teamAStripColor, 0.3f);
-            CreateRectOutline("A_Bottom", new Vector2(0f, -hh - strip), new Vector2(hw, -hh), teamAStripColor, 0.3f);
+            CreateRectOutline("A_Back",   new Vector2(hw, -hh),  new Vector2(hw + strip, hh),  teamAStripColor, StripOutlineOrder);
+            CreateRectOutline("A_Top",    new Vector2(0f, hh),   new Vector2(hw, hh + strip), teamAStripColor, StripOutlineOrder);
+            CreateRectOutline("A_Bottom", new Vector2(0f, -hh - strip), new Vector2(hw, -hh), teamAStripColor, StripOutlineOrder);
 
-            // Team B strips
-            CreateRectOutline("B_Back",   new Vector2(-hw - strip, -hh),  new Vector2(-hw, hh), teamBStripColor, 0.3f);
-            CreateRectOutline("B_Top",    new Vector2(-hw, hh),   new Vector2(0f, hh + strip), teamBStripColor, 0.3f);
-            CreateRectOutline("B_Bottom", new Vector2(-hw, -hh - strip), new Vector2(0f, -hh), teamBStripColor, 0.3f);
+            CreateRectOutline("B_Back",   new Vector2(-hw - strip, -hh),  new Vector2(-hw, hh), teamBStripColor, StripOutlineOrder);
+            CreateRectOutline("B_Top",    new Vector2(-hw, hh),   new Vector2(0f, hh + strip), teamBStripColor, StripOutlineOrder);
+            CreateRectOutline("B_Bottom", new Vector2(-hw, -hh - strip), new Vector2(0f, -hh), teamBStripColor, StripOutlineOrder);
 
-            // Court boundary and center line on top.
-            CreateRectOutline("CourtBoundary", new Vector2(-hw, -hh), new Vector2(hw, hh), boundaryColor, 0.1f);
-            CreateLine("CenterLine", new Vector2(0f, -hh), new Vector2(0f, hh), centerLineColor, 0.05f);
+            CreateRectOutline("CourtBoundary", new Vector2(-hw, -hh), new Vector2(hw, hh), boundaryColor, BoundaryOrder);
+            CreateLine("CenterLine", new Vector2(0f, -hh), new Vector2(0f, hh), centerLineColor, CenterLineOrder);
         }
 
-        private GameObject CreateRectFill(string goName, Vector2 min, Vector2 max, Color color, float z)
+        private GameObject CreateRectFill(string goName, Vector2 min, Vector2 max, Color color, int sortingOrder)
         {
             var go = new GameObject(goName);
             go.transform.SetParent(transform, false);
-            go.transform.localPosition = new Vector3(0f, 0f, z);
+            go.transform.localPosition = Vector3.zero;
 
             var mf = go.AddComponent<MeshFilter>();
             var mr = go.AddComponent<MeshRenderer>();
             mr.sharedMaterial = CreateMat(color);
+            mr.sortingOrder = sortingOrder;
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             mr.receiveShadows = false;
 
@@ -86,11 +93,11 @@ namespace Sportland.Sports.Dodgeball
             return go;
         }
 
-        private GameObject CreateRectOutline(string goName, Vector2 min, Vector2 max, Color color, float z)
+        private GameObject CreateRectOutline(string goName, Vector2 min, Vector2 max, Color color, int sortingOrder)
         {
             var go = new GameObject(goName);
             go.transform.SetParent(transform, false);
-            go.transform.localPosition = new Vector3(0f, 0f, z);
+            go.transform.localPosition = Vector3.zero;
 
             var lr = go.AddComponent<LineRenderer>();
             lr.useWorldSpace = false;
@@ -101,6 +108,7 @@ namespace Sportland.Sports.Dodgeball
             lr.material = CreateMat(color);
             lr.startColor = color;
             lr.endColor = color;
+            lr.sortingOrder = sortingOrder;
             lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             lr.receiveShadows = false;
             lr.SetPosition(0, new Vector3(min.x, min.y, 0f));
@@ -110,11 +118,11 @@ namespace Sportland.Sports.Dodgeball
             return go;
         }
 
-        private GameObject CreateLine(string goName, Vector2 a, Vector2 b, Color color, float z)
+        private GameObject CreateLine(string goName, Vector2 a, Vector2 b, Color color, int sortingOrder)
         {
             var go = new GameObject(goName);
             go.transform.SetParent(transform, false);
-            go.transform.localPosition = new Vector3(0f, 0f, z);
+            go.transform.localPosition = Vector3.zero;
 
             var lr = go.AddComponent<LineRenderer>();
             lr.useWorldSpace = false;
@@ -125,6 +133,7 @@ namespace Sportland.Sports.Dodgeball
             lr.material = CreateMat(color);
             lr.startColor = color;
             lr.endColor = color;
+            lr.sortingOrder = sortingOrder;
             lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             lr.receiveShadows = false;
             lr.SetPosition(0, new Vector3(a.x, a.y, 0f));
