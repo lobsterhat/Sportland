@@ -3,35 +3,36 @@ using UnityEngine;
 namespace Sportland.Sports.Dodgeball
 {
     /// <summary>
-    /// Dodgeball with a real (top-down) Height dimension.
+    /// Dodgeball with a real (top-down) Height dimension and a small state
+    /// machine over its trajectory.
     ///
-    /// The root transform's XY is the "ground" position used for pickups and
-    /// collision. A "Visual" child is offset along Y by Height each frame, and
-    /// a "Shadow" child stays grounded but shrinks as Height grows. Both
-    /// children are pre-built by Dodgeball.prefab; procedural fallbacks build
-    /// them at runtime if the ball is spawned without the prefab.
-    ///
-    /// Trajectory state:
-    ///   - Carried (carrier != null): ground tracks carrier; Height = carryHeight.
-    ///   - Passing (passActive):       parametric lerp to a fixed target; lob
-    ///                                 adds a sin-arc to carryHeight, chest
-    ///                                 stays flat at carryHeight.
-    ///   - Loose:                      velocity-driven; Height stays at
-    ///                                 carryHeight while in motion, drops to
-    ///                                 0 once nearly stopped.
+    /// States:
+    ///   - Carried:  Ground tracks the carrier; Height = carryHeight.
+    ///   - Passing:  Parametric lerp to a fixed target; lob adds a sin-arc to
+    ///               carryHeight, chest stays flat. Catches resolve via the
+    ///               normal proximity pickup (anyone on the path can intercept).
+    ///   - Thrown:   Velocity-driven via Rigidbody2D. Teammates of the thrower
+    ///               can catch (if catchable); opponents are struck and the
+    ///               ball caroms off based on hit zone (head / torso / limb).
+    ///   - Bouncing: Post-carom arc — Height follows a sin curve scaled by
+    ///               zone-specific apex/duration; pickups disabled.
+    ///   - Loose:    Velocity-driven, no special handling; pickups enabled.
     ///
     /// Pickups use 2D distance against PlayerZoneTracker.All and require
     /// CanCatchBall() to encode the "no catches in restricted areas" rule.
-    /// The thrower / passer is locked out for throwerPickupCooldown seconds
-    /// so the ball doesn't snap back on release.
+    /// They also require Height ≤ pickupMaxHeight so an overhead lob can't
+    /// be intercepted along its straight-line path.
     /// </summary>
     public class Ball : MonoBehaviour
     {
+        public enum HitZone { Head, Torso, Limb }
+
+        private enum State { Carried, Passing, Thrown, Bouncing, Loose }
+
         [Header("Pickup")]
         [SerializeField] private float pickupRadius = 0.6f;
         [SerializeField] private float throwerPickupCooldown = 0.4f;
-        [Tooltip("A ball above this Height is overhead and not catchable. " +
-                 "Set just above carryHeight to make chest passes catchable but block lob interceptions mid-arc.")]
+        [Tooltip("A ball above this Height is overhead and not catchable.")]
         [SerializeField] private float pickupMaxHeight = 0.7f;
 
         [Header("Physics")]
@@ -40,6 +41,29 @@ namespace Sportland.Sports.Dodgeball
         [Header("Height")]
         [SerializeField] private float carryHeight = 0.5f;
         [SerializeField] private float lobApex = 1.2f;
+
+        [Header("Throw bounce zones")]
+        [Tooltip("Ball Height at/above this lands in the head zone.")]
+        [SerializeField] private float headZoneMinHeight = 0.9f;
+        [Tooltip("Ball Height at/below this lands in the limb zone.")]
+        [SerializeField] private float limbZoneMaxHeight = 0.3f;
+        [Tooltip("When a thrown ball's speed drops below this, it transitions to Loose without hitting.")]
+        [SerializeField] private float thrownToLooseSpeed = 4f;
+
+        [Header("Bounce — head")]
+        [SerializeField, Range(0f, 1f)] private float headBounceFactor = 0.25f;
+        [SerializeField] private float headBounceArcApex = 1.2f;
+        [SerializeField] private float headBounceArcDuration = 0.6f;
+
+        [Header("Bounce — torso")]
+        [SerializeField, Range(0f, 1f)] private float torsoBounceFactor = 0.6f;
+        [SerializeField] private float torsoBounceArcApex = 0.3f;
+        [SerializeField] private float torsoBounceArcDuration = 0.3f;
+
+        [Header("Bounce — limb")]
+        [SerializeField, Range(0f, 1f)] private float limbBounceFactor = 0.35f;
+        [SerializeField] private float limbBounceArcApex = 0.15f;
+        [SerializeField] private float limbBounceArcDuration = 0.25f;
 
         [Header("Shadow")]
         [Tooltip("Ball Height at which the shadow has fully shrunk to shadowMinScale.")]
@@ -63,13 +87,20 @@ namespace Sportland.Sports.Dodgeball
         private Transform shadowTransform;
         private Vector3 shadowBaseScale = Vector3.one;
 
-        // Pass / lob state — parametric drive when active.
-        private bool passActive;
+        private State state = State.Loose;
+
+        // Passing state.
         private bool passIsLob;
         private float passTimer;
         private float passDurationCurrent;
         private Vector2 passStart;
         private Vector2 passEnd;
+
+        // Bouncing state.
+        private float bounceArcTimer;
+        private float bounceArcDuration;
+        private float bounceArcApex;
+        private float bounceStartHeight;
 
         public PlayerZoneTracker Carrier => carrier;
 
@@ -78,6 +109,9 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>Fires whenever the ball attaches to a player (pickup, pass catch, or ForcePickup).</summary>
         public event System.Action<PlayerZoneTracker> OnAttached;
+
+        /// <summary>Fires when a thrown ball caroms off an opponent. Args: hit player, zone.</summary>
+        public event System.Action<PlayerZoneTracker, HitZone> OnHit;
 
         private void Awake()
         {
@@ -119,35 +153,68 @@ namespace Sportland.Sports.Dodgeball
                 if (throwerCooldownRemaining <= 0f) recentThrower = null;
             }
 
-            if (carrier != null)
+            switch (state)
             {
-                transform.position = carrier.transform.position;
-                Height = carryHeight;
-            }
-            else if (passActive)
-            {
-                passTimer += Time.deltaTime;
-                float t = Mathf.Clamp01(passTimer / passDurationCurrent);
-                transform.position = Vector2.Lerp(passStart, passEnd, t);
-                Height = passIsLob
-                    ? carryHeight + lobApex * Mathf.Sin(t * Mathf.PI)
-                    : carryHeight;
-                if (t >= 1f)
-                {
-                    passActive = false;
-                    rb.simulated = true;
-                    rb.linearVelocity = Vector2.zero;
-                }
-                TryPickup();
-            }
-            else
-            {
-                bool moving = rb.linearVelocity.sqrMagnitude > 0.01f;
-                Height = moving ? carryHeight : 0f;
-                TryPickup();
+                case State.Carried:  UpdateCarried(); break;
+                case State.Passing:  UpdatePassing(); break;
+                case State.Thrown:   UpdateThrown(); break;
+                case State.Bouncing: UpdateBouncing(); break;
+                case State.Loose:    UpdateLoose(); break;
             }
 
             ApplyVisualHeight();
+        }
+
+        private void UpdateCarried()
+        {
+            transform.position = carrier.transform.position;
+            Height = carryHeight;
+        }
+
+        private void UpdatePassing()
+        {
+            passTimer += Time.deltaTime;
+            float t = Mathf.Clamp01(passTimer / passDurationCurrent);
+            transform.position = Vector2.Lerp(passStart, passEnd, t);
+            Height = passIsLob
+                ? carryHeight + lobApex * Mathf.Sin(t * Mathf.PI)
+                : carryHeight;
+            TryPickup();
+            if (state != State.Passing) return;  // pickup may have transitioned us
+            if (t >= 1f) EnterLoose();
+        }
+
+        private void UpdateThrown()
+        {
+            Height = carryHeight;
+            TryThrownInteraction();
+            if (state != State.Thrown) return;
+            if (rb.linearVelocity.sqrMagnitude < thrownToLooseSpeed * thrownToLooseSpeed)
+            {
+                EnterLoose();
+            }
+        }
+
+        private void UpdateBouncing()
+        {
+            bounceArcTimer += Time.deltaTime;
+            float t = Mathf.Clamp01(bounceArcTimer / bounceArcDuration);
+            Height = Mathf.Lerp(bounceStartHeight, 0f, t)
+                   + bounceArcApex * Mathf.Sin(t * Mathf.PI);
+            if (t >= 1f) EnterLoose();
+        }
+
+        private void UpdateLoose()
+        {
+            bool moving = rb.linearVelocity.sqrMagnitude > 0.01f;
+            Height = moving ? carryHeight : 0f;
+            TryPickup();
+        }
+
+        private void EnterLoose()
+        {
+            state = State.Loose;
+            rb.simulated = true;
         }
 
         private void ApplyVisualHeight()
@@ -169,12 +236,15 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
+        // ── Pickup / hit checks ──
+
         private void TryPickup()
         {
             if (Height > pickupMaxHeight) return;
 
             var trackers = PlayerZoneTracker.All;
             Vector2 ballPos = transform.position;
+            float r2 = pickupRadius * pickupRadius;
             for (int i = 0; i < trackers.Count; i++)
             {
                 var t = trackers[i];
@@ -184,7 +254,7 @@ namespace Sportland.Sports.Dodgeball
                 if (!t.CanCatchBall()) continue;
 
                 Vector2 trackerPos = t.transform.position;
-                if (Vector2.SqrMagnitude(trackerPos - ballPos) <= pickupRadius * pickupRadius)
+                if (Vector2.SqrMagnitude(trackerPos - ballPos) <= r2)
                 {
                     AttachTo(t);
                     return;
@@ -192,13 +262,97 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
+        // While Thrown: opponents trigger a carom, teammates may catch.
+        private void TryThrownInteraction()
+        {
+            var trackers = PlayerZoneTracker.All;
+            Vector2 ballPos = transform.position;
+            float r2 = pickupRadius * pickupRadius;
+            Team? throwerTeam = recentThrower != null ? recentThrower.Spawn.team : (Team?)null;
+
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null) continue;
+                if (t == recentThrower) continue;
+
+                Vector2 trackerPos = t.transform.position;
+                if (Vector2.SqrMagnitude(trackerPos - ballPos) > r2) continue;
+
+                bool isTeammate = throwerTeam.HasValue && t.Spawn.team == throwerTeam.Value;
+                if (isTeammate)
+                {
+                    if (!t.HasBall && t.CanCatchBall() && Height <= pickupMaxHeight)
+                    {
+                        AttachTo(t);
+                        return;
+                    }
+                    // Teammate present but can't catch — ball passes through.
+                }
+                else
+                {
+                    Carom(t, ClassifyHit(Height));
+                    return;
+                }
+            }
+        }
+
+        private HitZone ClassifyHit(float height)
+        {
+            if (height >= headZoneMinHeight) return HitZone.Head;
+            if (height >  limbZoneMaxHeight) return HitZone.Torso;
+            return HitZone.Limb;
+        }
+
+        private void Carom(PlayerZoneTracker hit, HitZone zone)
+        {
+            Vector2 incoming = rb.linearVelocity;
+            Vector2 normal = (Vector2)transform.position - (Vector2)hit.transform.position;
+            if (normal.sqrMagnitude < 0.0001f) normal = -incoming;
+            normal = normal.sqrMagnitude > 0.0001f ? normal.normalized : Vector2.up;
+
+            Vector2 reflected = Vector2.Reflect(incoming, normal);
+
+            float factor, apex, duration;
+            switch (zone)
+            {
+                case HitZone.Head:
+                    factor = headBounceFactor;
+                    apex = headBounceArcApex;
+                    duration = headBounceArcDuration;
+                    break;
+                case HitZone.Limb:
+                    factor = limbBounceFactor;
+                    apex = limbBounceArcApex;
+                    duration = limbBounceArcDuration;
+                    break;
+                default:
+                    factor = torsoBounceFactor;
+                    apex = torsoBounceArcApex;
+                    duration = torsoBounceArcDuration;
+                    break;
+            }
+
+            rb.linearVelocity = reflected.normalized * (incoming.magnitude * factor);
+
+            bounceArcTimer = 0f;
+            bounceArcDuration = Mathf.Max(0.05f, duration);
+            bounceStartHeight = Height;
+            bounceArcApex = apex;
+            state = State.Bouncing;
+
+            OnHit?.Invoke(hit, zone);
+        }
+
+        // ── Release / attach API ──
+
         private void AttachTo(PlayerZoneTracker t)
         {
-            passActive = false;
             carrier = t;
             t.HeldBall = this;
             rb.linearVelocity = Vector2.zero;
             rb.simulated = false;
+            state = State.Carried;
             OnAttached?.Invoke(t);
         }
 
@@ -221,8 +375,8 @@ namespace Sportland.Sports.Dodgeball
         }
 
         /// <summary>
-        /// Velocity-driven release. Used for the Circle throw — direction is a
-        /// unit-normalized world vector; power is units/sec.
+        /// Velocity-driven release at the held ball — used for the Circle throw.
+        /// Direction is normalized internally; power is units/sec.
         /// </summary>
         public void Throw(Vector2 direction, float power)
         {
@@ -234,16 +388,16 @@ namespace Sportland.Sports.Dodgeball
             carrier.HeldBall = null;
             carrier = null;
 
-            passActive = false;
             rb.simulated = true;
             rb.linearVelocity = direction.normalized * power;
+            state = State.Thrown;
         }
 
         /// <summary>
         /// Parametric pass to a fixed world position. Lateral motion is a
         /// straight lerp from current position to target; lob adds a sin-arc
-        /// on top of carryHeight, chest stays flat. Catches still resolve via
-        /// the normal proximity pickup so anyone on the path can intercept.
+        /// on top of carryHeight, chest stays flat. Catches resolve via the
+        /// normal proximity pickup so anyone on the path can intercept.
         /// </summary>
         public void Pass(Vector2 target, float lateralSpeed, bool isLob)
         {
@@ -264,7 +418,7 @@ namespace Sportland.Sports.Dodgeball
             passDurationCurrent = dist / Mathf.Max(0.01f, lateralSpeed);
             passTimer = 0f;
             passIsLob = isLob;
-            passActive = true;
+            state = State.Passing;
 
             rb.simulated = false;
         }

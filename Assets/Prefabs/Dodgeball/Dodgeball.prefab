@@ -117,6 +117,18 @@ MonoBehaviour:
   linearDamping: 0.5
   carryHeight: 0.5
   lobApex: 1.2
+  headZoneMinHeight: 0.9
+  limbZoneMaxHeight: 0.3
+  thrownToLooseSpeed: 4
+  headBounceFactor: 0.25
+  headBounceArcApex: 1.2
+  headBounceArcDuration: 0.6
+  torsoBounceFactor: 0.6
+  torsoBounceArcApex: 0.3
+  torsoBounceArcDuration: 0.3
+  limbBounceFactor: 0.35
+  limbBounceArcApex: 0.15
+  limbBounceArcDuration: 0.25
   shadowFalloffHeight: 1.5
   shadowMinScale: 0.4
   ballRadius: 0.12
