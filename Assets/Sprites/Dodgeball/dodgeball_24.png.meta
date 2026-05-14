@@ -1,10 +1,10 @@
 fileFormatVersion: 2
-guid: 99d7718d54bc4a64e8a86005cf22db69
+guid: 091a6f08de0340b409dea4a64a928656
 TextureImporter:
   internalIDToNameTable:
   - first:
-      213: -994236666064013784
-    second: dodgeball_0
+      213: 6391502430797514526
+    second: dodgeball_24_0
   externalObjects: {}
   serializedVersion: 13
   mipmaps:
@@ -100,23 +100,23 @@ TextureImporter:
     serializedVersion: 2
     sprites:
     - serializedVersion: 2
-      name: dodgeball_0
+      name: dodgeball_24_0
       rect:
         serializedVersion: 2
         x: 0
         y: 0
-        width: 48
-        height: 48
+        width: 24
+        height: 24
       alignment: 0
-      pivot: {x: 0.5, y: 0.5}
+      pivot: {x: 0, y: 0}
       border: {x: 0, y: 0, z: 0, w: 0}
       customData: 
       outline: []
       physicsShape: []
       tessellationDetail: -1
       bones: []
-      spriteID: 826f5981503c332f0800000000000000
-      internalID: -994236666064013784
+      spriteID: e174bb0e89d23b850800000000000000
+      internalID: 6391502430797514526
       vertices: []
       indices: 
       edges: []
@@ -125,7 +125,7 @@ TextureImporter:
     customData: 
     physicsShape: []
     bones: []
-    spriteID: 7875cdc564e3af344950d1df0473dc70
+    spriteID: 
     internalID: 0
     vertices: []
     indices: 
@@ -134,8 +134,7 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable:
-      dodgeball_0: -994236666064013784
+    nameFileIdTable: {}
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
