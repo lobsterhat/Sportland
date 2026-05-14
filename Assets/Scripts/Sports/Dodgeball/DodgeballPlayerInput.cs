@@ -29,6 +29,12 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Hold longer than this (seconds) for chest pass; release sooner for lob.")]
         [SerializeField] private float passTapThreshold = 0.18f;
 
+        [Header("Throw aim assist")]
+        [Tooltip("Half-angle of the throw cone (degrees). Opponents whose bearing from the thrower " +
+                 "lies within this many degrees of the press direction are eligible targets; the " +
+                 "nearest one becomes the actual throw target.")]
+        [SerializeField] private float throwConeHalfAngleDegrees = 15f;
+
         [Header("Run mode (D-pad double-tap)")]
         [Tooltip("Seconds with no movement input before run mode disengages. " +
                  "Tiny grace lets D-pad rolls between directions stay running.")]
@@ -108,7 +114,50 @@ namespace Sportland.Sports.Dodgeball
         {
             var ball = tracker.HeldBall;
             if (ball == null) return;
-            ball.Throw(lastMoveDirection, throwPower);
+            Vector2 dir = ResolveThrowDirection(lastMoveDirection);
+            ball.Throw(dir, throwPower);
+        }
+
+        /// <summary>
+        /// Aim-assist for throws: if any opponent's bearing from the thrower
+        /// is within throwConeHalfAngleDegrees of the press direction, return
+        /// the direction to the nearest one. Otherwise return the press
+        /// direction unchanged.
+        /// </summary>
+        private Vector2 ResolveThrowDirection(Vector2 desired)
+        {
+            if (desired.sqrMagnitude < 0.0001f) desired = Vector2.right;
+            Vector2 dirNorm = desired.normalized;
+
+            float cosThreshold = Mathf.Cos(throwConeHalfAngleDegrees * Mathf.Deg2Rad);
+            Vector2 origin = transform.position;
+            var team = tracker.Spawn.team;
+
+            PlayerZoneTracker best = null;
+            float bestDistSq = float.MaxValue;
+
+            var trackers = PlayerZoneTracker.All;
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null || t == tracker) continue;
+                if (t.Spawn.team == team) continue;  // throw targets opponents only
+
+                Vector2 toT = (Vector2)t.transform.position - origin;
+                float distSq = toT.sqrMagnitude;
+                if (distSq < 0.0001f) continue;
+                if (Vector2.Dot(dirNorm, toT / Mathf.Sqrt(distSq)) < cosThreshold) continue;
+
+                if (distSq < bestDistSq)
+                {
+                    bestDistSq = distSq;
+                    best = t;
+                }
+            }
+
+            return best != null
+                ? ((Vector2)best.transform.position - origin).normalized
+                : dirNorm;
         }
 
         private void OnPassStarted(InputAction.CallbackContext _)
