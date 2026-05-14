@@ -14,8 +14,8 @@ namespace Sportland.Sports.Dodgeball
     public class PlayerMovement : MonoBehaviour
     {
         [Header("Movement")]
-        [SerializeField] private float moveSpeed = 6f;     // units/sec at walk
-        [SerializeField] private float sprintSpeed = 9f;   // units/sec while sprinting
+        [SerializeField] private float moveSpeed = 5f;     // units/sec at walk
+        [SerializeField] private float sprintSpeed = 7f;   // units/sec while sprinting
         [Tooltip("Linear velocity change rate (units/sec^2) used to ramp toward " +
                  "the target velocity. Higher = snappier, lower = more inertia.")]
         [SerializeField] private float acceleration = 40f;
