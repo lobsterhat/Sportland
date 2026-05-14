@@ -41,8 +41,8 @@ namespace Sportland.Sports.Dodgeball
         [Header("Height")]
         [SerializeField] private float carryHeight = 0.5f;
         [SerializeField] private float lobApex = 1.2f;
-        [Tooltip("After a Throw, Height decays from launch height back toward carryHeight at this rate (units/sec).")]
-        [SerializeField] private float throwHeightFallRate = 2.5f;
+        [Tooltip("Constant downward acceleration applied to Height in the Thrown state (units/sec^2).")]
+        [SerializeField] private float gravity = 12f;
 
         [Header("Throw bounce zones")]
         [Tooltip("Ball Height at/above this lands in the head zone.")]
@@ -115,6 +115,10 @@ namespace Sportland.Sports.Dodgeball
         private float bounceArcDuration;
         private float bounceArcApex;
         private float bounceStartHeight;
+
+        // Thrown state vertical kinematics. Positive = rising; gravity pulls
+        // it negative; ground impacts flip it via bounceRestitution.
+        private float heightVelocity;
 
         public PlayerZoneTracker Carrier => carrier;
 
@@ -202,10 +206,36 @@ namespace Sportland.Sports.Dodgeball
 
         private void UpdateThrown()
         {
-            Height = Mathf.MoveTowards(Height, carryHeight, throwHeightFallRate * Time.deltaTime);
+            // Gravity pulls the ball down continuously. Initial vertical
+            // velocity is 0 (set in Throw), so the trajectory is a parabola
+            // from the launch height to the floor.
+            heightVelocity -= gravity * Time.deltaTime;
+            Height += heightVelocity * Time.deltaTime;
+
+            if (Height <= 0f && heightVelocity < 0f)
+            {
+                Height = 0f;
+                rb.linearVelocity *= bounceLateralFriction;
+                heightVelocity = -heightVelocity * bounceRestitution;
+
+                // If the next vertical arc would peak below minBounceApex,
+                // the ball is essentially settled — let it roll to a stop.
+                float predictedApex = (heightVelocity * heightVelocity) / (2f * gravity);
+                if (predictedApex < minBounceApex)
+                {
+                    heightVelocity = 0f;
+                    EnterLoose();
+                    return;
+                }
+            }
+
             TryThrownInteraction();
             if (state != State.Thrown) return;
-            if (rb.linearVelocity.sqrMagnitude < thrownToLooseSpeed * thrownToLooseSpeed)
+
+            // Only fall back to Loose once the ball has settled on the ground
+            // and slowed laterally.
+            if (Height <= 0f
+                && rb.linearVelocity.sqrMagnitude < thrownToLooseSpeed * thrownToLooseSpeed)
             {
                 EnterLoose();
             }
@@ -440,6 +470,7 @@ namespace Sportland.Sports.Dodgeball
 
             rb.simulated = true;
             rb.linearVelocity = direction.normalized * power;
+            heightVelocity = 0f;
             state = State.Thrown;
         }
 

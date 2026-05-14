@@ -117,6 +117,7 @@ MonoBehaviour:
   linearDamping: 1.4
   carryHeight: 0.5
   lobApex: 1.2
+  gravity: 12
   headZoneMinHeight: 0.9
   limbZoneMaxHeight: 0.3
   thrownToLooseSpeed: 4

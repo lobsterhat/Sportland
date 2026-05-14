@@ -21,7 +21,7 @@ namespace Sportland.Sports.Dodgeball
         public static DodgeballPlayerInput Current { get; private set; }
 
         [Header("Power")]
-        [SerializeField] private float throwPower = 18f;
+        [SerializeField] private float throwPower = 24f;
         [SerializeField] private float lobPassSpeed = 6f;
         [SerializeField] private float chestPassSpeed = 12f;
 
