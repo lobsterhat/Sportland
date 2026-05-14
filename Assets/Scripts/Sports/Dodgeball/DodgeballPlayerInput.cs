@@ -29,12 +29,20 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Hold longer than this (seconds) for chest pass; release sooner for lob.")]
         [SerializeField] private float passTapThreshold = 0.18f;
 
+        [Header("Run mode (D-pad double-tap)")]
+        [Tooltip("Seconds with no movement input before run mode disengages. " +
+                 "Tiny grace lets D-pad rolls between directions stay running.")]
+        [SerializeField] private float runReleaseGrace = 0.08f;
+
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
         private DodgeballInputActions actions;
 
         private Vector2 lastMoveDirection = Vector2.right;
         private float passPressTime = -1f;
+
+        private bool isRunning;
+        private float idleTime;
 
         // Pending pass we issued: the catch handler watches for this ball to
         // arrive at intendedPassTarget so it can hand control off.
@@ -51,6 +59,7 @@ namespace Sportland.Sports.Dodgeball
             actions.Pass.started         += OnPassStarted;
             actions.Pass.canceled        += OnPassCanceled;
             actions.ReturnBall.performed += OnReturnBallPressed;
+            actions.Run.performed        += OnRunDoubleTap;
 
             Current = this;
         }
@@ -67,6 +76,7 @@ namespace Sportland.Sports.Dodgeball
                 actions.Pass.started         -= OnPassStarted;
                 actions.Pass.canceled        -= OnPassCanceled;
                 actions.ReturnBall.performed -= OnReturnBallPressed;
+                actions.Run.performed        -= OnRunDoubleTap;
                 actions.Disable();
             }
             if (passedBall != null) passedBall.OnAttached -= OnPassedBallCaught;
@@ -76,13 +86,23 @@ namespace Sportland.Sports.Dodgeball
         private void Update()
         {
             Vector2 input = actions.Move.ReadValue<Vector2>();
-            if (input.sqrMagnitude > 0.04f) lastMoveDirection = input.normalized;
+            if (input.sqrMagnitude > 0.04f)
+            {
+                lastMoveDirection = input.normalized;
+                idleTime = 0f;
+            }
+            else
+            {
+                idleTime += Time.deltaTime;
+                if (idleTime >= runReleaseGrace) isRunning = false;
+            }
 
-            movement.IsSprinting = actions.Sprint.IsPressed();
+            movement.IsSprinting = isRunning || actions.Sprint.IsPressed();
             movement.ApplyMove(input);
         }
 
         private void OnJumpPressed(InputAction.CallbackContext _) => movement.TryJump();
+        private void OnRunDoubleTap(InputAction.CallbackContext _) => isRunning = true;
 
         private void OnThrowPressed(InputAction.CallbackContext _)
         {

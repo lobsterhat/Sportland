@@ -16,6 +16,9 @@ namespace Sportland.Sports.Dodgeball
         [Header("Movement")]
         [SerializeField] private float moveSpeed = 6f;     // units/sec at walk
         [SerializeField] private float sprintSpeed = 9f;   // units/sec while sprinting
+        [Tooltip("Linear velocity change rate (units/sec^2) used to ramp toward " +
+                 "the target velocity. Higher = snappier, lower = more inertia.")]
+        [SerializeField] private float acceleration = 40f;
         [SerializeField] private float jumpHeight = 1.5f;  // peak hop height
         [SerializeField] private float jumpDuration = 0.6f;
 
@@ -51,12 +54,16 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>
         /// Move the player by an analog input vector. Magnitude (0..1) scales
         /// speed; vectors over length 1 (e.g. keyboard diagonals) are clamped.
+        /// Current velocity ramps toward the target at the configured
+        /// acceleration so changes of direction and start/stop both have weight.
         /// </summary>
         public void ApplyMove(Vector2 input)
         {
             Vector2 clamped = input.sqrMagnitude > 1f ? input.normalized : input;
             float speed = IsSprinting ? sprintSpeed : moveSpeed;
-            rb.linearVelocity = clamped * speed;
+            Vector2 target = clamped * speed;
+            rb.linearVelocity = Vector2.MoveTowards(
+                rb.linearVelocity, target, acceleration * Time.deltaTime);
         }
 
         public void TryJump()
