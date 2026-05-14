@@ -30,6 +30,9 @@ namespace Sportland.Sports.Dodgeball
         [Header("Pickup")]
         [SerializeField] private float pickupRadius = 0.6f;
         [SerializeField] private float throwerPickupCooldown = 0.4f;
+        [Tooltip("A ball above this Height is overhead and not catchable. " +
+                 "Set just above carryHeight to make chest passes catchable but block lob interceptions mid-arc.")]
+        [SerializeField] private float pickupMaxHeight = 0.7f;
 
         [Header("Physics")]
         [SerializeField] private float linearDamping = 0.5f;
@@ -168,6 +171,8 @@ namespace Sportland.Sports.Dodgeball
 
         private void TryPickup()
         {
+            if (Height > pickupMaxHeight) return;
+
             var trackers = PlayerZoneTracker.All;
             Vector2 ballPos = transform.position;
             for (int i = 0; i < trackers.Count; i++)

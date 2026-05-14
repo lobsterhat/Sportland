@@ -112,8 +112,9 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   pickupRadius: 0.6
-  linearDamping: 0.5
   throwerPickupCooldown: 0.4
+  pickupMaxHeight: 0.7
+  linearDamping: 0.5
   carryHeight: 0.5
   lobApex: 1.2
   shadowFalloffHeight: 1.5
