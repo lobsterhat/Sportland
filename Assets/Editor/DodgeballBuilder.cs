@@ -44,7 +44,7 @@ namespace Sportland.Sports.Dodgeball.EditorTools
                 options          = BuildOptions.None,
             };
 
-            Debug.Log($"[DodgeballBuilder] Building {output} ...");
+            Debug.Log($"[DodgeballBuilder] Building {output} (scene: {SceneAsset}) ...");
             BuildReport report  = BuildPipeline.BuildPlayer(options);
             BuildSummary summary = report.summary;
 
