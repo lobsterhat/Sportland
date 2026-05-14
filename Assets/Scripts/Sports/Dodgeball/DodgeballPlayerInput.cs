@@ -113,16 +113,17 @@ namespace Sportland.Sports.Dodgeball
             var target = FindPassTarget();
             if (target == null) return;
 
-            Vector2 dir = ((Vector2)target.transform.position - (Vector2)transform.position).normalized;
-            if (dir.sqrMagnitude < 0.0001f) dir = lastMoveDirection;
-
             // Clear any stale subscription before recording the new pass.
             if (passedBall != null) passedBall.OnAttached -= OnPassedBallCaught;
             passedBall = ball;
             intendedPassTarget = target;
             passedBall.OnAttached += OnPassedBallCaught;
 
-            ball.Throw(dir, isChest ? chestPassSpeed : lobPassSpeed);
+            // Parametric drive — ball lerps to target's current position; lob
+            // adds an arc, chest stays flat. Speed sets the flight duration.
+            ball.Pass(target.transform.position,
+                      isChest ? chestPassSpeed : lobPassSpeed,
+                      isLob: !isChest);
         }
 
         private void OnPassedBallCaught(PlayerZoneTracker catcher)
