@@ -28,6 +28,9 @@ namespace Sportland.Sports.Dodgeball
 
         public PlayerZoneTracker Carrier => carrier;
 
+        /// <summary>Fires whenever the ball attaches to a player (pickup, pass catch, or ForcePickup).</summary>
+        public event System.Action<PlayerZoneTracker> OnAttached;
+
         private void Awake()
         {
             rb = GetComponent<Rigidbody2D>();
@@ -96,6 +99,25 @@ namespace Sportland.Sports.Dodgeball
             t.HeldBall = this;
             rb.linearVelocity = Vector2.zero;
             rb.simulated = false;
+            OnAttached?.Invoke(t);
+        }
+
+        /// <summary>
+        /// Debug / scripted attach — detaches from the current carrier (if any)
+        /// and snaps the ball onto the target, bypassing cooldown and range.
+        /// </summary>
+        public void ForcePickup(PlayerZoneTracker t)
+        {
+            if (t == null) return;
+            if (carrier != null && carrier != t)
+            {
+                carrier.HeldBall = null;
+                carrier = null;
+            }
+            recentThrower = null;
+            throwerCooldownRemaining = 0f;
+            transform.position = (Vector2)t.transform.position + carryOffset;
+            AttachTo(t);
         }
 
         /// <summary>
