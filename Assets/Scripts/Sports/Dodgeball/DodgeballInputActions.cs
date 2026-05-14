@@ -10,9 +10,9 @@ namespace Sportland.Sports.Dodgeball
     ///                 (analog magnitude respected on the stick; D-pad is digital)
     ///   Sprint      — L2 / Left Shift                  (hold)
     ///   Run         — D-pad double-tap (any direction) (sticky while D-pad held)
-    ///   Jump        — Triangle / Space
+    ///   Jump        — Cross / Space
     ///   Throw       — Circle / Q                       (only fires while holding the ball)
-    ///   Pass        — Cross / F                        (tap = lob, hold = chest;
+    ///   Pass        — Square / F                       (tap = lob, hold = chest;
     ///                                                   target = teammate most aligned
     ///                                                   with last move direction)
     ///   ReturnBall  — L1 / 1                           (debug: snap ball to player)
@@ -62,7 +62,7 @@ namespace Sportland.Sports.Dodgeball
 
             Jump = actionMap.AddAction("Jump", InputActionType.Button);
             Jump.AddBinding("<Keyboard>/space");
-            Jump.AddBinding("<Gamepad>/buttonNorth");
+            Jump.AddBinding("<Gamepad>/buttonSouth");
 
             Throw = actionMap.AddAction("Throw", InputActionType.Button);
             Throw.AddBinding("<Keyboard>/q");
@@ -70,7 +70,7 @@ namespace Sportland.Sports.Dodgeball
 
             Pass = actionMap.AddAction("Pass", InputActionType.Button);
             Pass.AddBinding("<Keyboard>/f");
-            Pass.AddBinding("<Gamepad>/buttonSouth");
+            Pass.AddBinding("<Gamepad>/buttonWest");
 
             ReturnBall = actionMap.AddAction("ReturnBall", InputActionType.Button);
             ReturnBall.AddBinding("<Keyboard>/1");
