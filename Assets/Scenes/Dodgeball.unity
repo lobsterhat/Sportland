@@ -251,6 +251,7 @@ MonoBehaviour:
   m_Name:
   m_EditorClassIdentifier:
   spritePrefab: {fileID: 4757217570519896899, guid: 4adc7eabe311b964a92f8c7f53624d2d, type: 3}
+  ballPrefab: {fileID: 100000001, guid: 257205362ecf75460ceb5498e38b3123, type: 3}
   courtPrefab: {fileID: 0}
   centerLinePrefab: {fileID: 0}
   playerControlledId: A_In_2

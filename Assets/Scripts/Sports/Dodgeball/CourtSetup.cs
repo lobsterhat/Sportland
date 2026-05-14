@@ -52,6 +52,9 @@ namespace Sportland.Sports.Dodgeball
         // which PlayerMovement bobs for the jump arc. Team tint is applied at
         // runtime via DodgeballPlayerVisual.
         [SerializeField] private GameObject spritePrefab;
+        // Optional prefab for the dodgeball. Must carry the Ball component
+        // itself; if null, CourtSetup spawns a procedural ball at runtime.
+        [SerializeField] private GameObject ballPrefab;
         [SerializeField] private GameObject courtPrefab;       // optional: visual court sprite
         [SerializeField] private GameObject centerLinePrefab;  // optional: visual divider
 
@@ -72,10 +75,19 @@ namespace Sportland.Sports.Dodgeball
 
         private void SpawnBall()
         {
-            var ballGO = new GameObject("Ball");
-            ballGO.transform.SetParent(transform, false);
-            ballGO.transform.position = Vector3.zero;
-            ballGO.AddComponent<Ball>();
+            GameObject ballGO;
+            if (ballPrefab != null)
+            {
+                ballGO = Instantiate(ballPrefab, transform);
+                ballGO.name = ballPrefab.name;
+            }
+            else
+            {
+                ballGO = new GameObject("Ball");
+                ballGO.transform.SetParent(transform, false);
+                ballGO.AddComponent<Ball>();
+            }
+            ballGO.transform.localPosition = Vector3.zero;
         }
 
         private void BuildCourt()

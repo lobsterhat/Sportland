@@ -30,16 +30,26 @@ namespace Sportland.Sports.Dodgeball
 
         private void Awake()
         {
-            rb = gameObject.AddComponent<Rigidbody2D>();
+            rb = GetComponent<Rigidbody2D>();
+            if (rb == null) rb = gameObject.AddComponent<Rigidbody2D>();
             rb.gravityScale = 0f;
             rb.linearDamping = linearDamping;
             rb.freezeRotation = true;
 
-            var col = gameObject.AddComponent<CircleCollider2D>();
-            col.radius = ballRadius;
-            col.isTrigger = true;
+            var col = GetComponent<CircleCollider2D>();
+            if (col == null)
+            {
+                col = gameObject.AddComponent<CircleCollider2D>();
+                col.radius = ballRadius;
+                col.isTrigger = true;
+            }
 
-            BuildVisual();
+            // Only build the procedural visual when nothing's rendering yet
+            // (i.e. we weren't instantiated from a sprite-bearing prefab).
+            if (GetComponentInChildren<Renderer>() == null)
+            {
+                BuildVisual();
+            }
         }
 
         private void Update()
