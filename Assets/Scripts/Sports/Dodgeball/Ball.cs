@@ -21,6 +21,12 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float ballRadius = 0.25f;
         [SerializeField] private Color ballColor = new Color(0.98f, 0.85f, 0.25f, 1f);
 
+        [Header("Shadow")]
+        [SerializeField] private float shadowWidth = 0.18f;
+        [SerializeField] private float shadowHeight = 0.06f;
+        [SerializeField] private Vector2 shadowOffset = new Vector2(0f, -0.08f);
+        [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, 0.4f);
+
         private Rigidbody2D rb;
         private PlayerZoneTracker carrier;
         private PlayerZoneTracker recentThrower;
@@ -53,6 +59,8 @@ namespace Sportland.Sports.Dodgeball
             {
                 BuildVisual();
             }
+
+            BuildShadow();
         }
 
         private void Update()
@@ -137,6 +145,51 @@ namespace Sportland.Sports.Dodgeball
 
             rb.simulated = true;
             rb.linearVelocity = direction.normalized * power;
+        }
+
+        // Small flat ellipse rendered behind the ball sprite. Currently
+        // fixed in world Y relative to the ball — when we add real height
+        // tracking, this should stay grounded while the visual rises.
+        private void BuildShadow()
+        {
+            if (transform.Find("Shadow") != null) return;
+
+            var go = new GameObject("Shadow");
+            go.transform.SetParent(transform, false);
+            go.transform.localPosition = new Vector3(shadowOffset.x, shadowOffset.y, 0f);
+
+            var mf = go.AddComponent<MeshFilter>();
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = new Material(Shader.Find("Sprites/Default")) { color = shadowColor };
+            mr.sortingOrder = LowestVisualSortingOrder() - 1;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+
+            const int segs = 20;
+            var verts = new Vector3[segs + 1];
+            var tris  = new int[segs * 3];
+            verts[0] = Vector3.zero;
+            for (int i = 0; i < segs; i++)
+            {
+                float a = i * Mathf.PI * 2f / segs;
+                verts[i + 1] = new Vector3(Mathf.Cos(a) * shadowWidth, Mathf.Sin(a) * shadowHeight, 0f);
+                tris[i * 3]     = 0;
+                tris[i * 3 + 1] = i + 1;
+                tris[i * 3 + 2] = (i + 1) % segs + 1;
+            }
+            var mesh = new Mesh { name = "BallShadow", vertices = verts, triangles = tris };
+            mesh.RecalculateNormals();
+            mf.mesh = mesh;
+        }
+
+        private int LowestVisualSortingOrder()
+        {
+            int min = int.MaxValue;
+            foreach (var r in GetComponentsInChildren<Renderer>())
+            {
+                if (r.sortingOrder < min) min = r.sortingOrder;
+            }
+            return min == int.MaxValue ? 0 : min;
         }
 
         private void BuildVisual()
