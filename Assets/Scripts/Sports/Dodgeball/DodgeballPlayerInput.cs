@@ -39,6 +39,8 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Seconds with no movement input before run mode disengages. " +
                  "Tiny grace lets D-pad rolls between directions stay running.")]
         [SerializeField] private float runReleaseGrace = 0.08f;
+        [Tooltip("Two presses of the same D-pad direction within this window (seconds) latch run mode on.")]
+        [SerializeField] private float doubleTapWindow = 0.3f;
 
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
@@ -49,6 +51,10 @@ namespace Sportland.Sports.Dodgeball
 
         private bool isRunning;
         private float idleTime;
+
+        // Last .started time for each D-pad direction, used to detect
+        // same-direction double-taps. Indexed up / down / left / right.
+        private readonly float[] lastDpadPressTime = new float[] { -10f, -10f, -10f, -10f };
 
         // Pending pass we issued: the catch handler watches for this ball to
         // arrive at intendedPassTarget so it can hand control off.
@@ -65,7 +71,10 @@ namespace Sportland.Sports.Dodgeball
             actions.Pass.started         += OnPassStarted;
             actions.Pass.canceled        += OnPassCanceled;
             actions.ReturnBall.performed += OnReturnBallPressed;
-            actions.Run.performed        += OnRunDoubleTap;
+            actions.DpadUp.started       += OnDpadUpPressed;
+            actions.DpadDown.started     += OnDpadDownPressed;
+            actions.DpadLeft.started     += OnDpadLeftPressed;
+            actions.DpadRight.started    += OnDpadRightPressed;
 
             Current = this;
         }
@@ -82,7 +91,10 @@ namespace Sportland.Sports.Dodgeball
                 actions.Pass.started         -= OnPassStarted;
                 actions.Pass.canceled        -= OnPassCanceled;
                 actions.ReturnBall.performed -= OnReturnBallPressed;
-                actions.Run.performed        -= OnRunDoubleTap;
+                actions.DpadUp.started       -= OnDpadUpPressed;
+                actions.DpadDown.started     -= OnDpadDownPressed;
+                actions.DpadLeft.started     -= OnDpadLeftPressed;
+                actions.DpadRight.started    -= OnDpadRightPressed;
                 actions.Disable();
             }
             if (passedBall != null) passedBall.OnAttached -= OnPassedBallCaught;
@@ -108,7 +120,24 @@ namespace Sportland.Sports.Dodgeball
         }
 
         private void OnJumpPressed(InputAction.CallbackContext _) => movement.TryJump();
-        private void OnRunDoubleTap(InputAction.CallbackContext _) => isRunning = true;
+
+        private void OnDpadUpPressed(InputAction.CallbackContext _)    => HandleDpadPress(0);
+        private void OnDpadDownPressed(InputAction.CallbackContext _)  => HandleDpadPress(1);
+        private void OnDpadLeftPressed(InputAction.CallbackContext _)  => HandleDpadPress(2);
+        private void OnDpadRightPressed(InputAction.CallbackContext _) => HandleDpadPress(3);
+
+        // Same-direction double-tap detection: if the same D-pad direction was
+        // .started twice within doubleTapWindow, latch isRunning so subsequent
+        // holds of that direction sprint instead of walk.
+        private void HandleDpadPress(int dirIndex)
+        {
+            float now = Time.unscaledTime;
+            if (now - lastDpadPressTime[dirIndex] <= doubleTapWindow)
+            {
+                isRunning = true;
+            }
+            lastDpadPressTime[dirIndex] = now;
+        }
 
         private void OnThrowPressed(InputAction.CallbackContext _)
         {

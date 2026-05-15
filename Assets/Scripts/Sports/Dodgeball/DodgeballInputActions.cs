@@ -21,11 +21,19 @@ namespace Sportland.Sports.Dodgeball
     {
         public InputAction Move       { get; private set; }
         public InputAction Sprint     { get; private set; }
-        public InputAction Run        { get; private set; }
         public InputAction Jump       { get; private set; }
         public InputAction Throw      { get; private set; }
         public InputAction Pass       { get; private set; }
         public InputAction ReturnBall { get; private set; }
+
+        // Per-direction D-pad press actions. The input layer watches their
+        // .started callbacks to detect a same-direction double-tap and engage
+        // run mode without requiring the second tap to release (which is what
+        // a built-in multiTap interaction would demand).
+        public InputAction DpadUp     { get; private set; }
+        public InputAction DpadDown   { get; private set; }
+        public InputAction DpadLeft   { get; private set; }
+        public InputAction DpadRight  { get; private set; }
 
         private readonly InputActionMap actionMap;
 
@@ -51,14 +59,16 @@ namespace Sportland.Sports.Dodgeball
             Sprint.AddBinding("<Keyboard>/leftShift");
             Sprint.AddBinding("<Gamepad>/leftTrigger");
 
-            // Double-tap any D-pad direction to engage run mode. Each binding
-            // has its own multiTap state, so it's same-direction double-taps
-            // rather than any two D-pad presses within the window.
-            Run = actionMap.AddAction("Run", InputActionType.Button);
-            Run.AddBinding("<Gamepad>/dpad/up").WithInteraction("multiTap");
-            Run.AddBinding("<Gamepad>/dpad/down").WithInteraction("multiTap");
-            Run.AddBinding("<Gamepad>/dpad/left").WithInteraction("multiTap");
-            Run.AddBinding("<Gamepad>/dpad/right").WithInteraction("multiTap");
+            // Per-direction D-pad press actions for manual double-tap
+            // detection in the input layer.
+            DpadUp    = actionMap.AddAction("DpadUp",    InputActionType.Button);
+            DpadDown  = actionMap.AddAction("DpadDown",  InputActionType.Button);
+            DpadLeft  = actionMap.AddAction("DpadLeft",  InputActionType.Button);
+            DpadRight = actionMap.AddAction("DpadRight", InputActionType.Button);
+            DpadUp.AddBinding("<Gamepad>/dpad/up");
+            DpadDown.AddBinding("<Gamepad>/dpad/down");
+            DpadLeft.AddBinding("<Gamepad>/dpad/left");
+            DpadRight.AddBinding("<Gamepad>/dpad/right");
 
             Jump = actionMap.AddAction("Jump", InputActionType.Button);
             Jump.AddBinding("<Keyboard>/space");
