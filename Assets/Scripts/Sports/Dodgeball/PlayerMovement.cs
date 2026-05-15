@@ -21,20 +21,25 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Local Y offset from the root down to where the floor visually sits under this player.</summary>
         public float FootOffset => footOffset;
 
-        [Header("Movement")]
-        [SerializeField] private float moveSpeed = 4f;     // units/sec at walk
-        [SerializeField] private float sprintSpeed = 6f;   // units/sec while sprinting
+        [Header("Speed")]
+        [Tooltip("Top speed (units/sec) when not running.")]
+        [SerializeField] private float walkSpeed = 4f;
+        [Tooltip("Top speed (units/sec) while running (D-pad double-tap or L2 hold).")]
+        [SerializeField] private float runSpeed = 6f;
         [Tooltip("Linear velocity change rate (units/sec^2) used to ramp toward " +
                  "the target velocity. Higher = snappier, lower = more inertia.")]
         [SerializeField] private float acceleration = 40f;
+
+        [Header("Jump")]
         [SerializeField] private float jumpHeight = 1.5f;  // peak hop height
         [SerializeField] private float jumpDuration = 0.6f;
 
         /// <summary>
-        /// When true, ApplyMove scales by sprintSpeed instead of moveSpeed.
-        /// The input layer mirrors L2 / Left Shift pressed state into this.
+        /// When true, ApplyMove scales by runSpeed instead of walkSpeed.
+        /// The input layer flips this on each frame from D-pad double-tap latch
+        /// and/or L2 (Sprint) hold state.
         /// </summary>
-        public bool IsSprinting { get; set; }
+        public bool IsRunning { get; set; }
 
         private Rigidbody2D rb;
         private float jumpTimer = -1f;
@@ -71,7 +76,7 @@ namespace Sportland.Sports.Dodgeball
         public void ApplyMove(Vector2 input)
         {
             Vector2 clamped = input.sqrMagnitude > 1f ? input.normalized : input;
-            float speed = IsSprinting ? sprintSpeed : moveSpeed;
+            float speed = IsRunning ? runSpeed : walkSpeed;
             Vector2 target = clamped * speed;
             rb.linearVelocity = Vector2.MoveTowards(
                 rb.linearVelocity, target, acceleration * Time.deltaTime);

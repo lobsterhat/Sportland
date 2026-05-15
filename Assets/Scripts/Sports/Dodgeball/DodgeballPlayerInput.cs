@@ -103,7 +103,7 @@ namespace Sportland.Sports.Dodgeball
                 if (idleTime >= runReleaseGrace) isRunning = false;
             }
 
-            movement.IsSprinting = isRunning || actions.Sprint.IsPressed();
+            movement.IsRunning = isRunning || actions.Sprint.IsPressed();
             movement.ApplyMove(input);
         }
 
