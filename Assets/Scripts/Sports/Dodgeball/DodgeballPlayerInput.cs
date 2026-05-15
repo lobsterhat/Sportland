@@ -35,12 +35,14 @@ namespace Sportland.Sports.Dodgeball
                  "nearest one becomes the actual throw target.")]
         [SerializeField] private float throwConeHalfAngleDegrees = 15f;
 
-        [Header("Run mode (D-pad double-tap)")]
+        [Header("Run mode (D-pad second-tap-while-moving)")]
         [Tooltip("Seconds with no movement input before run mode disengages. " +
                  "Tiny grace lets D-pad rolls between directions stay running.")]
         [SerializeField] private float runReleaseGrace = 0.08f;
-        [Tooltip("Two presses of the same D-pad direction within this window (seconds) latch run mode on.")]
-        [SerializeField] private float doubleTapWindow = 0.3f;
+        [Tooltip("How long the previous D-pad press direction stays \"in memory\" after movement " +
+                 "input has dropped (seconds). A second press of that direction within this window " +
+                 "engages run; longer than this and the next press is a fresh first tap.")]
+        [SerializeField] private float directionMemorySeconds = 0.5f;
 
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
@@ -52,9 +54,12 @@ namespace Sportland.Sports.Dodgeball
         private bool isRunning;
         private float idleTime;
 
-        // Last .started time for each D-pad direction, used to detect
-        // same-direction double-taps. Indexed up / down / left / right.
-        private readonly float[] lastDpadPressTime = new float[] { -10f, -10f, -10f, -10f };
+        // Direction memory for second-tap-while-moving run detection. The
+        // previous D-pad press direction is held until movement has been
+        // idle for longer than directionMemorySeconds; pressing that same
+        // direction inside the window engages run.
+        private int previousDpadDirIndex = -1;
+        private float lastMovementActiveTime = -10f;
 
         // Pending pass we issued: the catch handler watches for this ball to
         // arrive at intendedPassTarget so it can hand control off.
@@ -108,11 +113,18 @@ namespace Sportland.Sports.Dodgeball
             {
                 lastMoveDirection = input.normalized;
                 idleTime = 0f;
+                lastMovementActiveTime = Time.unscaledTime;
             }
             else
             {
                 idleTime += Time.deltaTime;
                 if (idleTime >= runReleaseGrace) isRunning = false;
+                // Once movement input has been idle long enough, forget the
+                // previous direction so the next press starts a fresh session.
+                if (Time.unscaledTime - lastMovementActiveTime > directionMemorySeconds)
+                {
+                    previousDpadDirIndex = -1;
+                }
             }
 
             movement.IsRunning = isRunning || actions.Sprint.IsPressed();
@@ -126,17 +138,20 @@ namespace Sportland.Sports.Dodgeball
         private void OnDpadLeftPressed(InputAction.CallbackContext _)  => HandleDpadPress(2);
         private void OnDpadRightPressed(InputAction.CallbackContext _) => HandleDpadPress(3);
 
-        // Same-direction double-tap detection: if the same D-pad direction was
-        // .started twice within doubleTapWindow, latch isRunning so subsequent
-        // holds of that direction sprint instead of walk.
+        // Run engages on a second press of the direction the player is
+        // currently moving in. Time between presses is irrelevant — what
+        // matters is that movement has stayed active (input non-zero within
+        // directionMemorySeconds) since the previous press of this same
+        // direction. The check uses previousDpadDirIndex, which the Update
+        // loop resets when movement has been idle long enough.
         private void HandleDpadPress(int dirIndex)
         {
-            float now = Time.unscaledTime;
-            if (now - lastDpadPressTime[dirIndex] <= doubleTapWindow)
+            if (previousDpadDirIndex == dirIndex)
             {
                 isRunning = true;
             }
-            lastDpadPressTime[dirIndex] = now;
+            previousDpadDirIndex = dirIndex;
+            lastMovementActiveTime = Time.unscaledTime;
         }
 
         private void OnThrowPressed(InputAction.CallbackContext _)
