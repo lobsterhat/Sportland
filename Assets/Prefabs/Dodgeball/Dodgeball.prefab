@@ -113,13 +113,14 @@ MonoBehaviour:
   m_EditorClassIdentifier:
   pickupRadius: 0.6
   throwerPickupCooldown: 0.4
-  pickupMaxHeight: 0.7
+  pickupMaxHeight: 1.5
   linearDamping: 1.4
-  carryHeight: 0.5
+  floorOffsetY: -0.79
+  carryHeight: 1.29
   lobApex: 1.2
   gravity: 12
-  headZoneMinHeight: 0.9
-  limbZoneMaxHeight: 0.3
+  headZoneMinHeight: 1.4
+  limbZoneMaxHeight: 0.6
   thrownToLooseSpeed: 4
   headBounceFactor: 0.25
   headBounceArcApex: 1.2
@@ -134,7 +135,7 @@ MonoBehaviour:
   bounceLateralFriction: 0.65
   minBounceApex: 0.08
   looseFallRate: 3
-  shadowFalloffHeight: 1.5
+  shadowFalloffHeight: 2.5
   shadowMinScale: 0.4
   ballRadius: 0.12
   ballColor: {r: 0.98, g: 0.85, b: 0.25, a: 1}

@@ -33,22 +33,26 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float pickupRadius = 0.6f;
         [SerializeField] private float throwerPickupCooldown = 0.4f;
         [Tooltip("A ball above this Height is overhead and not catchable.")]
-        [SerializeField] private float pickupMaxHeight = 0.7f;
+        [SerializeField] private float pickupMaxHeight = 1.5f;
 
         [Header("Physics")]
         [SerializeField] private float linearDamping = 1.4f;
 
-        [Header("Height")]
-        [SerializeField] private float carryHeight = 0.5f;
+        [Header("Height (measured above the visible floor)")]
+        [Tooltip("Local Y offset from ball.transform.position down to the visible floor. " +
+                 "Match the player's FootOffset so a Height = 0 ball renders at foot level.")]
+        [SerializeField] private float floorOffsetY = -0.79f;
+        [Tooltip("Ball Height while carried (chest level, above feet).")]
+        [SerializeField] private float carryHeight = 1.29f;
         [SerializeField] private float lobApex = 1.2f;
         [Tooltip("Constant downward acceleration applied to Height in the Thrown state (units/sec^2).")]
         [SerializeField] private float gravity = 12f;
 
-        [Header("Throw bounce zones")]
+        [Header("Throw bounce zones (Height above the floor)")]
         [Tooltip("Ball Height at/above this lands in the head zone.")]
-        [SerializeField] private float headZoneMinHeight = 0.9f;
+        [SerializeField] private float headZoneMinHeight = 1.4f;
         [Tooltip("Ball Height at/below this lands in the limb zone.")]
-        [SerializeField] private float limbZoneMaxHeight = 0.3f;
+        [SerializeField] private float limbZoneMaxHeight = 0.6f;
         [Tooltip("When a thrown ball's speed drops below this, it transitions to Loose without hitting.")]
         [SerializeField] private float thrownToLooseSpeed = 4f;
 
@@ -79,7 +83,7 @@ namespace Sportland.Sports.Dodgeball
 
         [Header("Shadow")]
         [Tooltip("Ball Height at which the shadow has fully shrunk to shadowMinScale.")]
-        [SerializeField] private float shadowFalloffHeight = 1.5f;
+        [SerializeField] private float shadowFalloffHeight = 2.5f;
         [SerializeField, Range(0f, 1f)] private float shadowMinScale = 0.4f;
 
         [Header("Procedural fallback")]
@@ -283,22 +287,21 @@ namespace Sportland.Sports.Dodgeball
 
         private void ApplyVisualHeight()
         {
+            // Heights are measured above the floor; ball.transform.position
+            // sits sprite-center above the floor by |floorOffsetY|. So the
+            // Visual gets Height shifted down by that offset, and the Shadow
+            // lands at (floorOffsetY + shadowOffset.y) — at floor regardless
+            // of state (carried, in flight, at rest, etc).
             if (visualTransform != null)
             {
                 var p = visualTransform.localPosition;
-                visualTransform.localPosition = new Vector3(p.x, Height, p.z);
+                visualTransform.localPosition = new Vector3(p.x, Height + floorOffsetY, p.z);
             }
             if (shadowTransform != null)
             {
-                // Carrier's transform sits at their sprite center, so the floor
-                // under their feet is FootOffset below the ball's root. Drop the
-                // shadow that far when carried so it lands at the feet.
-                float shadowY = shadowOffset.y;
-                if (state == State.Carried && carrierMovement != null)
-                    shadowY += carrierMovement.FootOffset;
-
                 var sp = shadowTransform.localPosition;
-                shadowTransform.localPosition = new Vector3(shadowOffset.x, shadowY, sp.z);
+                shadowTransform.localPosition = new Vector3(
+                    shadowOffset.x, shadowOffset.y + floorOffsetY, sp.z);
 
                 if (shadowFalloffHeight > 0f)
                 {

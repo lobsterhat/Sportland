@@ -53,10 +53,19 @@ namespace Sportland.Sports.Dodgeball
 
         private string[] BuildLines()
         {
+            EnsureBall();
+            float ballSpeed  = GetBallSpeed();
+            float ballHeight = cachedBall != null ? cachedBall.Height : 0f;
+
             var input = DodgeballPlayerInput.Current;
             if (input == null)
             {
-                return new[] { "Player: (no controller)", $"Ball speed:   {GetBallSpeed():F2} u/s" };
+                return new[]
+                {
+                    "Player: (no controller)",
+                    $"Ball speed:   {ballSpeed,5:F2} u/s",
+                    $"Ball height:  {ballHeight,5:F2} u",
+                };
             }
 
             var movement = input.GetComponent<PlayerMovement>();
@@ -65,7 +74,6 @@ namespace Sportland.Sports.Dodgeball
             float playerSpeed = rb != null ? rb.linearVelocity.magnitude : 0f;
             string state      = movement != null && movement.IsRunning ? "RUN" : "walk";
             string accelStr   = movement != null && movement.IsAccelerating ? "yes" : "no";
-            float ballSpeed   = GetBallSpeed();
 
             return new[]
             {
@@ -73,12 +81,17 @@ namespace Sportland.Sports.Dodgeball
                 $"State:        {state}",
                 $"Accelerating: {accelStr}",
                 $"Ball speed:   {ballSpeed,5:F2} u/s",
+                $"Ball height:  {ballHeight,5:F2} u",
             };
+        }
+
+        private void EnsureBall()
+        {
+            if (cachedBall == null) cachedBall = FindFirstObjectByType<Ball>();
         }
 
         private float GetBallSpeed()
         {
-            if (cachedBall == null) cachedBall = FindFirstObjectByType<Ball>();
             if (cachedBall == null) return 0f;
             var rb = cachedBall.GetComponent<Rigidbody2D>();
             return rb != null ? rb.linearVelocity.magnitude : 0f;
