@@ -63,6 +63,10 @@ namespace Sportland.Sports.Dodgeball
         // infielder at (-4.5, 0).
         [SerializeField] private string playerControlledId = "A_In_2";
 
+        [Header("Diagnostics")]
+        [Tooltip("Spawn an on-screen readout of player/ball state for tuning.")]
+        [SerializeField] private bool showDiagnosticsHud = true;
+
         [Header("Runtime")]
         [SerializeField] private List<GameObject> spawnedPlayers = new List<GameObject>();
 
@@ -71,6 +75,7 @@ namespace Sportland.Sports.Dodgeball
             BuildCourt();
             SpawnAllPlayers();
             SpawnBall();
+            if (showDiagnosticsHud) gameObject.AddComponent<DodgeballDiagnosticsHUD>();
         }
 
         private void SpawnBall()

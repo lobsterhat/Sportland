@@ -25,7 +25,7 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Top speed (units/sec) when not running.")]
         [SerializeField] private float walkSpeed = 4f;
         [Tooltip("Top speed (units/sec) while running (D-pad double-tap or L2 hold).")]
-        [SerializeField] private float runSpeed = 6f;
+        [SerializeField] private float runSpeed = 8f;
         [Tooltip("Linear velocity change rate (units/sec^2) used to ramp toward " +
                  "the target velocity. Higher = snappier, lower = more inertia.")]
         [SerializeField] private float acceleration = 40f;
@@ -50,6 +50,9 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>Current vertical offset of the jump arc above the player's ground position (0 when grounded).</summary>
         public float CurrentJumpHeight { get; private set; }
+
+        /// <summary>True on frames where ApplyMove found a non-zero gap between current and target velocity.</summary>
+        public bool IsAccelerating { get; private set; }
 
         public System.Action<PlayerMovement> OnLanded;
 
@@ -78,8 +81,10 @@ namespace Sportland.Sports.Dodgeball
             Vector2 clamped = input.sqrMagnitude > 1f ? input.normalized : input;
             float speed = IsRunning ? runSpeed : walkSpeed;
             Vector2 target = clamped * speed;
+            Vector2 current = rb.linearVelocity;
+            IsAccelerating = (target - current).sqrMagnitude > 0.0001f;
             rb.linearVelocity = Vector2.MoveTowards(
-                rb.linearVelocity, target, acceleration * Time.deltaTime);
+                current, target, acceleration * Time.deltaTime);
         }
 
         public void TryJump()
