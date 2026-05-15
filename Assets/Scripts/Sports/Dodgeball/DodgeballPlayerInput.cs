@@ -114,17 +114,27 @@ namespace Sportland.Sports.Dodgeball
         {
             var ball = tracker.HeldBall;
             if (ball == null) return;
-            Vector2 dir = ResolveThrowDirection(lastMoveDirection);
-            ball.Throw(dir, throwPower);
+
+            var target = FindThrowTargetInCone(lastMoveDirection);
+            if (target != null)
+            {
+                // Ball solves the ballistic arc to reach the target.
+                ball.ThrowAt(target.transform.position, throwPower);
+            }
+            else
+            {
+                Vector2 dir = lastMoveDirection.sqrMagnitude > 0.0001f
+                    ? lastMoveDirection.normalized
+                    : Vector2.right;
+                ball.Throw(dir, throwPower);
+            }
         }
 
         /// <summary>
-        /// Aim-assist for throws: if any opponent's bearing from the thrower
-        /// is within throwConeHalfAngleDegrees of the press direction, return
-        /// the direction to the nearest one. Otherwise return the press
-        /// direction unchanged.
+        /// Aim-assist target: nearest opponent whose bearing from the thrower
+        /// is within throwConeHalfAngleDegrees of the press direction, or null.
         /// </summary>
-        private Vector2 ResolveThrowDirection(Vector2 desired)
+        private PlayerZoneTracker FindThrowTargetInCone(Vector2 desired)
         {
             if (desired.sqrMagnitude < 0.0001f) desired = Vector2.right;
             Vector2 dirNorm = desired.normalized;
@@ -154,10 +164,7 @@ namespace Sportland.Sports.Dodgeball
                     best = t;
                 }
             }
-
-            return best != null
-                ? ((Vector2)best.transform.position - origin).normalized
-                : dirNorm;
+            return best;
         }
 
         private void OnPassStarted(InputAction.CallbackContext _)

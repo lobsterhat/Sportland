@@ -454,10 +454,12 @@ namespace Sportland.Sports.Dodgeball
         }
 
         /// <summary>
-        /// Velocity-driven release at the held ball — used for the Circle throw.
-        /// Direction is normalized internally; power is units/sec.
+        /// Velocity-driven release of the held ball — used for the Circle throw.
+        /// Direction is normalized internally; power is units/sec. Vertical
+        /// release velocity defaults to 0 (a flat horizontal throw); pass
+        /// something positive to add a little arc.
         /// </summary>
-        public void Throw(Vector2 direction, float power)
+        public void Throw(Vector2 direction, float power, float verticalVelocity = 0f)
         {
             if (carrier == null) return;
             if (direction.sqrMagnitude < 0.0001f) direction = Vector2.right;
@@ -470,8 +472,32 @@ namespace Sportland.Sports.Dodgeball
 
             rb.simulated = true;
             rb.linearVelocity = direction.normalized * power;
-            heightVelocity = 0f;
+            heightVelocity = verticalVelocity;
             state = State.Thrown;
+        }
+
+        /// <summary>
+        /// Throw at a target position with enough arc to land at carryHeight
+        /// when the ball reaches the target. Drag is ignored in the math
+        /// (the ball will fall slightly short of far targets); the resulting
+        /// arc is what a "thrower aiming up" would do to extend the reach.
+        /// </summary>
+        public void ThrowAt(Vector2 targetPos, float power)
+        {
+            if (carrier == null) return;
+
+            Vector2 toTarget = targetPos - (Vector2)transform.position;
+            float dist = toTarget.magnitude;
+            if (dist < 0.01f)
+            {
+                Throw(Vector2.right, power);
+                return;
+            }
+
+            Vector2 dir = toTarget / dist;
+            float t = dist / power;
+            float vy = (carryHeight - Height + 0.5f * gravity * t * t) / t;
+            Throw(dir, power, vy);
         }
 
         /// <summary>
