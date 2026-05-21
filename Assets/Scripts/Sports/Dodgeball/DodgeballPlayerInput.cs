@@ -298,7 +298,10 @@ namespace Sportland.Sports.Dodgeball
 
         private void OnCatchPressed(InputAction.CallbackContext _)
         {
-            //TODO: active catch of a ball thrown by opponent.
+            // Already holding the ball — nothing to catch.
+            if (tracker.HasBall) return;
+            var ball = FindAnyObjectByType<Ball>();
+            if (ball != null) ball.TryCatch(tracker);
         }
 
         private void OnReturnBallPressed(InputAction.CallbackContext _)
