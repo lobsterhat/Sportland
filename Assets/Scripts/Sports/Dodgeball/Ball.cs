@@ -29,6 +29,23 @@ namespace Sportland.Sports.Dodgeball
 
         private enum State { Carried, Passing, Thrown, Bouncing, Loose }
 
+        /// <summary>Weights for the catch skill-check. All bonuses/penalties are additive on a 0..1 chance.</summary>
+        [System.Serializable]
+        public class CatchTuning
+        {
+            [Range(0f, 1f)] public float minBaseChance = 0.20f;   // at catching = 0
+            [Range(0f, 1f)] public float maxBaseChance = 0.85f;   // at catching = 100
+            public float comfortableSpeed = 8f;                   // no speed penalty at/below this
+            public float maxSpeed = 24f;                          // full speed penalty at/above this
+            [Range(0f, 1f)] public float speedPenalty = 0.40f;
+            [Range(0f, 1f)] public float throwPenalty = 0.20f;    // scaled by thrower's throwing
+            [Range(0f, 1f)] public float facingBonus = 0.15f;     // facing the ball head-on
+            [Range(0f, 1f)] public float facingPenalty = 0.60f;   // facing fully away
+            [Range(0f, 1f)] public float timingBonus = 0.20f;     // press right as the ball arrives
+            [Range(0f, 1f)] public float timingPenalty = 0.30f;   // press at the edge of the window
+            [Range(0f, 1f)] public float luckBonus = 0.15f;       // random upside scaled by luck
+        }
+
         [Header("Pickup")]
         [SerializeField] private float pickupRadius = 0.6f;
         [Tooltip("Reach of an active (button) catch — usually a touch more forgiving than the passive pickup radius.")]
@@ -36,6 +53,13 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float throwerPickupCooldown = 0.4f;
         [Tooltip("A ball above this Height is overhead and not catchable.")]
         [SerializeField] private float pickupMaxHeight = 1.5f;
+
+        [Header("Catch (skill check)")]
+        [Tooltip("A human-controlled player must press Catch within this window (seconds) before the ball arrives.")]
+        [SerializeField] private float catchArmWindow = 0.35f;
+        [Tooltip("Loose-ball speed above which securing it needs a skill catch rather than a free pickup.")]
+        [SerializeField] private float skillSpeedThreshold = 3f;
+        [SerializeField] private CatchTuning catchTuning = new CatchTuning();
 
         [Header("Physics")]
         [SerializeField] private float linearDamping = 1.4f;
@@ -320,84 +344,186 @@ namespace Sportland.Sports.Dodgeball
 
         // ── Pickup / hit checks ──
 
+        // Loose / Passing states: anyone in range may take the ball. A failed
+        // take here just leaves the ball in play (no carom).
         private void TryPickup()
         {
             if (Height > pickupMaxHeight) return;
 
             var trackers = PlayerZoneTracker.All;
             Vector2 ballPos = transform.position;
-            float r2 = pickupRadius * pickupRadius;
             for (int i = 0; i < trackers.Count; i++)
             {
                 var t = trackers[i];
-                if (t == null) continue;
-                if (t.HasBall) continue;
-                if (t == recentThrower) continue;
-                if (!t.CanCatchBall()) continue;
+                if (t == null || t == recentThrower) continue;
 
-                Vector2 trackerPos = t.transform.position;
-                if (Vector2.SqrMagnitude(trackerPos - ballPos) <= r2)
-                {
-                    AttachTo(t);
-                    return;
-                }
+                float radius = IsHumanControlled(t) ? catchRadius : pickupRadius;
+                if (Vector2.SqrMagnitude((Vector2)t.transform.position - ballPos) > radius * radius)
+                    continue;
+
+                if (TryTakeBall(t, caromOnMiss: false)) return;
             }
         }
 
-        /// <summary>
-        /// Player-initiated catch (Circle / E). Grabs the ball if it's
-        /// catchable for this player right now — in flight or loose, within
-        /// catchRadius, below pickupMaxHeight, legal per CanCatchBall, and not
-        /// the just-released thrower. Returns true if the catch succeeded.
-        /// </summary>
-        public bool TryCatch(PlayerZoneTracker t)
-        {
-            if (t == null || carrier != null) return false;
-            if (t.HasBall || t == recentThrower) return false;
-            if (!t.CanCatchBall()) return false;
-            if (Height > pickupMaxHeight) return false;
-            if (state != State.Loose && state != State.Passing && state != State.Thrown)
-                return false;
-
-            Vector2 d = (Vector2)t.transform.position - (Vector2)transform.position;
-            if (d.sqrMagnitude > catchRadius * catchRadius) return false;
-
-            AttachTo(t);
-            return true;
-        }
-
-        // While Thrown: opponents trigger a carom, teammates may catch.
+        // Thrown state: a non-catch by an opponent of the thrower becomes a hit
+        // (carom); teammates may catch but a non-catch just passes them by.
         private void TryThrownInteraction()
         {
             var trackers = PlayerZoneTracker.All;
             Vector2 ballPos = transform.position;
-            float r2 = pickupRadius * pickupRadius;
             Team? throwerTeam = recentThrower != null ? recentThrower.Spawn.team : (Team?)null;
 
             for (int i = 0; i < trackers.Count; i++)
             {
                 var t = trackers[i];
-                if (t == null) continue;
-                if (t == recentThrower) continue;
+                if (t == null || t == recentThrower) continue;
 
-                Vector2 trackerPos = t.transform.position;
-                if (Vector2.SqrMagnitude(trackerPos - ballPos) > r2) continue;
+                float radius = IsHumanControlled(t) ? catchRadius : pickupRadius;
+                if (Vector2.SqrMagnitude((Vector2)t.transform.position - ballPos) > radius * radius)
+                    continue;
 
                 bool isTeammate = throwerTeam.HasValue && t.Spawn.team == throwerTeam.Value;
-                if (isTeammate)
+                if (TryTakeBall(t, caromOnMiss: !isTeammate)) return;
+            }
+        }
+
+        /// <summary>
+        /// Resolves a ball/player contact. Slow loose balls are free pickups.
+        /// Live (in-flight or fast) balls require a skill catch from a
+        /// human-controlled player — armed via the Catch button — and resolve
+        /// probabilistically; AI players catch automatically for now. When
+        /// caromOnMiss is true, declining or failing a catch turns into a hit.
+        /// Returns true if the contact was consumed.
+        /// </summary>
+        private bool TryTakeBall(PlayerZoneTracker t, bool caromOnMiss)
+        {
+            if (t.HasBall) return false;
+            if (Height > pickupMaxHeight) return false;   // overhead: flies over, no hit/catch
+
+            bool live = state == State.Thrown || state == State.Passing
+                        || rb.linearVelocity.sqrMagnitude > skillSpeedThreshold * skillSpeedThreshold;
+
+            if (!live)
+            {
+                if (t.CanCatchBall()) { AttachTo(t); return true; }
+                return false;
+            }
+
+            if (IsHumanControlled(t))
+            {
+                if (t.CanCatchBall() && t.IsCatchArmed(catchArmWindow))
                 {
-                    if (!t.HasBall && t.CanCatchBall() && Height <= pickupMaxHeight)
-                    {
-                        AttachTo(t);
-                        return;
-                    }
-                    // Teammate present but can't catch — ball passes through.
+                    if (Random.value < ComputeCatchChance(t)) { AttachTo(t); return true; }
+                    ResolveMiss(t);
+                    return true;
                 }
-                else
-                {
-                    Carom(t, ClassifyHit(Height));
-                    return;
-                }
+                if (caromOnMiss) { Carom(t, ClassifyHit(Height)); return true; }
+                return false;   // didn't attempt; ball stays in play
+            }
+
+            // AI / uncontrolled: thrown-at-opponent still hits; otherwise auto-catch.
+            if (caromOnMiss) { Carom(t, ClassifyHit(Height)); return true; }
+            if (t.CanCatchBall()) { AttachTo(t); return true; }
+            return false;
+        }
+
+        private static bool IsHumanControlled(PlayerZoneTracker t)
+            => t.GetComponent<DodgeballPlayerInput>() != null;
+
+        /// <summary>
+        /// Combines catching ability, ball speed, the thrower's throwing
+        /// ability, whether the catcher faces the ball's path, press timing,
+        /// and luck into a 0..1 success chance.
+        /// </summary>
+        private float ComputeCatchChance(PlayerZoneTracker catcher)
+        {
+            var catchAttr  = catcher.GetComponent<DodgeballAttributes>();
+            var genAttr    = catcher.GetComponent<GeneralAttributes>();
+            float catch01  = catchAttr != null ? catchAttr.Catching01 : 0.6f;
+            float luck01   = genAttr != null ? genAttr.Luck01 : 0.5f;
+
+            float throw01 = 0.5f;
+            if (recentThrower != null)
+            {
+                var thrAttr = recentThrower.GetComponent<DodgeballAttributes>();
+                if (thrAttr != null) throw01 = thrAttr.Throwing01;
+            }
+
+            float chance = Mathf.Lerp(catchTuning.minBaseChance, catchTuning.maxBaseChance, catch01);
+
+            // Faster ball = harder.
+            float speed = rb.linearVelocity.magnitude;
+            float speedT = Mathf.Clamp01(
+                (speed - catchTuning.comfortableSpeed) /
+                Mathf.Max(0.01f, catchTuning.maxSpeed - catchTuning.comfortableSpeed));
+            chance -= speedT * catchTuning.speedPenalty;
+
+            // A stronger thrower puts more zip on it.
+            chance -= throw01 * catchTuning.throwPenalty;
+
+            chance += FacingFactor(catcher);
+            chance += TimingFactor(catcher);
+
+            // Luck: random upside that grows with the luck rating.
+            chance += Random.value * luck01 * catchTuning.luckBonus;
+
+            return Mathf.Clamp01(chance);
+        }
+
+        // +facingBonus when facing head-on into the ball's path, -facingPenalty
+        // when facing fully away. "Facing the ball" = facing opposite the ball's
+        // movement vector (i.e. toward where it's coming from).
+        private float FacingFactor(PlayerZoneTracker catcher)
+        {
+            Vector2 vel = rb.linearVelocity;
+            // Parametric passes carry no rb velocity; derive direction from the lerp.
+            if (vel.sqrMagnitude < 0.0001f && state == State.Passing) vel = passEnd - passStart;
+            if (vel.sqrMagnitude < 0.0001f) return 0f;
+
+            var move = catcher.GetComponent<PlayerMovement>();
+            Vector2 facing = move != null ? move.Facing : Vector2.right;
+
+            float alignment = -Vector2.Dot(facing.normalized, vel.normalized); // +1 = head-on
+            return Mathf.Lerp(-catchTuning.facingPenalty, catchTuning.facingBonus, (alignment + 1f) * 0.5f);
+        }
+
+        // Press-window reaction: best when the press is fresh (ball arrives just
+        // after pressing), worst at the far edge of the arm window.
+        private float TimingFactor(PlayerZoneTracker catcher)
+        {
+            float sincePress = Time.time - catcher.CatchArmedAt;
+            float t = Mathf.Clamp01(1f - sincePress / Mathf.Max(0.01f, catchArmWindow));
+            return Mathf.Lerp(-catchTuning.timingPenalty, catchTuning.timingBonus, t);
+        }
+
+        // A flubbed catch resolves into one of three outcomes at random.
+        private void ResolveMiss(PlayerZoneTracker catcher)
+        {
+            rb.simulated = true;
+            Vector2 v = rb.linearVelocity;
+            if (v.sqrMagnitude < 0.01f)
+            {
+                // From a parametric pass — synthesize a direction to react with.
+                Vector2 dir = (passEnd - passStart);
+                v = dir.sqrMagnitude > 0.0001f ? dir.normalized * 6f : Vector2.right * 6f;
+            }
+
+            switch (Random.Range(0, 3))
+            {
+                case 0: // carom off the catcher (a "hit")
+                    rb.linearVelocity = v;
+                    Carom(catcher, ClassifyHit(Height));
+                    break;
+                case 1: // fumble — drops loose at the catcher's feet
+                    rb.linearVelocity = v * 0.1f;
+                    heightVelocity = 0f;
+                    EnterLoose();
+                    break;
+                default: // deflect backward, back toward where it came from
+                    rb.linearVelocity = -v * 0.5f;
+                    heightVelocity = Mathf.Max(heightVelocity, 2.5f);
+                    state = State.Thrown;
+                    break;
             }
         }
 

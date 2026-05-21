@@ -35,6 +35,17 @@ namespace Sportland.Sports.Dodgeball
         public bool HasBall => HeldBall != null;
         public bool HasActiveWarning { get; private set; }
 
+        // Time of the most recent Catch press (press-window reaction). The Ball
+        // reads this to decide whether a catch attempt is "armed" and to score
+        // the timing of the press relative to the ball's arrival.
+        public float CatchArmedAt { get; private set; } = -999f;
+
+        /// <summary>Records a catch press at the current time.</summary>
+        public void ArmCatch() => CatchArmedAt = Time.time;
+
+        /// <summary>True if a catch was pressed within the last <paramref name="window"/> seconds.</summary>
+        public bool IsCatchArmed(float window) => Time.time - CatchArmedAt <= window;
+
         /// <summary>
         /// Live registry of trackers in the scene. Used by Ball for pickup
         /// proximity checks. Maintained in OnEnable/OnDisable.

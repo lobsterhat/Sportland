@@ -132,6 +132,11 @@ namespace Sportland.Sports.Dodgeball
             if (tracker == null) tracker = go.AddComponent<PlayerZoneTracker>();
             tracker.Initialize(spawn);
 
+            // Ability ratings used by skill checks (catching, etc.). Defaults
+            // are uniform for now; tune per-player in the Inspector later.
+            if (go.GetComponent<GeneralAttributes>() == null) go.AddComponent<GeneralAttributes>();
+            if (go.GetComponent<DodgeballAttributes>() == null) go.AddComponent<DodgeballAttributes>();
+
             var visual = go.GetComponentInChildren<DodgeballPlayerVisual>();
             if (visual != null) visual.Configure(spawn.team, spawn.role, tracker);
 

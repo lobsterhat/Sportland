@@ -54,6 +54,9 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>True on frames where ApplyMove found a non-zero gap between current and target velocity.</summary>
         public bool IsAccelerating { get; private set; }
 
+        /// <summary>Unit vector of the last non-zero movement direction (the way the player faces).</summary>
+        public Vector2 Facing { get; private set; } = Vector2.right;
+
         public System.Action<PlayerMovement> OnLanded;
 
         private void Awake()
@@ -79,6 +82,7 @@ namespace Sportland.Sports.Dodgeball
         public void ApplyMove(Vector2 input)
         {
             Vector2 clamped = input.sqrMagnitude > 1f ? input.normalized : input;
+            if (clamped.sqrMagnitude > 0.04f) Facing = clamped.normalized;
             float speed = IsRunning ? runSpeed : walkSpeed;
             Vector2 target = clamped * speed;
             Vector2 current = rb.linearVelocity;

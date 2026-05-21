@@ -298,10 +298,11 @@ namespace Sportland.Sports.Dodgeball
 
         private void OnCatchPressed(InputAction.CallbackContext _)
         {
-            // Already holding the ball — nothing to catch.
+            // Press-window reaction: arming a catch lets the Ball resolve a
+            // skill-checked catch when it arrives within reach. (A slow loose
+            // ball at the player's feet is still a free walk-over pickup.)
             if (tracker.HasBall) return;
-            var ball = FindAnyObjectByType<Ball>();
-            if (ball != null) ball.TryCatch(tracker);
+            tracker.ArmCatch();
         }
 
         private void OnReturnBallPressed(InputAction.CallbackContext _)
