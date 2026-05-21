@@ -75,6 +75,7 @@ namespace Sportland.Sports.Dodgeball
             actions.Throw.performed      += OnThrowPressed;
             actions.Pass.started         += OnPassStarted;
             actions.Pass.canceled        += OnPassCanceled;
+            actions.Catch.performed      += OnCatchPressed;
             actions.ReturnBall.performed += OnReturnBallPressed;
             actions.DpadUp.started       += OnDpadUpPressed;
             actions.DpadDown.started     += OnDpadDownPressed;
@@ -95,6 +96,7 @@ namespace Sportland.Sports.Dodgeball
                 actions.Throw.performed      -= OnThrowPressed;
                 actions.Pass.started         -= OnPassStarted;
                 actions.Pass.canceled        -= OnPassCanceled;
+                actions.Catch.performed      -= OnCatchPressed;
                 actions.ReturnBall.performed -= OnReturnBallPressed;
                 actions.DpadUp.started       -= OnDpadUpPressed;
                 actions.DpadDown.started     -= OnDpadDownPressed;
@@ -292,6 +294,11 @@ namespace Sportland.Sports.Dodgeball
                 }
             }
             return best;
+        }
+
+        private void OnCatchPressed(InputAction.CallbackContext _)
+        {
+            //TODO: active catch of a ball thrown by opponent.
         }
 
         private void OnReturnBallPressed(InputAction.CallbackContext _)

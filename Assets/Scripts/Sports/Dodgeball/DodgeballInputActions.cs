@@ -11,10 +11,11 @@ namespace Sportland.Sports.Dodgeball
     ///   Sprint      — L2 / Left Shift                  (hold)
     ///   Run         — D-pad double-tap (any direction) (sticky while D-pad held)
     ///   Jump        — Cross / Space
-    ///   Throw       — Circle / Q                       (only fires while holding the ball)
-    ///   Pass        — Square / F                       (tap = lob, hold = chest;
+    ///   Throw       — Square / Q                       (only fires while holding the ball)
+    ///   Pass        — Triangle / F                     (tap = lob, hold = chest;
     ///                                                   target = teammate most aligned
     ///                                                   with last move direction)
+    ///   Catch       — Circle / E                       (active grab of a nearby ball)
     ///   ReturnBall  — L1 / 1                           (debug: snap ball to player)
     /// </summary>
     public class DodgeballInputActions
@@ -24,6 +25,7 @@ namespace Sportland.Sports.Dodgeball
         public InputAction Jump       { get; private set; }
         public InputAction Throw      { get; private set; }
         public InputAction Pass       { get; private set; }
+        public InputAction Catch      { get; private set; }
         public InputAction ReturnBall { get; private set; }
 
         // Per-direction D-pad press actions. The input layer watches their
@@ -76,11 +78,15 @@ namespace Sportland.Sports.Dodgeball
 
             Throw = actionMap.AddAction("Throw", InputActionType.Button);
             Throw.AddBinding("<Keyboard>/q");
-            Throw.AddBinding("<Gamepad>/buttonEast");
+            Throw.AddBinding("<Gamepad>/buttonWest");   // Square
 
             Pass = actionMap.AddAction("Pass", InputActionType.Button);
             Pass.AddBinding("<Keyboard>/f");
-            Pass.AddBinding("<Gamepad>/buttonWest");
+            Pass.AddBinding("<Gamepad>/buttonNorth");   // Triangle
+
+            Catch = actionMap.AddAction("Catch", InputActionType.Button);
+            Catch.AddBinding("<Keyboard>/e");
+            Catch.AddBinding("<Gamepad>/buttonEast");   // Circle
 
             ReturnBall = actionMap.AddAction("ReturnBall", InputActionType.Button);
             ReturnBall.AddBinding("<Keyboard>/1");

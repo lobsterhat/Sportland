@@ -31,6 +31,8 @@ namespace Sportland.Sports.Dodgeball
 
         [Header("Pickup")]
         [SerializeField] private float pickupRadius = 0.6f;
+        [Tooltip("Reach of an active (button) catch — usually a touch more forgiving than the passive pickup radius.")]
+        [SerializeField] private float catchRadius = 0.9f;
         [SerializeField] private float throwerPickupCooldown = 0.4f;
         [Tooltip("A ball above this Height is overhead and not catchable.")]
         [SerializeField] private float pickupMaxHeight = 1.5f;
@@ -340,6 +342,28 @@ namespace Sportland.Sports.Dodgeball
                     return;
                 }
             }
+        }
+
+        /// <summary>
+        /// Player-initiated catch (Circle / E). Grabs the ball if it's
+        /// catchable for this player right now — in flight or loose, within
+        /// catchRadius, below pickupMaxHeight, legal per CanCatchBall, and not
+        /// the just-released thrower. Returns true if the catch succeeded.
+        /// </summary>
+        public bool TryCatch(PlayerZoneTracker t)
+        {
+            if (t == null || carrier != null) return false;
+            if (t.HasBall || t == recentThrower) return false;
+            if (!t.CanCatchBall()) return false;
+            if (Height > pickupMaxHeight) return false;
+            if (state != State.Loose && state != State.Passing && state != State.Thrown)
+                return false;
+
+            Vector2 d = (Vector2)t.transform.position - (Vector2)transform.position;
+            if (d.sqrMagnitude > catchRadius * catchRadius) return false;
+
+            AttachTo(t);
+            return true;
         }
 
         // While Thrown: opponents trigger a carom, teammates may catch.

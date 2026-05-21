@@ -25,7 +25,7 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Top speed (units/sec) when not running.")]
         [SerializeField] private float walkSpeed = 4f;
         [Tooltip("Top speed (units/sec) while running (D-pad double-tap or L2 hold).")]
-        [SerializeField] private float runSpeed = 8f;
+        [SerializeField] private float runSpeed = 6f;
         [Tooltip("Linear velocity change rate (units/sec^2) used to ramp toward " +
                  "the target velocity. Higher = snappier, lower = more inertia.")]
         [SerializeField] private float acceleration = 40f;
