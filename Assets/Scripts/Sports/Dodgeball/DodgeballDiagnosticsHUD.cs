@@ -67,7 +67,7 @@ namespace Sportland.Sports.Dodgeball
                 return new[]
                 {
                     "Player: (no controller)",
-                    $"Ball speed:   {ballSpeed,5:F2} u/s",
+                    $"Ball speed:   {Speed(ballSpeed)}",
                     $"Ball height:  {ballHeight,5:F2} u",
                 };
             }
@@ -81,10 +81,10 @@ namespace Sportland.Sports.Dodgeball
 
             return new[]
             {
-                $"Player speed: {playerSpeed,5:F2} u/s",
+                $"Player speed: {Speed(playerSpeed)}",
                 $"State:        {state}",
                 $"Accelerating: {accelStr}",
-                $"Ball speed:   {ballSpeed,5:F2} u/s",
+                $"Ball speed:   {Speed(ballSpeed)}",
                 $"Ball height:  {ballHeight,5:F2} u",
             };
         }
@@ -113,7 +113,7 @@ namespace Sportland.Sports.Dodgeball
             {
                 var f = cachedBall.PreviewCatch(tracker);
                 lines.Add($"catching {f.catching01:F2}    base   +{f.baseChance:F2}");
-                lines.Add($"ballspd  {f.ballSpeed,4:F1}    -speed {f.speedPenalty:F2}");
+                lines.Add($"ballspd {f.ballSpeed:F1} u/s ({DodgeballUnits.ToMph(f.ballSpeed):F0}mph) -spd {f.speedPenalty:F2}");
                 lines.Add($"throwing {f.throwing01:F2}    -throw {f.throwPenalty:F2}");
                 lines.Add($"facing  a{f.facingAlignment,5:F2}   {Signed(f.facingFactor)} fac");
                 lines.Add($"armed {(f.armed ? "Y" : "n")}  t{f.timingScore:F2}    {Signed(f.timingFactor)} time");
@@ -140,6 +140,7 @@ namespace Sportland.Sports.Dodgeball
 
         private static string Signed(float v) => (v >= 0f ? "+" : "") + v.ToString("F2");
         private static string Pct(float v) => $"{v * 100f:F0}%";
+        private static string Speed(float unitsPerSec) => $"{unitsPerSec,5:F2} u/s ({DodgeballUnits.ToMph(unitsPerSec),5:F1} mph)";
 
         private void EnsureBall()
         {
