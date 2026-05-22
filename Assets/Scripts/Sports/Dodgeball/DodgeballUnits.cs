@@ -8,8 +8,10 @@ namespace Sportland.Sports.Dodgeball
     {
         public const float MphPerUnitPerSecond = 2.2369363f;   // (m/s) -> mph
         public const float UnitsPerSecondPerMph = 0.44704f;    // mph -> (m/s)
+        public const float FeetPerUnit = 3.2808399f;           // metres -> feet
 
         public static float ToMph(float unitsPerSecond) => unitsPerSecond * MphPerUnitPerSecond;
         public static float ToUnitsPerSecond(float mph) => mph * UnitsPerSecondPerMph;
+        public static float ToFeet(float units) => units * FeetPerUnit;
     }
 }

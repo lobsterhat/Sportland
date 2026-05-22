@@ -36,6 +36,8 @@ namespace Sportland.Sports.Dodgeball
             float y = anchor.y;
             y = DrawPanel(BuildStatusLines(), anchor.x, y);
             y += 6f;
+            y = DrawPanel(BuildThrowLines(), anchor.x, y);
+            y += 6f;
             DrawPanel(BuildCatchLines(), anchor.x, y);
         }
 
@@ -87,6 +89,35 @@ namespace Sportland.Sports.Dodgeball
                 $"Ball speed:   {Speed(ballSpeed)}",
                 $"Ball height:  {ballHeight,5:F2} u",
             };
+        }
+
+        private string[] BuildThrowLines()
+        {
+            EnsureBall();
+            if (cachedBall == null)
+                return new[] { "== THROW ==", "(no ball)" };
+
+            var t = cachedBall.LastThrow;
+            if (!t.releaseValid)
+                return new[] { "== THROW ==", "(none yet — fire the cannon)" };
+
+            var lines = new System.Collections.Generic.List<string>
+            {
+                "== THROW ==",
+                $"release: {Speed(t.releaseSpeed)}",
+                $"  height {t.releaseHeight:F2} u",
+            };
+            if (t.destValid)
+            {
+                lines.Add($"dest:    {Speed(t.arrivalSpeed)}");
+                lines.Add($"  height {t.arrivalHeight:F2} u");
+                lines.Add($"distance {t.Distance:F1} u ({DodgeballUnits.ToFeet(t.Distance):F1} ft)");
+            }
+            else
+            {
+                lines.Add("dest:    (in flight)");
+            }
+            return lines.ToArray();
         }
 
         private string[] BuildCatchLines()

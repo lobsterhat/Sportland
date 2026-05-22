@@ -67,6 +67,20 @@ namespace Sportland.Sports.Dodgeball
             public float finalChance;      // clamp01(rawChance)
         }
 
+        /// <summary>Per-throw telemetry: state at release vs at the first live contact.</summary>
+        public struct ThrowTelemetry
+        {
+            public bool releaseValid;
+            public Vector2 origin;
+            public float releaseSpeed;   // lateral u/s
+            public float releaseHeight;  // u above floor
+            public bool destValid;
+            public Vector2 dest;
+            public float arrivalSpeed;   // lateral u/s
+            public float arrivalHeight;  // u above floor
+            public float Distance => (releaseValid && destValid) ? Vector2.Distance(origin, dest) : 0f;
+        }
+
         [Header("Pickup")]
         [SerializeField] private float pickupRadius = 0.6f;
         [Tooltip("Reach of an active (button) catch — usually a touch more forgiving than the passive pickup radius.")]
@@ -184,6 +198,9 @@ namespace Sportland.Sports.Dodgeball
         public float LastCatchRoll { get; private set; }
         public bool LastCatchSucceeded { get; private set; }
         public float LastCatchTime { get; private set; } = -999f;
+
+        // Most recent throw's release vs arrival metrics — for the HUD.
+        public ThrowTelemetry LastThrow { get; private set; }
 
         /// <summary>Fires whenever the ball attaches to a player (pickup, pass catch, or ForcePickup).</summary>
         public event System.Action<PlayerZoneTracker> OnAttached;
@@ -443,6 +460,7 @@ namespace Sportland.Sports.Dodgeball
             {
                 if (t.CanCatchBall() && t.IsCatchArmed(catchArmWindow))
                 {
+                    RecordArrival();
                     var f = BuildCatchFactors(t, applyLuck: true);
                     float roll = Random.value;
                     RecordCatchAttempt(f, roll);
@@ -450,13 +468,13 @@ namespace Sportland.Sports.Dodgeball
                     ResolveMiss(t);
                     return true;
                 }
-                if (caromOnMiss) { Carom(t, ClassifyHit(Height)); return true; }
+                if (caromOnMiss) { RecordArrival(); Carom(t, ClassifyHit(Height)); return true; }
                 return false;   // didn't attempt; ball stays in play
             }
 
             // AI / uncontrolled: thrown-at-opponent still hits; otherwise auto-catch.
-            if (caromOnMiss) { Carom(t, ClassifyHit(Height)); return true; }
-            if (t.CanCatchBall()) { AttachTo(t); return true; }
+            if (caromOnMiss) { RecordArrival(); Carom(t, ClassifyHit(Height)); return true; }
+            if (t.CanCatchBall()) { RecordArrival(); AttachTo(t); return true; }
             return false;
         }
 
@@ -548,6 +566,30 @@ namespace Sportland.Sports.Dodgeball
             LastCatchRoll = roll;
             LastCatchSucceeded = roll < f.finalChance;
             LastCatchTime = Time.time;
+        }
+
+        // Telemetry: snapshot at release; later filled in at the first live contact.
+        private void RecordRelease(float lateralSpeed)
+        {
+            LastThrow = new ThrowTelemetry
+            {
+                releaseValid = true,
+                origin = transform.position,
+                releaseSpeed = lateralSpeed,
+                releaseHeight = Height,
+                destValid = false,
+            };
+        }
+
+        private void RecordArrival()
+        {
+            var t = LastThrow;
+            if (!t.releaseValid || t.destValid) return;
+            t.destValid = true;
+            t.dest = transform.position;
+            t.arrivalSpeed = rb.linearVelocity.magnitude;
+            t.arrivalHeight = Height;
+            LastThrow = t;
         }
 
         // A flubbed catch resolves into one of three outcomes at random.
@@ -681,6 +723,7 @@ namespace Sportland.Sports.Dodgeball
             rb.linearVelocity = direction.normalized * power;
             heightVelocity = verticalVelocity;
             state = State.Thrown;
+            RecordRelease(power);
         }
 
         /// <summary>
@@ -739,6 +782,7 @@ namespace Sportland.Sports.Dodgeball
             rb.linearVelocity = dir * power;
             heightVelocity = vy;
             state = State.Thrown;
+            RecordRelease(power);
         }
 
         /// <summary>
@@ -773,6 +817,7 @@ namespace Sportland.Sports.Dodgeball
             state = State.Passing;
 
             rb.simulated = false;
+            RecordRelease(lateralSpeed);
         }
 
         // ── Procedural fallbacks (used only when no prefab provides them) ──

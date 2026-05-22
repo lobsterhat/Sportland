@@ -26,8 +26,14 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private bool showTool = true;
         [SerializeField] private float minSpeed = 4f;
         [SerializeField] private float maxSpeed = 50f;
+        [Tooltip("Right stick nudges the cannon position at this speed (units/sec).")]
+        [SerializeField] private float positionMoveSpeed = 8f;
         [SerializeField] private bool showMarker = true;
         [SerializeField] private Color markerColor = new Color(1f, 0.5f, 0.1f, 0.9f);
+
+        // Court bounds (incl. outfielder strips) that the cannon position is clamped to.
+        private const float MaxX = 12f;
+        private const float MaxY = 7.5f;
 
         private Ball ball;
         private Transform marker;
@@ -40,6 +46,7 @@ namespace Sportland.Sports.Dodgeball
 
         private void Update()
         {
+            HandlePositionStick();
             UpdateMarker();
 
             if (FireRequested()) Fire();
@@ -49,6 +56,19 @@ namespace Sportland.Sports.Dodgeball
                 Fire();
                 nextAutoFireTime = Time.time + autoFireInterval;
             }
+        }
+
+        // Right stick nudges the cannon around the court for debugging.
+        private void HandlePositionStick()
+        {
+            var gp = Gamepad.current;
+            if (gp == null) return;
+            Vector2 stick = gp.rightStick.ReadValue();
+            if (stick.sqrMagnitude < 0.02f) return;   // deadzone
+
+            firePosition += stick * (positionMoveSpeed * Time.deltaTime);
+            firePosition.x = Mathf.Clamp(firePosition.x, -MaxX, MaxX);
+            firePosition.y = Mathf.Clamp(firePosition.y, -MaxY, MaxY);
         }
 
         private static bool FireRequested()
@@ -147,10 +167,10 @@ namespace Sportland.Sports.Dodgeball
             GUILayout.Label($"Speed: {firePower:F1} u/s ({DodgeballUnits.ToMph(firePower):F0} mph)");
             firePower = GUILayout.HorizontalSlider(firePower, minSpeed, maxSpeed);
 
-            GUILayout.Label($"Pos X: {firePosition.x:F1}");
-            firePosition.x = GUILayout.HorizontalSlider(firePosition.x, -12f, 12f);
+            GUILayout.Label($"Pos X: {firePosition.x:F1}  (right stick moves)");
+            firePosition.x = GUILayout.HorizontalSlider(firePosition.x, -MaxX, MaxX);
             GUILayout.Label($"Pos Y: {firePosition.y:F1}");
-            firePosition.y = GUILayout.HorizontalSlider(firePosition.y, -7.5f, 7.5f);
+            firePosition.y = GUILayout.HorizontalSlider(firePosition.y, -MaxY, MaxY);
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Fire (C / R1)")) Fire();
