@@ -1,21 +1,25 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Sportland.Sports.Dodgeball
 {
     /// <summary>
-    /// Lightweight on-screen readout for tuning movement and ball physics.
-    /// Shows the human-controlled player's current speed, walk/run state,
-    /// IsAccelerating, and the ball's current speed.
+    /// Lightweight on-screen readout for tuning. Two stacked panels:
+    ///   1. Movement / ball: controlled player speed, walk/run, accel, ball
+    ///      speed + height.
+    ///   2. Catch math: the per-term breakdown the catch skill-check uses for
+    ///      the controlled player vs the current ball, plus the last resolved
+    ///      catch attempt (chance, roll, result).
     ///
-    /// Uses IMGUI so it doesn't need a Canvas / TMP / EventSystem setup —
-    /// drop the component on any GameObject and it draws to the top-left
-    /// of the game view.
+    /// Uses IMGUI so it needs no Canvas / TMP / EventSystem — drop it on any
+    /// GameObject and it draws to the top-left of the game view.
     /// </summary>
     public class DodgeballDiagnosticsHUD : MonoBehaviour
     {
         [SerializeField] private bool showHud = true;
         [SerializeField] private Vector2 anchor = new Vector2(12f, 12f);
-        [SerializeField] private int fontSize = 16;
+        [SerializeField] private float panelWidth = 320f;
+        [SerializeField] private int fontSize = 15;
         [SerializeField] private Color textColor = Color.white;
         [Tooltip("Translucent background drawn behind the text for legibility.")]
         [SerializeField] private Color backgroundColor = new Color(0f, 0f, 0f, 0.55f);
@@ -27,31 +31,31 @@ namespace Sportland.Sports.Dodgeball
         private void OnGUI()
         {
             if (!showHud) return;
-
             EnsureStyles();
 
-            string[] lines = BuildLines();
-
-            float lineHeight = fontSize + 4f;
-            float padding = 8f;
-            float width = 280f;
-            float height = lines.Length * lineHeight + padding * 2f;
-            Rect bg = new Rect(anchor.x, anchor.y, width, height);
-
-            // Background panel.
-            GUI.DrawTexture(bg, bgTexture);
-
-            for (int i = 0; i < lines.Length; i++)
-            {
-                Rect r = new Rect(anchor.x + padding,
-                                  anchor.y + padding + i * lineHeight,
-                                  width - padding * 2f,
-                                  lineHeight);
-                GUI.Label(r, lines[i], textStyle);
-            }
+            float y = anchor.y;
+            y = DrawPanel(BuildStatusLines(), anchor.x, y);
+            y += 6f;
+            DrawPanel(BuildCatchLines(), anchor.x, y);
         }
 
-        private string[] BuildLines()
+        private float DrawPanel(string[] lines, float x, float y)
+        {
+            float lineHeight = fontSize + 4f;
+            float padding = 8f;
+            float height = lines.Length * lineHeight + padding * 2f;
+
+            GUI.DrawTexture(new Rect(x, y, panelWidth, height), bgTexture);
+            for (int i = 0; i < lines.Length; i++)
+            {
+                Rect r = new Rect(x + padding, y + padding + i * lineHeight,
+                                  panelWidth - padding * 2f, lineHeight);
+                GUI.Label(r, lines[i], textStyle);
+            }
+            return y + height;
+        }
+
+        private string[] BuildStatusLines()
         {
             EnsureBall();
             float ballSpeed  = GetBallSpeed();
@@ -84,6 +88,58 @@ namespace Sportland.Sports.Dodgeball
                 $"Ball height:  {ballHeight,5:F2} u",
             };
         }
+
+        private string[] BuildCatchLines()
+        {
+            EnsureBall();
+            var input = DodgeballPlayerInput.Current;
+            if (cachedBall == null || input == null)
+                return new[] { "== CATCH ==", "(no ball / controller)" };
+
+            var tracker = input.GetComponent<PlayerZoneTracker>();
+            if (tracker == null)
+                return new[] { "== CATCH ==", "(no tracker)" };
+
+            var lines = new List<string>
+            {
+                $"== CATCH MATH  (ball: {cachedBall.StateLabel}) ==",
+            };
+
+            if (tracker.HasBall)
+            {
+                lines.Add("(holding the ball)");
+            }
+            else
+            {
+                var f = cachedBall.PreviewCatch(tracker);
+                lines.Add($"catching {f.catching01:F2}    base   +{f.baseChance:F2}");
+                lines.Add($"ballspd  {f.ballSpeed,4:F1}    -speed {f.speedPenalty:F2}");
+                lines.Add($"throwing {f.throwing01:F2}    -throw {f.throwPenalty:F2}");
+                lines.Add($"facing  a{f.facingAlignment,5:F2}   {Signed(f.facingFactor)} fac");
+                lines.Add($"armed {(f.armed ? "Y" : "n")}  t{f.timingScore:F2}    {Signed(f.timingFactor)} time");
+                lines.Add($"luck {f.luck01:F2} (roll adds 0..{f.luck01 * 0.15f:F2})");
+                lines.Add($"= preview chance {Pct(f.finalChance)}  (no luck)");
+            }
+
+            lines.Add("-------- last attempt --------");
+            if (cachedBall.LastCatchTime > 0f)
+            {
+                var lf = cachedBall.LastCatchFactors;
+                float ago = Time.time - cachedBall.LastCatchTime;
+                string result = cachedBall.LastCatchSucceeded ? "CAUGHT" : "MISS";
+                lines.Add($"chance {Pct(lf.finalChance)}  (+luck {lf.luckContribution:F2})");
+                lines.Add($"roll {cachedBall.LastCatchRoll:F2} -> {result}  ({ago:F1}s ago)");
+            }
+            else
+            {
+                lines.Add("(none yet)");
+            }
+
+            return lines.ToArray();
+        }
+
+        private static string Signed(float v) => (v >= 0f ? "+" : "") + v.ToString("F2");
+        private static string Pct(float v) => $"{v * 100f:F0}%";
 
         private void EnsureBall()
         {

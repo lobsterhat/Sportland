@@ -46,6 +46,27 @@ namespace Sportland.Sports.Dodgeball
             [Range(0f, 1f)] public float luckBonus = 0.15f;       // random upside scaled by luck
         }
 
+        /// <summary>Per-term breakdown of a catch chance, for resolution + HUD/debug display.</summary>
+        public struct CatchFactors
+        {
+            public bool valid;
+            public float catching01;       // catcher catching rating (0..1)
+            public float throwing01;       // thrower throwing rating (0..1)
+            public float luck01;           // catcher luck rating (0..1)
+            public float ballSpeed;        // u/s
+            public float baseChance;       // from catching
+            public float speedPenalty;     // subtracted
+            public float throwPenalty;     // subtracted
+            public float facingAlignment;  // -1..1 (+1 = head-on into the ball)
+            public float facingFactor;     // signed
+            public bool  armed;            // catch press active
+            public float timingScore;      // 0..1
+            public float timingFactor;     // signed
+            public float luckContribution; // added (0 in preview)
+            public float rawChance;        // unclamped sum
+            public float finalChance;      // clamp01(rawChance)
+        }
+
         [Header("Pickup")]
         [SerializeField] private float pickupRadius = 0.6f;
         [Tooltip("Reach of an active (button) catch — usually a touch more forgiving than the passive pickup radius.")]
@@ -154,6 +175,15 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>Current visual height above the ball's ground (XY) position.</summary>
         public float Height { get; private set; }
+
+        /// <summary>Name of the current trajectory state (Carried / Passing / Thrown / Bouncing / Loose).</summary>
+        public string StateLabel => state.ToString();
+
+        // Most recent resolved catch attempt — surfaced for the diagnostics HUD.
+        public CatchFactors LastCatchFactors { get; private set; }
+        public float LastCatchRoll { get; private set; }
+        public bool LastCatchSucceeded { get; private set; }
+        public float LastCatchTime { get; private set; } = -999f;
 
         /// <summary>Fires whenever the ball attaches to a player (pickup, pass catch, or ForcePickup).</summary>
         public event System.Action<PlayerZoneTracker> OnAttached;
@@ -413,7 +443,10 @@ namespace Sportland.Sports.Dodgeball
             {
                 if (t.CanCatchBall() && t.IsCatchArmed(catchArmWindow))
                 {
-                    if (Random.value < ComputeCatchChance(t)) { AttachTo(t); return true; }
+                    var f = BuildCatchFactors(t, applyLuck: true);
+                    float roll = Random.value;
+                    RecordCatchAttempt(f, roll);
+                    if (roll < f.finalChance) { AttachTo(t); return true; }
                     ResolveMiss(t);
                     return true;
                 }
@@ -431,69 +464,90 @@ namespace Sportland.Sports.Dodgeball
             => t.GetComponent<DodgeballPlayerInput>() != null;
 
         /// <summary>
-        /// Combines catching ability, ball speed, the thrower's throwing
-        /// ability, whether the catcher faces the ball's path, press timing,
-        /// and luck into a 0..1 success chance.
+        /// Builds the full per-term breakdown of a catch chance for a player
+        /// against the ball right now. With applyLuck=false the luck term is
+        /// 0 (deterministic preview for the HUD); with true it rolls the luck
+        /// contribution (used at actual resolution).
         /// </summary>
-        private float ComputeCatchChance(PlayerZoneTracker catcher)
+        public CatchFactors BuildCatchFactors(PlayerZoneTracker catcher, bool applyLuck)
         {
-            var catchAttr  = catcher.GetComponent<DodgeballAttributes>();
-            var genAttr    = catcher.GetComponent<GeneralAttributes>();
-            float catch01  = catchAttr != null ? catchAttr.Catching01 : 0.6f;
-            float luck01   = genAttr != null ? genAttr.Luck01 : 0.5f;
+            var f = new CatchFactors { valid = catcher != null };
+            if (catcher == null) return f;
 
-            float throw01 = 0.5f;
+            var catchAttr = catcher.GetComponent<DodgeballAttributes>();
+            var genAttr   = catcher.GetComponent<GeneralAttributes>();
+            f.catching01 = catchAttr != null ? catchAttr.Catching01 : 0.6f;
+            f.luck01     = genAttr != null ? genAttr.Luck01 : 0.5f;
+
+            f.throwing01 = 0.5f;
             if (recentThrower != null)
             {
                 var thrAttr = recentThrower.GetComponent<DodgeballAttributes>();
-                if (thrAttr != null) throw01 = thrAttr.Throwing01;
+                if (thrAttr != null) f.throwing01 = thrAttr.Throwing01;
             }
 
-            float chance = Mathf.Lerp(catchTuning.minBaseChance, catchTuning.maxBaseChance, catch01);
+            // Base from catching ability.
+            f.baseChance = Mathf.Lerp(catchTuning.minBaseChance, catchTuning.maxBaseChance, f.catching01);
 
             // Faster ball = harder.
-            float speed = rb.linearVelocity.magnitude;
+            f.ballSpeed = rb.linearVelocity.magnitude;
             float speedT = Mathf.Clamp01(
-                (speed - catchTuning.comfortableSpeed) /
+                (f.ballSpeed - catchTuning.comfortableSpeed) /
                 Mathf.Max(0.01f, catchTuning.maxSpeed - catchTuning.comfortableSpeed));
-            chance -= speedT * catchTuning.speedPenalty;
+            f.speedPenalty = speedT * catchTuning.speedPenalty;
 
-            // A stronger thrower puts more zip on it.
-            chance -= throw01 * catchTuning.throwPenalty;
+            // Stronger thrower puts more zip on it.
+            f.throwPenalty = f.throwing01 * catchTuning.throwPenalty;
 
-            chance += FacingFactor(catcher);
-            chance += TimingFactor(catcher);
+            // Facing: catcher's Facing vs the ball's movement vector.
+            Vector2 vel = rb.linearVelocity;
+            if (vel.sqrMagnitude < 0.0001f && state == State.Passing) vel = passEnd - passStart;
+            if (vel.sqrMagnitude < 0.0001f)
+            {
+                f.facingAlignment = 0f;
+                f.facingFactor = 0f;
+            }
+            else
+            {
+                var move = catcher.GetComponent<PlayerMovement>();
+                Vector2 facing = move != null ? move.Facing : Vector2.right;
+                f.facingAlignment = -Vector2.Dot(facing.normalized, vel.normalized); // +1 = head-on
+                f.facingFactor = Mathf.Lerp(-catchTuning.facingPenalty, catchTuning.facingBonus,
+                                            (f.facingAlignment + 1f) * 0.5f);
+            }
+
+            // Timing: press-window reaction. Neutral (0) until a catch is armed.
+            f.armed = catcher.IsCatchArmed(catchArmWindow);
+            if (f.armed)
+            {
+                float sincePress = Time.time - catcher.CatchArmedAt;
+                f.timingScore = Mathf.Clamp01(1f - sincePress / Mathf.Max(0.01f, catchArmWindow));
+                f.timingFactor = Mathf.Lerp(-catchTuning.timingPenalty, catchTuning.timingBonus, f.timingScore);
+            }
+            else
+            {
+                f.timingScore = 0f;
+                f.timingFactor = 0f;
+            }
 
             // Luck: random upside that grows with the luck rating.
-            chance += Random.value * luck01 * catchTuning.luckBonus;
+            f.luckContribution = applyLuck ? Random.value * f.luck01 * catchTuning.luckBonus : 0f;
 
-            return Mathf.Clamp01(chance);
+            f.rawChance = f.baseChance - f.speedPenalty - f.throwPenalty
+                        + f.facingFactor + f.timingFactor + f.luckContribution;
+            f.finalChance = Mathf.Clamp01(f.rawChance);
+            return f;
         }
 
-        // +facingBonus when facing head-on into the ball's path, -facingPenalty
-        // when facing fully away. "Facing the ball" = facing opposite the ball's
-        // movement vector (i.e. toward where it's coming from).
-        private float FacingFactor(PlayerZoneTracker catcher)
+        /// <summary>Deterministic catch preview (no luck roll) for HUD / debug.</summary>
+        public CatchFactors PreviewCatch(PlayerZoneTracker catcher) => BuildCatchFactors(catcher, false);
+
+        private void RecordCatchAttempt(CatchFactors f, float roll)
         {
-            Vector2 vel = rb.linearVelocity;
-            // Parametric passes carry no rb velocity; derive direction from the lerp.
-            if (vel.sqrMagnitude < 0.0001f && state == State.Passing) vel = passEnd - passStart;
-            if (vel.sqrMagnitude < 0.0001f) return 0f;
-
-            var move = catcher.GetComponent<PlayerMovement>();
-            Vector2 facing = move != null ? move.Facing : Vector2.right;
-
-            float alignment = -Vector2.Dot(facing.normalized, vel.normalized); // +1 = head-on
-            return Mathf.Lerp(-catchTuning.facingPenalty, catchTuning.facingBonus, (alignment + 1f) * 0.5f);
-        }
-
-        // Press-window reaction: best when the press is fresh (ball arrives just
-        // after pressing), worst at the far edge of the arm window.
-        private float TimingFactor(PlayerZoneTracker catcher)
-        {
-            float sincePress = Time.time - catcher.CatchArmedAt;
-            float t = Mathf.Clamp01(1f - sincePress / Mathf.Max(0.01f, catchArmWindow));
-            return Mathf.Lerp(-catchTuning.timingPenalty, catchTuning.timingBonus, t);
+            LastCatchFactors = f;
+            LastCatchRoll = roll;
+            LastCatchSucceeded = roll < f.finalChance;
+            LastCatchTime = Time.time;
         }
 
         // A flubbed catch resolves into one of three outcomes at random.
