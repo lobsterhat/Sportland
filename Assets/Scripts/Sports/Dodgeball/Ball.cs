@@ -38,7 +38,6 @@ namespace Sportland.Sports.Dodgeball
             public float comfortableSpeed = 8f;                   // no speed penalty at/below this
             public float maxSpeed = 24f;                          // full speed penalty at/above this
             [Range(0f, 1f)] public float speedPenalty = 0.40f;
-            [Range(0f, 1f)] public float throwPenalty = 0.20f;    // scaled by thrower's throwing
             [Range(0f, 1f)] public float facingBonus = 0.15f;     // facing the ball head-on
             [Range(0f, 1f)] public float facingPenalty = 0.60f;   // facing fully away
             [Range(0f, 1f)] public float timingBonus = 0.20f;     // press right as the ball arrives
@@ -51,12 +50,10 @@ namespace Sportland.Sports.Dodgeball
         {
             public bool valid;
             public float catching01;       // catcher catching rating (0..1)
-            public float throwing01;       // thrower throwing rating (0..1)
             public float luck01;           // catcher luck rating (0..1)
             public float ballSpeed;        // u/s
             public float baseChance;       // from catching
-            public float speedPenalty;     // subtracted
-            public float throwPenalty;     // subtracted
+            public float speedPenalty;     // subtracted (the only "throw speed" influence)
             public float facingAlignment;  // -1..1 (+1 = head-on into the ball)
             public float facingFactor;     // signed
             public bool  armed;            // catch press active
@@ -497,25 +494,16 @@ namespace Sportland.Sports.Dodgeball
             f.catching01 = catchAttr != null ? catchAttr.Catching01 : 0.6f;
             f.luck01     = genAttr != null ? genAttr.Luck01 : 0.5f;
 
-            f.throwing01 = 0.5f;
-            if (recentThrower != null)
-            {
-                var thrAttr = recentThrower.GetComponent<DodgeballAttributes>();
-                if (thrAttr != null) f.throwing01 = thrAttr.Throwing01;
-            }
-
             // Base from catching ability.
             f.baseChance = Mathf.Lerp(catchTuning.minBaseChance, catchTuning.maxBaseChance, f.catching01);
 
-            // Faster ball = harder.
+            // Faster ball = harder. This is the only path throw speed feeds in:
+            // a harder thrower simply produces a higher ballSpeed.
             f.ballSpeed = rb.linearVelocity.magnitude;
             float speedT = Mathf.Clamp01(
                 (f.ballSpeed - catchTuning.comfortableSpeed) /
                 Mathf.Max(0.01f, catchTuning.maxSpeed - catchTuning.comfortableSpeed));
             f.speedPenalty = speedT * catchTuning.speedPenalty;
-
-            // Stronger thrower puts more zip on it.
-            f.throwPenalty = f.throwing01 * catchTuning.throwPenalty;
 
             // Facing: catcher's Facing vs the ball's movement vector.
             Vector2 vel = rb.linearVelocity;
@@ -551,7 +539,7 @@ namespace Sportland.Sports.Dodgeball
             // Luck: random upside that grows with the luck rating.
             f.luckContribution = applyLuck ? Random.value * f.luck01 * catchTuning.luckBonus : 0f;
 
-            f.rawChance = f.baseChance - f.speedPenalty - f.throwPenalty
+            f.rawChance = f.baseChance - f.speedPenalty
                         + f.facingFactor + f.timingFactor + f.luckContribution;
             f.finalChance = Mathf.Clamp01(f.rawChance);
             return f;

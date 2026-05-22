@@ -21,9 +21,18 @@ namespace Sportland.Sports.Dodgeball
         public static DodgeballPlayerInput Current { get; private set; }
 
         [Header("Power")]
-        [SerializeField] private float throwPower = 24f;
+        [Tooltip("Release speed (u/s) at throwSpeed rating 0 and 100; the thrower's rating lerps between them.")]
+        [SerializeField] private float minThrowSpeed = 12f;
+        [SerializeField] private float maxThrowSpeed = 36f;
         [SerializeField] private float lobPassSpeed = 6f;
         [SerializeField] private float chestPassSpeed = 12f;
+
+        [Header("Throw accuracy")]
+        [Tooltip("At accuracy 0, the aim point is offset by up to this many units PER unit of throw distance; " +
+                 "scales to 0 at accuracy 100.")]
+        [SerializeField] private float accuracyErrorPerUnit = 0.15f;
+        [Tooltip("At accuracy 0, an untargeted throw's direction can be off by up to this many degrees.")]
+        [SerializeField] private float maxInaccuracyAngleDeg = 25f;
 
         [Header("Pass timing")]
         [Tooltip("Hold longer than this (seconds) for chest pass; release sooner for lob.")]
@@ -161,19 +170,51 @@ namespace Sportland.Sports.Dodgeball
             var ball = tracker.HeldBall;
             if (ball == null) return;
 
+            float power = ThrowReleaseSpeed();
             var target = FindThrowTargetInCone(lastMoveDirection);
             if (target != null)
             {
-                // Ball solves the ballistic arc to reach the target.
-                ball.ThrowAt(target.transform.position, throwPower);
+                // Aim at the target, then let accuracy scatter where it lands.
+                Vector2 aim = ApplyAccuracyToAim(target.transform.position);
+                ball.ThrowAt(aim, power);
             }
             else
             {
                 Vector2 dir = lastMoveDirection.sqrMagnitude > 0.0001f
                     ? lastMoveDirection.normalized
                     : Vector2.right;
-                ball.Throw(dir, throwPower);
+                ball.Throw(ApplyAccuracyToDirection(dir), power);
             }
+        }
+
+        // Release speed comes straight from the thrower's throwSpeed rating.
+        private float ThrowReleaseSpeed()
+        {
+            var attr = GetComponent<DodgeballAttributes>();
+            float s01 = attr != null ? attr.ThrowSpeed01 : 0.6f;
+            return Mathf.Lerp(minThrowSpeed, maxThrowSpeed, s01);
+        }
+
+        // Accuracy scatters the aim point; the miss grows with distance and with
+        // how far below 100 the thrower's accuracy is.
+        private Vector2 ApplyAccuracyToAim(Vector2 aimPoint)
+        {
+            var attr = GetComponent<DodgeballAttributes>();
+            float acc01 = attr != null ? attr.ThrowAccuracy01 : 0.6f;
+            float dist = Vector2.Distance(transform.position, aimPoint);
+            float maxError = (1f - acc01) * accuracyErrorPerUnit * dist;
+            return aimPoint + Random.insideUnitCircle * maxError;
+        }
+
+        // Untargeted throws scatter on angle instead of a point.
+        private Vector2 ApplyAccuracyToDirection(Vector2 dir)
+        {
+            var attr = GetComponent<DodgeballAttributes>();
+            float acc01 = attr != null ? attr.ThrowAccuracy01 : 0.6f;
+            float maxAngle = (1f - acc01) * maxInaccuracyAngleDeg;
+            float angle = Random.Range(-maxAngle, maxAngle);
+            Vector2 rotated = Quaternion.Euler(0f, 0f, angle) * (Vector3)dir;
+            return rotated.normalized;
         }
 
         /// <summary>
