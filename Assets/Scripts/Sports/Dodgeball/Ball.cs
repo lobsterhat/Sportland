@@ -708,6 +708,40 @@ namespace Sportland.Sports.Dodgeball
         }
 
         /// <summary>
+        /// Carrier-free launch (e.g. a debug cannon). Teleports the ball to
+        /// fromPos at chest height, then fires a ballistic arc at targetPos so
+        /// it arrives near chest level. virtualThrower is attributed as the
+        /// thrower for the catch math and team logic (use an opponent of the
+        /// intended catcher so the catcher is a valid target).
+        /// </summary>
+        public void LaunchFrom(Vector2 fromPos, Vector2 targetPos, float power, PlayerZoneTracker virtualThrower)
+        {
+            if (carrier != null)
+            {
+                carrier.HeldBall = null;
+                carrier = null;
+                carrierMovement = null;
+            }
+
+            transform.position = fromPos;
+            Height = carryHeight;
+
+            Vector2 toTarget = targetPos - fromPos;
+            float dist = toTarget.magnitude;
+            Vector2 dir = dist > 0.01f ? toTarget / dist : Vector2.right;
+            float t = dist / Mathf.Max(0.01f, power);
+            // Launch height == carryHeight, so this lands back at chest level.
+            float vy = (carryHeight - Height + 0.5f * gravity * t * t) / t;
+
+            recentThrower = virtualThrower;
+            throwerCooldownRemaining = throwerPickupCooldown;
+            rb.simulated = true;
+            rb.linearVelocity = dir * power;
+            heightVelocity = vy;
+            state = State.Thrown;
+        }
+
+        /// <summary>
         /// Parametric pass to a fixed world position. Lateral motion is a
         /// straight lerp from current position to target; lob adds a sin-arc
         /// on top of carryHeight, chest stays flat. Catches resolve via the

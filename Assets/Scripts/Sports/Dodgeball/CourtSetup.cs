@@ -66,6 +66,8 @@ namespace Sportland.Sports.Dodgeball
         [Header("Diagnostics")]
         [Tooltip("Spawn an on-screen readout of player/ball state for tuning.")]
         [SerializeField] private bool showDiagnosticsHud = true;
+        [Tooltip("Spawn the debug cannon (C / R1) that fires balls at the controlled player.")]
+        [SerializeField] private bool spawnDebugCannon = true;
 
         [Header("Runtime")]
         [SerializeField] private List<GameObject> spawnedPlayers = new List<GameObject>();
@@ -76,6 +78,7 @@ namespace Sportland.Sports.Dodgeball
             SpawnAllPlayers();
             SpawnBall();
             if (showDiagnosticsHud) gameObject.AddComponent<DodgeballDiagnosticsHUD>();
+            if (spawnDebugCannon) gameObject.AddComponent<DodgeballCannon>();
         }
 
         private void SpawnBall()
