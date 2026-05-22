@@ -175,7 +175,7 @@ namespace Sportland.Sports.Dodgeball
             if (target != null)
             {
                 // Anticipation leads the target; accuracy then scatters the aim.
-                Vector2 lead = Ball.LeadAim(transform.position, target.transform.position,
+                Vector2 lead = ball.LeadAim(transform.position, target.transform.position,
                                             TargetVelocity(target), power, OwnAnticipation01());
                 Vector2 aim = ApplyAccuracyToAim(lead);
                 ball.ThrowAt(aim, power);

@@ -94,7 +94,7 @@ namespace Sportland.Sports.Dodgeball
 
             var rb = target.GetComponent<Rigidbody2D>();
             Vector2 tvel = rb != null ? rb.linearVelocity : Vector2.zero;
-            Vector2 aim = Ball.LeadAim(firePosition, target.transform.position, tvel, firePower, anticipation);
+            Vector2 aim = ball.LeadAim(firePosition, target.transform.position, tvel, firePower, anticipation);
             ball.LaunchFrom(firePosition, aim, firePower, FindOpponent(target));
         }
 

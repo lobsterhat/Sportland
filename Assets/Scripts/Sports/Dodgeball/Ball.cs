@@ -733,22 +733,42 @@ namespace Sportland.Sports.Dodgeball
             }
 
             Vector2 dir = toTarget / dist;
-            float t = dist / power;
+            float t = FlightTime(dist, power);
             float vy = (carryHeight - Height + 0.5f * gravity * t * t) / t;
             Throw(dir, power, vy);
         }
 
         /// <summary>
+        /// Estimated lateral time-of-flight to cover <paramref name="dist"/> at
+        /// release speed <paramref name="power"/>, accounting for linearDamping
+        /// (the ball decelerates, so this is longer than dist/power). Drag-free
+        /// and beyond-max-range cases fall back to dist/power.
+        ///
+        /// Under exponential decay v(t) = v0·e^(-k·t), distance covered is
+        /// (v0/k)(1 - e^(-k·t)); solving for t gives the closed form below.
+        /// </summary>
+        public float FlightTime(float dist, float power)
+        {
+            float v0 = Mathf.Max(0.01f, power);
+            float k = linearDamping;
+            if (k <= 0.0001f) return dist / v0;          // no drag: constant speed
+
+            float maxRange = v0 / k;                     // asymptotic reach under drag
+            if (dist >= maxRange * 0.999f) return dist / v0;  // can't actually reach; avoid log blow-up
+            return -Mathf.Log(1f - dist * k / v0) / k;
+        }
+
+        /// <summary>
         /// Lead-the-target aim point. Predicts where the target will be when
-        /// the ball arrives (flightTime = dist/power) and blends from the
+        /// the ball arrives (drag-aware flight time) and blends from the
         /// target's current position (anticipation 0) to the full predicted
         /// intercept (anticipation 1).
         /// </summary>
-        public static Vector2 LeadAim(Vector2 throwerPos, Vector2 targetPos,
-                                      Vector2 targetVelocity, float power, float anticipation01)
+        public Vector2 LeadAim(Vector2 throwerPos, Vector2 targetPos,
+                               Vector2 targetVelocity, float power, float anticipation01)
         {
             float dist = Vector2.Distance(throwerPos, targetPos);
-            float flightTime = dist / Mathf.Max(0.01f, power);
+            float flightTime = FlightTime(dist, power);
             return targetPos + targetVelocity * (flightTime * Mathf.Clamp01(anticipation01));
         }
 
