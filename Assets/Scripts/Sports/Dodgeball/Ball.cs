@@ -739,6 +739,20 @@ namespace Sportland.Sports.Dodgeball
         }
 
         /// <summary>
+        /// Lead-the-target aim point. Predicts where the target will be when
+        /// the ball arrives (flightTime = dist/power) and blends from the
+        /// target's current position (anticipation 0) to the full predicted
+        /// intercept (anticipation 1).
+        /// </summary>
+        public static Vector2 LeadAim(Vector2 throwerPos, Vector2 targetPos,
+                                      Vector2 targetVelocity, float power, float anticipation01)
+        {
+            float dist = Vector2.Distance(throwerPos, targetPos);
+            float flightTime = dist / Mathf.Max(0.01f, power);
+            return targetPos + targetVelocity * (flightTime * Mathf.Clamp01(anticipation01));
+        }
+
+        /// <summary>
         /// Carrier-free launch (e.g. a debug cannon). Teleports the ball to
         /// fromPos at chest height, then fires a ballistic arc at targetPos so
         /// it arrives near chest level. virtualThrower is attributed as the

@@ -16,11 +16,16 @@ namespace Sportland.Sports.Dodgeball
                  "Low = wild throws that may miss or hit the wrong player.")]
         [Range(0f, 100f)] public float throwAccuracy = 60f;
 
+        [Tooltip("0..100. Leads a moving target: 0 aims where the target is now, " +
+                 "100 aims where it will be when the ball arrives.")]
+        [Range(0f, 100f)] public float anticipation = 60f;
+
         [Tooltip("0..100. Higher = better odds of completing a catch.")]
         [Range(0f, 100f)] public float catching = 60f;
 
         public float ThrowSpeed01 => Mathf.Clamp01(throwSpeed / 100f);
         public float ThrowAccuracy01 => Mathf.Clamp01(throwAccuracy / 100f);
+        public float Anticipation01 => Mathf.Clamp01(anticipation / 100f);
         public float Catching01 => Mathf.Clamp01(catching / 100f);
     }
 }

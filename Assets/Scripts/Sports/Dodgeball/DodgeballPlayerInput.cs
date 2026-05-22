@@ -174,8 +174,10 @@ namespace Sportland.Sports.Dodgeball
             var target = FindThrowTargetInCone(lastMoveDirection);
             if (target != null)
             {
-                // Aim at the target, then let accuracy scatter where it lands.
-                Vector2 aim = ApplyAccuracyToAim(target.transform.position);
+                // Anticipation leads the target; accuracy then scatters the aim.
+                Vector2 lead = Ball.LeadAim(transform.position, target.transform.position,
+                                            TargetVelocity(target), power, OwnAnticipation01());
+                Vector2 aim = ApplyAccuracyToAim(lead);
                 ball.ThrowAt(aim, power);
             }
             else
@@ -193,6 +195,18 @@ namespace Sportland.Sports.Dodgeball
             var attr = GetComponent<DodgeballAttributes>();
             float s01 = attr != null ? attr.ThrowSpeed01 : 0.6f;
             return Mathf.Lerp(minThrowSpeed, maxThrowSpeed, s01);
+        }
+
+        private float OwnAnticipation01()
+        {
+            var attr = GetComponent<DodgeballAttributes>();
+            return attr != null ? attr.Anticipation01 : 0f;
+        }
+
+        private static Vector2 TargetVelocity(PlayerZoneTracker t)
+        {
+            var rb = t.GetComponent<Rigidbody2D>();
+            return rb != null ? rb.linearVelocity : Vector2.zero;
         }
 
         // Accuracy scatters the aim point; the miss grows with distance and with

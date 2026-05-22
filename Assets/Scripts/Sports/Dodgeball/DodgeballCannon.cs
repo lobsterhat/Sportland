@@ -19,6 +19,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float firePower = 20f;
         [Tooltip("Absolute world position the ball is fired from.")]
         [SerializeField] private Vector2 firePosition = new Vector2(3f, 0f);
+        [Tooltip("0 = aim where the target is now; 1 = lead to where it will be on arrival.")]
+        [SerializeField, Range(0f, 1f)] private float anticipation = 0f;
         [SerializeField] private bool autoFire = false;
         [SerializeField] private float autoFireInterval = 3f;
 
@@ -90,7 +92,10 @@ namespace Sportland.Sports.Dodgeball
             var target = input.GetComponent<PlayerZoneTracker>();
             if (target == null) return;
 
-            ball.LaunchFrom(firePosition, target.transform.position, firePower, FindOpponent(target));
+            var rb = target.GetComponent<Rigidbody2D>();
+            Vector2 tvel = rb != null ? rb.linearVelocity : Vector2.zero;
+            Vector2 aim = Ball.LeadAim(firePosition, target.transform.position, tvel, firePower, anticipation);
+            ball.LaunchFrom(firePosition, aim, firePower, FindOpponent(target));
         }
 
         // Any player on the other team — used as the virtual thrower so the
@@ -160,7 +165,7 @@ namespace Sportland.Sports.Dodgeball
 
             const float w = 250f;
             float x = Screen.width - w - 12f;
-            GUILayout.BeginArea(new Rect(x, 12f, w, 220f), GUI.skin.box);
+            GUILayout.BeginArea(new Rect(x, 12f, w, 270f), GUI.skin.box);
 
             GUILayout.Label("== CANNON ==");
 
@@ -171,6 +176,9 @@ namespace Sportland.Sports.Dodgeball
             firePosition.x = GUILayout.HorizontalSlider(firePosition.x, -MaxX, MaxX);
             GUILayout.Label($"Pos Y: {firePosition.y:F1}");
             firePosition.y = GUILayout.HorizontalSlider(firePosition.y, -MaxY, MaxY);
+
+            GUILayout.Label($"Anticipation: {anticipation:F2}");
+            anticipation = GUILayout.HorizontalSlider(anticipation, 0f, 1f);
 
             GUILayout.BeginHorizontal();
             if (GUILayout.Button("Fire (C / R1)")) Fire();
