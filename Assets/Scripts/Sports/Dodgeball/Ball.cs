@@ -451,14 +451,13 @@ namespace Sportland.Sports.Dodgeball
         private bool TryTakeBall(PlayerZoneTracker t, bool caromOnMiss)
         {
             if (t.HasBall) return false;
-            if (Height > pickupMaxHeight) return false;   // overhead: flies over, no hit/catch
 
             bool live = state == State.Thrown || state == State.Passing
                         || rb.linearVelocity.sqrMagnitude > skillSpeedThreshold * skillSpeedThreshold;
 
             if (!live)
             {
-                if (t.CanCatchBall()) { AttachTo(t); return true; }
+                if (t.CanCatchBall() && Height <= pickupMaxHeight) { AttachTo(t); return true; }
                 return false;
             }
 
@@ -467,7 +466,8 @@ namespace Sportland.Sports.Dodgeball
             // passes / loose balls auto-catch (keeps passing + control transfer).
             bool deliberate = human || (caromOnMiss && HasAI(t));
 
-            if (deliberate && t.CanCatchBall() && t.IsCatchArmed(catchArmWindow))
+            // A catch needs the ball within reach height.
+            if (deliberate && t.CanCatchBall() && t.IsCatchArmed(catchArmWindow) && Height <= pickupMaxHeight)
             {
                 RecordArrival();
                 var f = BuildCatchFactors(t, applyLuck: true);
@@ -478,11 +478,27 @@ namespace Sportland.Sports.Dodgeball
                 return true;
             }
 
-            if (caromOnMiss) { RecordArrival(); Carom(t, ClassifyHit(Height)); return true; }
+            // An opponent throw hits only if the ball is within the player's body
+            // band — ducking drops the top, jumping raises the bottom, so the ball
+            // can pass over/under and miss.
+            if (caromOnMiss)
+            {
+                if (WithinBody(t)) { RecordArrival(); Carom(t, ClassifyHit(Height)); return true; }
+                return false;   // passed over a ducker / under a jumper
+            }
 
             // Pass / loose ball: humans must arm (pass-by), AI/uncontrolled auto-catch.
-            if (!human && t.CanCatchBall()) { RecordArrival(); AttachTo(t); return true; }
+            if (!human && t.CanCatchBall() && Height <= pickupMaxHeight) { RecordArrival(); AttachTo(t); return true; }
             return false;
+        }
+
+        // True if the ball's Height is within the player's current vertical body
+        // band (which jump/duck shift). Falls back to the catch ceiling.
+        private bool WithinBody(PlayerZoneTracker t)
+        {
+            var m = t.GetComponent<PlayerMovement>();
+            if (m == null) return Height <= pickupMaxHeight;
+            return Height >= m.BodyBottom && Height <= m.BodyTop;
         }
 
         private static bool IsHumanControlled(PlayerZoneTracker t)
@@ -769,6 +785,20 @@ namespace Sportland.Sports.Dodgeball
             float maxRange = v0 / k;                     // asymptotic reach under drag
             if (dist >= maxRange * 0.999f) return dist / v0;  // can't actually reach; avoid log blow-up
             return -Mathf.Log(1f - dist * k / v0) / k;
+        }
+
+        /// <summary>
+        /// Predicts the ball's Height after it travels <paramref name="lateralDistance"/>
+        /// at its current speed, integrating heightVelocity + gravity over the
+        /// (drag-aware) flight time. Ignores bounces — meant for a direct shot
+        /// reaching a defender. Used by AI to pick duck / jump / catch.
+        /// </summary>
+        public float PredictHeightAfter(float lateralDistance)
+        {
+            float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
+            if (speed < 0.01f) return Height;
+            float t = FlightTime(lateralDistance, speed);
+            return Mathf.Max(0f, Height + heightVelocity * t - 0.5f * gravity * t * t);
         }
 
         /// <summary>

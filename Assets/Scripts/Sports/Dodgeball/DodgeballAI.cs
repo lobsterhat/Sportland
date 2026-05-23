@@ -38,15 +38,24 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Stop nudging home once within this distance of the spawn spot.")]
         [SerializeField] private float homeDeadzone = 0.4f;
 
+        [Header("Evasion thresholds (predicted ball Height)")]
+        [Tooltip("Catch only viable if the predicted arrival height is at/below this (catch reach).")]
+        [SerializeField] private float maxCatchHeight = 1.5f;
+        [Tooltip("At/above this predicted height, duck under the throw.")]
+        [SerializeField] private float highBallThreshold = 0.9f;
+        [Tooltip("At/below this predicted height, jump over the throw.")]
+        [SerializeField] private float lowBallThreshold = 0.6f;
+
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
         private DodgeballAttributes attr;
         private Ball ball;
 
-        private enum Reaction { None, Catch, Evade }
+        private enum Reaction { None, Catch, Duck, Jump, Sidestep }
         private Reaction reaction;
         private bool threatActive;
         private bool armedThisThreat;
+        private bool jumpedThisThreat;
 
         private void Awake()
         {
@@ -62,14 +71,25 @@ namespace Sportland.Sports.Dodgeball
 
             if (IsIncomingThreat(out Vector2 ballDir))
             {
+                Vector2 ballPos = ball.transform.position;
+                float distToBall = Vector2.Distance(transform.position, ballPos);
+                float predictedHeight = ball.PredictHeightAfter(distToBall);
+
                 if (!threatActive)
                 {
                     threatActive = true;
                     armedThisThreat = false;
-                    reaction = Decide();
+                    jumpedThisThreat = false;
+                    reaction = Decide(predictedHeight);
                 }
-                if (reaction == Reaction.Catch) DoCatch(ballDir);
-                else DoEvade(ballDir);
+
+                switch (reaction)
+                {
+                    case Reaction.Catch:    DoCatch(ballDir); break;
+                    case Reaction.Duck:     DoDuck(ballPos); break;
+                    case Reaction.Jump:     DoJump(ballPos, distToBall); break;
+                    default:                DoSidestep(ballDir); break;
+                }
                 return;
             }
 
@@ -85,6 +105,7 @@ namespace Sportland.Sports.Dodgeball
             threatActive = false;
             reaction = Reaction.None;
             armedThisThreat = false;
+            jumpedThisThreat = false;
         }
 
         // True if an opponent's throw is in flight and on a line that passes
@@ -110,13 +131,19 @@ namespace Sportland.Sports.Dodgeball
             return Vector2.Distance(closest, transform.position) <= threatRadius;
         }
 
-        // Commit once per threat: catch if I can legally catch here and a
-        // catching-weighted roll says so, otherwise dodge.
-        private Reaction Decide()
+        // Commit once per threat, using all known factors: try to catch when
+        // it's legal/reachable and a catching-weighted roll says so; otherwise
+        // pick the evasion that best clears the predicted arrival height —
+        // duck under a high ball, jump over a low one, sidestep the rest.
+        private Reaction Decide(float predictedHeight)
         {
-            if (!tracker.CanCatchBall()) return Reaction.Evade;
+            bool canCatch = tracker.CanCatchBall() && predictedHeight <= maxCatchHeight;
             float catch01 = attr != null ? attr.Catching01 : 0.6f;
-            return Random.value < catch01 ? Reaction.Catch : Reaction.Evade;
+            if (canCatch && Random.value < catch01) return Reaction.Catch;
+
+            if (predictedHeight >= highBallThreshold) return Reaction.Duck;
+            if (predictedHeight <= lowBallThreshold)  return Reaction.Jump;
+            return Reaction.Sidestep;
         }
 
         private void DoCatch(Vector2 ballDir)
@@ -138,7 +165,7 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
-        private void DoEvade(Vector2 ballDir)
+        private void DoSidestep(Vector2 ballDir)
         {
             movement.IsRunning = true;
             Vector2 me = transform.position;
@@ -149,6 +176,33 @@ namespace Sportland.Sports.Dodgeball
             Vector2 dodge = side >= 0f ? perp : -perp;             // move further off the line
             MoveToward(ClampToZone(me + dodge * evadeDistance));
             movement.SetFacing(dodge);
+        }
+
+        // Hold position, face the ball, and stay crouched so a high throw passes over.
+        private void DoDuck(Vector2 ballPos)
+        {
+            movement.IsRunning = false;
+            movement.ApplyMove(Vector2.zero);
+            movement.SetFacing(ballPos - (Vector2)transform.position);
+            movement.Duck();
+        }
+
+        // Hold position, face the ball, and time a single jump so the apex
+        // (highest feet) lands on the ball's arrival — a low throw passes under.
+        private void DoJump(Vector2 ballPos, float distToBall)
+        {
+            movement.IsRunning = false;
+            movement.ApplyMove(Vector2.zero);
+            movement.SetFacing(ballPos - (Vector2)transform.position);
+
+            if (jumpedThisThreat) return;
+            float speed = ball.Velocity.magnitude;
+            float timeToArrival = speed > 0.01f ? distToBall / speed : 999f;
+            if (timeToArrival <= movement.JumpApexTime)
+            {
+                movement.TryJump();
+                jumpedThisThreat = true;
+            }
         }
 
         private void Prepare(PlayerZoneTracker carrier)

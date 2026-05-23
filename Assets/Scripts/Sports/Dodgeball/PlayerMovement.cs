@@ -34,6 +34,16 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float jumpHeight = 1.5f;  // peak hop height
         [SerializeField] private float jumpDuration = 0.6f;
 
+        [Header("Body / duck")]
+        [Tooltip("Height (above feet) of the top of the body while standing — the hit ceiling.")]
+        [SerializeField] private float standBodyTop = 1.6f;
+        [Tooltip("Body top while ducking — balls above this pass over a ducker.")]
+        [SerializeField] private float duckBodyTop = 0.8f;
+        [Tooltip("How long a duck holds after the last Duck() call (seconds).")]
+        [SerializeField] private float duckDuration = 0.5f;
+        [Tooltip("Vertical sprite squash while ducking (visual only).")]
+        [SerializeField] private float duckSquash = 0.6f;
+
         /// <summary>
         /// When true, ApplyMove scales by runSpeed instead of walkSpeed.
         /// The input layer flips this on each frame from D-pad double-tap latch
@@ -43,13 +53,25 @@ namespace Sportland.Sports.Dodgeball
 
         private Rigidbody2D rb;
         private float jumpTimer = -1f;
+        private float duckTimer = -1f;
         private float spriteBaseY;
+        private Vector3 spriteBaseScale = Vector3.one;
         private Transform spriteChild; // visual sprite that we'll bob up/down
 
         public bool IsAirborne => jumpTimer >= 0f;
+        public bool IsDucking => duckTimer >= 0f;
 
         /// <summary>Current vertical offset of the jump arc above the player's ground position (0 when grounded).</summary>
         public float CurrentJumpHeight { get; private set; }
+
+        /// <summary>Lower edge of the body above the floor (rises while jumping). Balls below this pass under.</summary>
+        public float BodyBottom => CurrentJumpHeight;
+
+        /// <summary>Upper edge of the body above the floor (drops while ducking, rises while jumping). Balls above this pass over.</summary>
+        public float BodyTop => (IsDucking ? duckBodyTop : standBodyTop) + CurrentJumpHeight;
+
+        /// <summary>Time from jump start to the apex (peak height).</summary>
+        public float JumpApexTime => jumpDuration * 0.5f;
 
         /// <summary>True on frames where ApplyMove found a non-zero gap between current and target velocity.</summary>
         public bool IsAccelerating { get; private set; }
@@ -76,6 +98,7 @@ namespace Sportland.Sports.Dodgeball
             {
                 spriteChild = transform.GetChild(0);
                 spriteBaseY = spriteChild.localPosition.y;
+                spriteBaseScale = spriteChild.localScale;
             }
         }
 
@@ -99,7 +122,13 @@ namespace Sportland.Sports.Dodgeball
 
         public void TryJump()
         {
-            if (!IsAirborne) jumpTimer = 0f;
+            if (!IsAirborne && !IsDucking) jumpTimer = 0f;
+        }
+
+        /// <summary>Start/refresh a duck. Holds for duckDuration after the last call. Ignored while airborne.</summary>
+        public void Duck()
+        {
+            if (!IsAirborne) duckTimer = 0f;
         }
 
         private void Update()
@@ -112,17 +141,28 @@ namespace Sportland.Sports.Dodgeball
                 {
                     jumpTimer = -1f;
                     CurrentJumpHeight = 0f;
-                    if (spriteChild != null)
-                        spriteChild.localPosition = new Vector3(0f, spriteBaseY, 0f);
                     OnLanded?.Invoke(this);
                 }
                 else
                 {
                     // Parabolic arc: 4*t*(1-t) peaks at t=0.5 with value 1.
                     CurrentJumpHeight = 4f * t * (1f - t) * jumpHeight;
-                    if (spriteChild != null)
-                        spriteChild.localPosition = new Vector3(0f, spriteBaseY + CurrentJumpHeight, 0f);
                 }
+            }
+
+            if (IsDucking)
+            {
+                duckTimer += Time.deltaTime;
+                if (duckTimer >= duckDuration) duckTimer = -1f;
+            }
+
+            // Sprite: bob up with the jump arc, squash down while ducking.
+            if (spriteChild != null)
+            {
+                spriteChild.localPosition = new Vector3(0f, spriteBaseY + CurrentJumpHeight, 0f);
+                float yScale = IsDucking ? duckSquash : 1f;
+                spriteChild.localScale = new Vector3(
+                    spriteBaseScale.x, spriteBaseScale.y * yScale, spriteBaseScale.z);
             }
         }
     }
