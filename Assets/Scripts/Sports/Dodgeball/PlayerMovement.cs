@@ -57,6 +57,12 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Unit vector of the last non-zero movement direction (the way the player faces).</summary>
         public Vector2 Facing { get; private set; } = Vector2.right;
 
+        /// <summary>Orient the player without moving (e.g. AI facing the ball while set).</summary>
+        public void SetFacing(Vector2 dir)
+        {
+            if (dir.sqrMagnitude > 0.0001f) Facing = dir.normalized;
+        }
+
         public System.Action<PlayerMovement> OnLanded;
 
         private void Awake()

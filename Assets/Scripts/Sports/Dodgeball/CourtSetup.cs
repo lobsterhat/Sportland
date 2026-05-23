@@ -143,6 +143,9 @@ namespace Sportland.Sports.Dodgeball
             var visual = go.GetComponentInChildren<DodgeballPlayerVisual>();
             if (visual != null) visual.Configure(spawn.team, spawn.role, tracker);
 
+            // Every player gets a CPU brain; the human input component
+            // (added below) disables it on the controlled player while present.
+            go.AddComponent<DodgeballAI>();
             if (spawn.id == playerControlledId)
             {
                 go.AddComponent<DodgeballPlayerInput>();

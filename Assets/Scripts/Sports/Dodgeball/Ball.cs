@@ -27,7 +27,7 @@ namespace Sportland.Sports.Dodgeball
     {
         public enum HitZone { Head, Torso, Limb }
 
-        private enum State { Carried, Passing, Thrown, Bouncing, Loose }
+        public enum State { Carried, Passing, Thrown, Bouncing, Loose }
 
         /// <summary>Weights for the catch skill-check. All bonuses/penalties are additive on a 0..1 chance.</summary>
         [System.Serializable]
@@ -183,6 +183,15 @@ namespace Sportland.Sports.Dodgeball
         private float heightVelocity;
 
         public PlayerZoneTracker Carrier => carrier;
+
+        /// <summary>Player credited with the most recent release (thrower/passer/cannon source), or null.</summary>
+        public PlayerZoneTracker RecentThrower => recentThrower;
+
+        /// <summary>Current trajectory state.</summary>
+        public State CurrentState => state;
+
+        /// <summary>Lateral (court-plane) velocity of the ball.</summary>
+        public Vector2 Velocity => rb != null ? rb.linearVelocity : Vector2.zero;
 
         /// <summary>Current visual height above the ball's ground (XY) position.</summary>
         public float Height { get; private set; }
@@ -401,7 +410,7 @@ namespace Sportland.Sports.Dodgeball
                 var t = trackers[i];
                 if (t == null || t == recentThrower) continue;
 
-                float radius = IsHumanControlled(t) ? catchRadius : pickupRadius;
+                float radius = (IsHumanControlled(t) || HasAI(t)) ? catchRadius : pickupRadius;
                 if (Vector2.SqrMagnitude((Vector2)t.transform.position - ballPos) > radius * radius)
                     continue;
 
@@ -422,7 +431,7 @@ namespace Sportland.Sports.Dodgeball
                 var t = trackers[i];
                 if (t == null || t == recentThrower) continue;
 
-                float radius = IsHumanControlled(t) ? catchRadius : pickupRadius;
+                float radius = (IsHumanControlled(t) || HasAI(t)) ? catchRadius : pickupRadius;
                 if (Vector2.SqrMagnitude((Vector2)t.transform.position - ballPos) > radius * radius)
                     continue;
 
@@ -433,11 +442,11 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>
         /// Resolves a ball/player contact. Slow loose balls are free pickups.
-        /// Live (in-flight or fast) balls require a skill catch from a
-        /// human-controlled player — armed via the Catch button — and resolve
-        /// probabilistically; AI players catch automatically for now. When
-        /// caromOnMiss is true, declining or failing a catch turns into a hit.
-        /// Returns true if the contact was consumed.
+        /// For a live ball, a human always — and an AI when defending an
+        /// opponent throw — must have an armed catch to attempt one (resolved
+        /// by the skill check); otherwise an opponent throw hits (carom) and a
+        /// teammate pass / loose ball is auto-caught by AI. caromOnMiss marks
+        /// the opponent-throw case. Returns true if the contact was consumed.
         /// </summary>
         private bool TryTakeBall(PlayerZoneTracker t, bool caromOnMiss)
         {
@@ -453,30 +462,34 @@ namespace Sportland.Sports.Dodgeball
                 return false;
             }
 
-            if (IsHumanControlled(t))
+            bool human = IsHumanControlled(t);
+            // AI only skill-catches when defending an opponent's throw; teammate
+            // passes / loose balls auto-catch (keeps passing + control transfer).
+            bool deliberate = human || (caromOnMiss && HasAI(t));
+
+            if (deliberate && t.CanCatchBall() && t.IsCatchArmed(catchArmWindow))
             {
-                if (t.CanCatchBall() && t.IsCatchArmed(catchArmWindow))
-                {
-                    RecordArrival();
-                    var f = BuildCatchFactors(t, applyLuck: true);
-                    float roll = Random.value;
-                    RecordCatchAttempt(f, roll);
-                    if (roll < f.finalChance) { AttachTo(t); return true; }
-                    ResolveMiss(t);
-                    return true;
-                }
-                if (caromOnMiss) { RecordArrival(); Carom(t, ClassifyHit(Height)); return true; }
-                return false;   // didn't attempt; ball stays in play
+                RecordArrival();
+                var f = BuildCatchFactors(t, applyLuck: true);
+                float roll = Random.value;
+                RecordCatchAttempt(f, roll);
+                if (roll < f.finalChance) { AttachTo(t); return true; }
+                ResolveMiss(t);
+                return true;
             }
 
-            // AI / uncontrolled: thrown-at-opponent still hits; otherwise auto-catch.
             if (caromOnMiss) { RecordArrival(); Carom(t, ClassifyHit(Height)); return true; }
-            if (t.CanCatchBall()) { RecordArrival(); AttachTo(t); return true; }
+
+            // Pass / loose ball: humans must arm (pass-by), AI/uncontrolled auto-catch.
+            if (!human && t.CanCatchBall()) { RecordArrival(); AttachTo(t); return true; }
             return false;
         }
 
         private static bool IsHumanControlled(PlayerZoneTracker t)
             => t.GetComponent<DodgeballPlayerInput>() != null;
+
+        private static bool HasAI(PlayerZoneTracker t)
+            => t.GetComponent<DodgeballAI>() != null;
 
         /// <summary>
         /// Builds the full per-term breakdown of a catch chance for a player

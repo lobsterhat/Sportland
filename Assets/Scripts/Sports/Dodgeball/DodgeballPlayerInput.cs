@@ -79,6 +79,11 @@ namespace Sportland.Sports.Dodgeball
         {
             movement = GetComponent<PlayerMovement>();
             tracker = GetComponent<PlayerZoneTracker>();
+
+            // Human input overrides the CPU brain while this component lives.
+            var ai = GetComponent<DodgeballAI>();
+            if (ai != null) ai.enabled = false;
+
             actions = new DodgeballInputActions();
             actions.Jump.performed       += OnJumpPressed;
             actions.Throw.performed      += OnThrowPressed;
@@ -115,6 +120,10 @@ namespace Sportland.Sports.Dodgeball
             }
             if (passedBall != null) passedBall.OnAttached -= OnPassedBallCaught;
             if (Current == this) Current = null;
+
+            // Hand the player back to its CPU brain when control leaves.
+            var ai = GetComponent<DodgeballAI>();
+            if (ai != null) ai.enabled = true;
         }
 
         private void Update()
