@@ -10,7 +10,10 @@ namespace Sportland.Sports.Dodgeball
     ///                 (analog magnitude respected on the stick; D-pad is digital)
     ///   Sprint      — L2 / Left Shift                  (hold)
     ///   Run         — D-pad double-tap (any direction) (sticky while D-pad held)
-    ///   Jump        — Cross / Space
+    ///   Evade       — Cross / Space                    (smart evade — holding the ball: jump
+    ///                                                   to cross a line and throw; empty-handed:
+    ///                                                   a held direction dashes, neutral stick
+    ///                                                   ducks a high throw / jumps a low one)
     ///   Throw       — Square / Q                       (only fires while holding the ball)
     ///   Pass        — Triangle / F                     (tap = lob, hold = chest;
     ///                                                   target = teammate most aligned
@@ -22,7 +25,7 @@ namespace Sportland.Sports.Dodgeball
     {
         public InputAction Move       { get; private set; }
         public InputAction Sprint     { get; private set; }
-        public InputAction Jump       { get; private set; }
+        public InputAction Evade      { get; private set; }
         public InputAction Throw      { get; private set; }
         public InputAction Pass       { get; private set; }
         public InputAction Catch      { get; private set; }
@@ -72,9 +75,9 @@ namespace Sportland.Sports.Dodgeball
             DpadLeft.AddBinding("<Gamepad>/dpad/left");
             DpadRight.AddBinding("<Gamepad>/dpad/right");
 
-            Jump = actionMap.AddAction("Jump", InputActionType.Button);
-            Jump.AddBinding("<Keyboard>/space");
-            Jump.AddBinding("<Gamepad>/buttonSouth");
+            Evade = actionMap.AddAction("Evade", InputActionType.Button);
+            Evade.AddBinding("<Keyboard>/space");
+            Evade.AddBinding("<Gamepad>/buttonSouth");
 
             Throw = actionMap.AddAction("Throw", InputActionType.Button);
             Throw.AddBinding("<Keyboard>/q");

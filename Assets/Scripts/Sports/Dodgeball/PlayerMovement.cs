@@ -34,6 +34,14 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float jumpHeight = 1.5f;  // peak hop height
         [SerializeField] private float jumpDuration = 0.6f;
 
+        [Header("Dash (sidestep evade)")]
+        [Tooltip("Speed (u/s) of the evade dash burst.")]
+        [SerializeField] private float dashSpeed = 14f;
+        [Tooltip("How long the dash burst lasts (seconds). Distance ≈ dashSpeed × this.")]
+        [SerializeField] private float dashDuration = 0.15f;
+        [Tooltip("Minimum time between dashes (seconds).")]
+        [SerializeField] private float dashCooldown = 0.35f;
+
         [Header("Body / duck")]
         [Tooltip("Height (above feet) of the top of the body while standing — the hit ceiling.")]
         [SerializeField] private float standBodyTop = 1.6f;
@@ -54,12 +62,16 @@ namespace Sportland.Sports.Dodgeball
         private Rigidbody2D rb;
         private float jumpTimer = -1f;
         private float duckTimer = -1f;
+        private float dashTimer = -1f;
+        private float dashCooldownTimer = -1f;
+        private Vector2 dashDir = Vector2.right;
         private float spriteBaseY;
         private Vector3 spriteBaseScale = Vector3.one;
         private Transform spriteChild; // visual sprite that we'll bob up/down
 
         public bool IsAirborne => jumpTimer >= 0f;
         public bool IsDucking => duckTimer >= 0f;
+        public bool IsDashing => dashTimer >= 0f;
 
         /// <summary>Current vertical offset of the jump arc above the player's ground position (0 when grounded).</summary>
         public float CurrentJumpHeight { get; private set; }
@@ -110,6 +122,7 @@ namespace Sportland.Sports.Dodgeball
         /// </summary>
         public void ApplyMove(Vector2 input)
         {
+            if (IsDashing) return;   // the dash drives velocity directly; ignore steering input
             Vector2 clamped = input.sqrMagnitude > 1f ? input.normalized : input;
             if (clamped.sqrMagnitude > 0.04f) Facing = clamped.normalized;
             float speed = IsRunning ? runSpeed : walkSpeed;
@@ -122,13 +135,27 @@ namespace Sportland.Sports.Dodgeball
 
         public void TryJump()
         {
-            if (!IsAirborne && !IsDucking) jumpTimer = 0f;
+            if (!IsAirborne && !IsDucking && !IsDashing) jumpTimer = 0f;
         }
 
-        /// <summary>Start/refresh a duck. Holds for duckDuration after the last call. Ignored while airborne.</summary>
+        /// <summary>Start/refresh a duck. Holds for duckDuration after the last call. Ignored while airborne or dashing.</summary>
         public void Duck()
         {
-            if (!IsAirborne) duckTimer = 0f;
+            if (!IsAirborne && !IsDashing) duckTimer = 0f;
+        }
+
+        /// <summary>
+        /// Start a quick lateral dash in <paramref name="dir"/> (the evade
+        /// sidestep). Ignored while airborne, ducking, already dashing, or on
+        /// cooldown. Drives velocity directly for dashDuration, then cools down.
+        /// </summary>
+        public void Dash(Vector2 dir)
+        {
+            if (IsAirborne || IsDucking || IsDashing || dashCooldownTimer >= 0f) return;
+            if (dir.sqrMagnitude < 0.0001f) return;
+            dashDir = dir.normalized;
+            Facing = dashDir;
+            dashTimer = 0f;
         }
 
         private void Update()
@@ -154,6 +181,25 @@ namespace Sportland.Sports.Dodgeball
             {
                 duckTimer += Time.deltaTime;
                 if (duckTimer >= duckDuration) duckTimer = -1f;
+            }
+
+            if (IsDashing)
+            {
+                dashTimer += Time.deltaTime;
+                if (dashTimer >= dashDuration)
+                {
+                    dashTimer = -1f;
+                    dashCooldownTimer = 0f;   // begin cooldown
+                }
+                else
+                {
+                    rb.linearVelocity = dashDir * dashSpeed;
+                }
+            }
+            else if (dashCooldownTimer >= 0f)
+            {
+                dashCooldownTimer += Time.deltaTime;
+                if (dashCooldownTimer >= dashCooldown) dashCooldownTimer = -1f;
             }
 
             // Sprite: bob up with the jump arc, squash down while ducking.

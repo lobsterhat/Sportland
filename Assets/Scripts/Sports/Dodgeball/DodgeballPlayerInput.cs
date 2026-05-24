@@ -5,9 +5,12 @@ namespace Sportland.Sports.Dodgeball
 {
     /// <summary>
     /// Routes PS4 / keyboard input into a single human-controlled Dodgeball
-    /// player. Move uses analog magnitude. L2 holds sprint. Triangle jumps.
-    /// Circle throws. Cross passes (tap = lob, hold = chest). L1 force-returns
-    /// the ball for testing.
+    /// player. Move uses analog magnitude; L2 holds sprint. Square throws,
+    /// Triangle passes (tap = lob, hold = chest), Circle catches. Cross is the
+    /// smart-evade button: holding the ball it jumps (cross a line to throw);
+    /// empty-handed, a held direction dashes off the ball's line while a neutral
+    /// stick ducks a high throw or jumps a low one. L1 force-returns the ball
+    /// for testing.
     ///
     /// Player control is single-active: a static Current reference points at
     /// the live input component. When a pass arrives at the intended target,
@@ -37,6 +40,11 @@ namespace Sportland.Sports.Dodgeball
         [Header("Pass timing")]
         [Tooltip("Hold longer than this (seconds) for chest pass; release sooner for lob.")]
         [SerializeField] private float passTapThreshold = 0.18f;
+
+        [Header("Evade")]
+        [Tooltip("Neutral-stick evade auto-picks a verb from the incoming throw's predicted " +
+                 "arrival height: at/above this, duck under it; below, jump over it.")]
+        [SerializeField] private float evadeDuckHeight = 0.75f;
 
         [Header("Throw aim assist")]
         [Tooltip("Half-angle of the throw cone (degrees). Opponents whose bearing from the thrower " +
@@ -85,7 +93,7 @@ namespace Sportland.Sports.Dodgeball
             if (ai != null) ai.enabled = false;
 
             actions = new DodgeballInputActions();
-            actions.Jump.performed       += OnJumpPressed;
+            actions.Evade.performed      += OnEvadePressed;
             actions.Throw.performed      += OnThrowPressed;
             actions.Pass.started         += OnPassStarted;
             actions.Pass.canceled        += OnPassCanceled;
@@ -106,7 +114,7 @@ namespace Sportland.Sports.Dodgeball
         {
             if (actions != null)
             {
-                actions.Jump.performed       -= OnJumpPressed;
+                actions.Evade.performed      -= OnEvadePressed;
                 actions.Throw.performed      -= OnThrowPressed;
                 actions.Pass.started         -= OnPassStarted;
                 actions.Pass.canceled        -= OnPassCanceled;
@@ -151,7 +159,39 @@ namespace Sportland.Sports.Dodgeball
             movement.ApplyMove(input);
         }
 
-        private void OnJumpPressed(InputAction.CallbackContext _) => movement.TryJump();
+        // Cross is the smart-evade button. Holding the ball it's the offensive
+        // jump (cross a line and throw before landing). Empty-handed it's a
+        // context evade: a held direction dashes off the ball's line; a neutral
+        // stick reads the incoming throw and ducks a high ball / jumps a low one.
+        private void OnEvadePressed(InputAction.CallbackContext _)
+        {
+            if (tracker.HasBall) { movement.TryJump(); return; }
+
+            Vector2 dir = actions.Move.ReadValue<Vector2>();
+            if (dir.sqrMagnitude > 0.04f) { movement.Dash(dir); return; }
+
+            if (TryGetIncomingThrowHeight(out float predictedHeight))
+            {
+                if (predictedHeight >= evadeDuckHeight) movement.Duck();
+                else                                    movement.TryJump();
+            }
+            else
+            {
+                movement.Duck();   // nothing incoming — brief crouch
+            }
+        }
+
+        // Predicted arrival height of an in-flight thrown ball at our position,
+        // used to auto-pick duck vs jump for a neutral-stick evade.
+        private bool TryGetIncomingThrowHeight(out float predictedHeight)
+        {
+            predictedHeight = 0f;
+            var ball = FindAnyObjectByType<Ball>();
+            if (ball == null || ball.CurrentState != Ball.State.Thrown) return false;
+            float dist = Vector2.Distance(transform.position, ball.transform.position);
+            predictedHeight = ball.PredictHeightAfter(dist);
+            return true;
+        }
 
         private void OnDpadUpPressed(InputAction.CallbackContext _)    => HandleDpadPress(0);
         private void OnDpadDownPressed(InputAction.CallbackContext _)  => HandleDpadPress(1);
