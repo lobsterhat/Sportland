@@ -134,7 +134,8 @@ TextureImporter:
     secondaryTextures: []
     spriteCustomMetadata:
       entries: []
-    nameFileIdTable: {}
+    nameFileIdTable:
+      dodgeball_24_0: 6391502430797514526
   mipmapLimitGroupName: 
   pSDRemoveMatte: 0
   userData: 
