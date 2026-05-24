@@ -6,7 +6,10 @@
       "Bash(git -C \"D:/Unity/Sportland\" branch --show-current)",
       "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/DodgeballAI.cs)",
       "Bash(git -C D:/Unity/Sportland commit -m ' *)",
-      "Bash(git -C \"D:/Unity/Sportland\" log --oneline -1)"
+      "Bash(git -C \"D:/Unity/Sportland\" log --oneline -1)",
+      "Bash(git -C \"D:/Unity/Sportland\" --no-pager diff --stat)",
+      "Bash(git -C \"D:/Unity/Sportland\" --no-pager diff)",
+      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/DodgeballInputActions.cs Assets/Scripts/Sports/Dodgeball/DodgeballPlayerInput.cs Assets/Scripts/Sports/Dodgeball/PlayerMovement.cs)"
     ]
   }
 }
