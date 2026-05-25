@@ -69,6 +69,11 @@ namespace Sportland.Sports.Dodgeball
             if (ball == null) ball = FindFirstObjectByType<Ball>();
             if (ball == null || tracker.HasBall) { EndThreat(); Idle(); return; }
 
+            // Backrow (outfielders) can't be eliminated, so they don't fear the
+            // ball: no retreat, no evasion — just hold formation while the
+            // infielders defend. (Offensive positioning comes later.)
+            if (tracker.Spawn.role != PlayerRole.Infielder) { EndThreat(); Idle(); return; }
+
             if (IsIncomingThreat(out Vector2 ballDir))
             {
                 Vector2 ballPos = ball.transform.position;
