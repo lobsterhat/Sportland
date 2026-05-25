@@ -103,6 +103,18 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Ball Height while carried (chest level, above feet).")]
         [SerializeField] private float carryHeight = 1.29f;
         [SerializeField] private float lobApex = 1.2f;
+        [Tooltip("Extra lateral pass speed (u/s) per unit of distance — long passes are thrown harder.")]
+        [SerializeField] private float passSpeedPerUnit = 0.8f;
+        [Tooltip("Cap on lateral pass speed (u/s) after distance scaling.")]
+        [SerializeField] private float maxPassSpeed = 34f;
+        [Tooltip("Extra lob apex (height) per unit of pass distance.")]
+        [SerializeField] private float lobApexPerUnit = 0.06f;
+        [Tooltip("Lob apex floor when an opponent stands in the pass lane (clears their reach).")]
+        [SerializeField] private float lobClearanceApex = 2f;
+        [Tooltip("Maximum lob apex after scaling.")]
+        [SerializeField] private float maxLobApex = 3f;
+        [Tooltip("Half-width (u) of the lob lane used to detect opponents to clear.")]
+        [SerializeField] private float lobLaneRadius = 0.9f;
         [Tooltip("Constant downward acceleration applied to Height in the Thrown state (units/sec^2).")]
         [SerializeField] private float gravity = 12f;
 
@@ -171,6 +183,7 @@ namespace Sportland.Sports.Dodgeball
         private Vector2 passStart;
         private Vector2 passEnd;
         private float passLaunchHeight;
+        private float passApex;
 
         // Bouncing state.
         private float bounceArcTimer;
@@ -280,7 +293,7 @@ namespace Sportland.Sports.Dodgeball
             transform.position = Vector2.Lerp(passStart, passEnd, t);
             float baseline = Mathf.Lerp(passLaunchHeight, carryHeight, t);
             Height = passIsLob
-                ? baseline + lobApex * Mathf.Sin(t * Mathf.PI)
+                ? baseline + passApex * Mathf.Sin(t * Mathf.PI)
                 : baseline;
             TryPickup();
             if (state != State.Passing) return;  // pickup may have transitioned us
@@ -865,24 +878,63 @@ namespace Sportland.Sports.Dodgeball
             float dist = toTarget.magnitude;
             if (dist < 0.01f) return;
 
+            Team passerTeam = carrier.Spawn.team;
+
             recentThrower = carrier;
             throwerCooldownRemaining = throwerPickupCooldown;
             carrier.HeldBall = null;
             carrier = null;
             carrierMovement = null;
 
+            // Long passes are thrown harder so they don't float across the court.
+            float effectiveSpeed = Mathf.Min(lateralSpeed + passSpeedPerUnit * dist, maxPassSpeed);
+
+            // Lobs arc higher the further they travel — and higher still when an
+            // opponent stands in the lane, so the pass clears them.
+            float apex = 0f;
+            if (isLob)
+            {
+                apex = lobApex + lobApexPerUnit * dist;
+                if (OpponentInLane(start, target, passerTeam)) apex = Mathf.Max(apex, lobClearanceApex);
+                apex = Mathf.Min(apex, maxLobApex);
+            }
+
             passStart = start;
             passEnd = target;
-            passDurationCurrent = dist / Mathf.Max(0.01f, lateralSpeed);
+            passDurationCurrent = dist / Mathf.Max(0.01f, effectiveSpeed);
             passTimer = 0f;
             passIsLob = isLob;
+            passApex = apex;
             // Capture the visual height at the moment of release so the
             // trajectory's baseline starts there, not at carryHeight.
             passLaunchHeight = Height;
             state = State.Passing;
 
             rb.simulated = false;
-            RecordRelease(lateralSpeed);
+            RecordRelease(effectiveSpeed);
+        }
+
+        // True if an opponent (other team) stands within lobLaneRadius of the
+        // pass segment, between passer and target — someone a lob should clear.
+        private bool OpponentInLane(Vector2 start, Vector2 end, Team passerTeam)
+        {
+            Vector2 seg = end - start;
+            float segLen = seg.magnitude;
+            if (segLen < 0.01f) return false;
+            Vector2 dir = seg / segLen;
+
+            var trackers = PlayerZoneTracker.All;
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null || t.Spawn.team == passerTeam) continue;
+                Vector2 toP = (Vector2)t.transform.position - start;
+                float along = Vector2.Dot(toP, dir);
+                if (along <= 0.5f || along >= segLen - 0.5f) continue;   // behind passer or past target
+                float perp = Vector2.Distance(start + dir * along, t.transform.position);
+                if (perp <= lobLaneRadius) return true;
+            }
+            return false;
         }
 
         // ── Procedural fallbacks (used only when no prefab provides them) ──
