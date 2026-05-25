@@ -46,12 +46,6 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("At/below this predicted height, jump over the throw.")]
         [SerializeField] private float lowBallThreshold = 0.6f;
 
-        [Header("Positioning")]
-        [Tooltip("During 'prepare' (an opponent holds the ball), defenders back away " +
-                 "from the carrier. Large value = settle against the far edge of the " +
-                 "assigned zone; the zone clamp caps how far they can actually go.")]
-        [SerializeField] private float retreatPush = 25f;
-
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
         private DodgeballAttributes attr;
@@ -211,8 +205,11 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
-        // An opponent is holding the ball: watch the thrower and back away toward
-        // the far edge of the assigned zone so any throw has to travel further.
+        // An opponent is holding the ball: watch the thrower and back away to the
+        // far edge of the assigned zone so any throw has to travel further. We
+        // retreat along the dominant "depth" axis (the way the zone sits away
+        // from the carrier) but hold the spawn lane on the other axis, so the
+        // defenders spread across the zone instead of collapsing into the corners.
         private void Prepare(PlayerZoneTracker carrier)
         {
             movement.IsRunning = false;
@@ -220,9 +217,16 @@ namespace Sportland.Sports.Dodgeball
             Vector2 carrierPos = carrier.transform.position;
             movement.SetFacing(carrierPos - me);
 
-            Vector2 away = me - carrierPos;
-            if (away.sqrMagnitude < 0.0001f) { movement.ApplyMove(Vector2.zero); return; }
-            MoveToward(ClampToZone(me + away.normalized * retreatPush));
+            PlayZone zone = tracker.AssignedZone;
+            Vector2 zoneCenter = (zone.min + zone.max) * 0.5f;
+            Vector2 away = zoneCenter - carrierPos;   // team-consistent retreat direction
+            Vector2 home = tracker.Spawn.position;
+
+            Vector2 target = Mathf.Abs(away.x) >= Mathf.Abs(away.y)
+                ? new Vector2(away.x >= 0f ? zone.max.x : zone.min.x, home.y)   // depth = X, spread in Y
+                : new Vector2(home.x, away.y >= 0f ? zone.max.y : zone.min.y);  // depth = Y, spread in X
+
+            MoveToward(ClampToZone(target));
         }
 
         private void Idle()
