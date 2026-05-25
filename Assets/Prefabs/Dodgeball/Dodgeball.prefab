@@ -118,7 +118,7 @@ MonoBehaviour:
   linearDamping: 1.4
   floorOffsetY: -0.79
   carryHeight: 1.29
-  lobApex: 1.2
+  lobApex: 0.15
   gravity: 12
   headZoneMinHeight: 1.4
   limbZoneMaxHeight: 0.6

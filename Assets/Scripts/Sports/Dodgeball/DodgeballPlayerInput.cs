@@ -27,8 +27,8 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Release speed (u/s) at throwSpeed rating 0 and 100; the thrower's rating lerps between them.")]
         [SerializeField] private float minThrowSpeed = 12f;
         [SerializeField] private float maxThrowSpeed = 36f;
-        [SerializeField] private float lobPassSpeed = 12f;
-        [SerializeField] private float chestPassSpeed = 24f;
+        [SerializeField] private float lobPassSpeed = 10f;
+        [SerializeField] private float chestPassSpeed = 18f;
 
         [Header("Throw accuracy")]
         [Tooltip("At accuracy 0, the aim point is offset by up to this many units PER unit of throw distance; " +
