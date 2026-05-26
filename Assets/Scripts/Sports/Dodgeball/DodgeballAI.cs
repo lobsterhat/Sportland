@@ -85,6 +85,16 @@ namespace Sportland.Sports.Dodgeball
             if (tracker.HasBall) { EndThreat(); Offense(); return; }
             holdStartTime = -1f;   // not holding — reset any wind-up
 
+            // Ball has left the play area: the nearest backrow player fetches it
+            // (leaving its strip — retrieval is allowed out of zone).
+            if (ball.IsOutOfPlay && BallSettled()
+                && tracker.Spawn.role != PlayerRole.Infielder && IsClosestOutfielderToBall())
+            {
+                EndThreat();
+                RetrieveOutOfPlay();
+                return;
+            }
+
             // Backrow (outfielders) can't be eliminated, so they don't fear the
             // ball: no retreat, no evasion — just hold formation while the
             // infielders defend.
@@ -258,8 +268,20 @@ namespace Sportland.Sports.Dodgeball
         // Plant, face a target opponent, wind up, then throw.
         private void Offense()
         {
-            movement.IsRunning = false;
             movement.SetStance(false);
+
+            // Grabbed the ball out of our area — carry it home before we can throw.
+            if (!tracker.IsInZone)
+            {
+                movement.IsRunning = true;
+                Vector2 back = tracker.Spawn.position;
+                movement.SetFacing(back - (Vector2)transform.position);
+                MoveToward(back);
+                holdStartTime = -1f;   // wind-up only starts once we're set in our area
+                return;
+            }
+
+            movement.IsRunning = false;
             movement.ApplyMove(Vector2.zero);   // plant to throw
 
             if (throwTarget == null || throwTarget.Spawn.team == tracker.Spawn.team)
@@ -320,9 +342,11 @@ namespace Sportland.Sports.Dodgeball
 
         // ── Loose-ball retrieval ──
 
+        private bool BallSettled() =>
+            ball.CurrentState == Ball.State.Loose || ball.CurrentState == Ball.State.Bouncing;
+
         private bool BallIsLoose() =>
-            (ball.CurrentState == Ball.State.Loose || ball.CurrentState == Ball.State.Bouncing)
-            && tracker.AssignedZone.Contains(ball.transform.position);
+            BallSettled() && tracker.AssignedZone.Contains(ball.transform.position);
 
         // True if no same-team infielder is closer to the ball than I am, so
         // only the nearest one commits to the chase (not the whole line).
@@ -349,6 +373,33 @@ namespace Sportland.Sports.Dodgeball
             Vector2 ballPos = ball.transform.position;
             movement.SetFacing(ballPos - (Vector2)transform.position);
             MoveToward(ClampToZone(ballPos));
+        }
+
+        // Backrow fetch of an out-of-play ball — chase the actual ball position
+        // (unclamped, leaving the strip); the passive pickup then secures it.
+        private void RetrieveOutOfPlay()
+        {
+            movement.IsRunning = true;
+            movement.SetStance(false);
+            Vector2 ballPos = ball.transform.position;
+            movement.SetFacing(ballPos - (Vector2)transform.position);
+            MoveToward(ballPos);
+        }
+
+        // True if no other outfielder (either team) is closer to the ball, so
+        // only the nearest backrow player commits to the retrieval.
+        private bool IsClosestOutfielderToBall()
+        {
+            Vector2 ballPos = ball.transform.position;
+            float myDistSq = ((Vector2)transform.position - ballPos).sqrMagnitude;
+            var trackers = PlayerZoneTracker.All;
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null || t == tracker || t.Spawn.role == PlayerRole.Infielder) continue;
+                if (((Vector2)t.transform.position - ballPos).sqrMagnitude < myDistSq) return false;
+            }
+            return true;
         }
 
         private void Idle()
