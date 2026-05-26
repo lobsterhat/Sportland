@@ -80,11 +80,13 @@ namespace Sportland.Sports.Dodgeball
             float playerSpeed = rb != null ? rb.linearVelocity.magnitude : 0f;
             string state      = movement != null && movement.IsRunning ? "RUN" : "walk";
             string accelStr   = movement != null && movement.IsAccelerating ? "yes" : "no";
+            string stanceStr  = movement != null && movement.InDefensiveStance ? "ON (set, slow)" : "off";
 
             return new[]
             {
                 $"Player speed: {Speed(playerSpeed)}",
                 $"State:        {state}",
+                $"Stance:       {stanceStr}",
                 $"Accelerating: {accelStr}",
                 $"Ball speed:   {Speed(ballSpeed)}",
                 $"Ball height:  {ballHeight,5:F2} u",
@@ -146,6 +148,7 @@ namespace Sportland.Sports.Dodgeball
                 lines.Add($"catching {f.catching01:F2}    base   +{f.baseChance:F2}");
                 lines.Add($"ballspd {f.ballSpeed:F1} u/s ({DodgeballUnits.ToMph(f.ballSpeed):F0}mph) -spd {f.speedPenalty:F2}");
                 lines.Add($"facing  a{f.facingAlignment,5:F2}   {Signed(f.facingFactor)} fac");
+                lines.Add($"stance  {(f.inStance ? "Y" : "n")}        {Signed(f.stanceFactor)} stn");
                 lines.Add($"armed {(f.armed ? "Y" : "n")}  t{f.timingScore:F2}    {Signed(f.timingFactor)} time");
                 lines.Add($"luck {f.luck01:F2} (roll adds 0..{f.luck01 * 0.15f:F2})");
                 lines.Add($"= preview chance {Pct(f.finalChance)}  (no luck)");
