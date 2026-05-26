@@ -206,6 +206,17 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Current trajectory state.</summary>
         public State CurrentState => state;
 
+        /// <summary>True when the ball has left the play area (beyond the outer strip bounds).</summary>
+        public bool IsOutOfPlay
+        {
+            get
+            {
+                Vector2 p = transform.position;
+                return Mathf.Abs(p.x) > CourtSetup.HalfWidth + ZoneFactory.StripDepth
+                    || Mathf.Abs(p.y) > CourtSetup.HalfHeight + ZoneFactory.StripDepth;
+            }
+        }
+
         /// <summary>Lateral (court-plane) velocity of the ball.</summary>
         public Vector2 Velocity => rb != null ? rb.linearVelocity : Vector2.zero;
 
@@ -473,7 +484,8 @@ namespace Sportland.Sports.Dodgeball
 
             if (!live)
             {
-                if (t.CanCatchBall() && Height <= pickupMaxHeight) { AttachTo(t); return true; }
+                // In-zone as usual, OR anyone may retrieve a ball that's left the play area.
+                if ((t.CanCatchBall() || IsOutOfPlay) && Height <= pickupMaxHeight) { AttachTo(t); return true; }
                 return false;
             }
 
