@@ -87,12 +87,19 @@ namespace Sportland.Sports.Dodgeball
             if (tracker.HasBall) { EndThreat(); Offense(); return; }
             holdStartTime = -1f;   // not holding — reset any wind-up
 
-            // Outfielders don't defend (can't be eliminated): they fetch a loose
-            // ball that's settled in their strip, otherwise hold formation. Once
-            // they grab one, Offense lobs it back to an infielder.
+            // Outfielders don't defend (can't be eliminated). They read an
+            // incoming throw and get under its predicted landing — staying in
+            // their strip — to take it out of the air or off the hop; failing
+            // that they fetch a loose ball already in their strip, else hold.
+            // Once they grab one, Offense lobs it back to an infielder.
             if (tracker.Spawn.role != PlayerRole.Infielder)
             {
                 EndThreat();
+                if (ball.CurrentState == Ball.State.Thrown)
+                {
+                    Vector2 land = ball.PredictGroundPoint();
+                    if (tracker.AssignedZone.Contains(land)) { AnticipateCatch(land); return; }
+                }
                 if (BallIsLoose()) ChaseLooseBall();
                 else Idle();
                 return;
@@ -375,6 +382,20 @@ namespace Sportland.Sports.Dodgeball
             Vector2 ballPos = ball.transform.position;
             movement.SetFacing(ballPos - (Vector2)transform.position);
             MoveToward(ClampToZone(ballPos));
+        }
+
+        // Read the throw's predicted landing and get under it (clamped to our
+        // zone), facing the ball and arming a catch when it's near so we can take
+        // it out of the air; otherwise we're there to grab it off the hop.
+        private void AnticipateCatch(Vector2 land)
+        {
+            movement.IsRunning = true;
+            movement.SetStance(false);
+            movement.SetFacing((Vector2)ball.transform.position - (Vector2)transform.position);
+            MoveToward(ClampToZone(land));
+
+            if (Vector2.Distance(transform.position, ball.transform.position) <= armWithinDistance)
+                tracker.ArmCatch();
         }
 
         // Outfielder offense: lob the ball back to the nearest teammate infielder

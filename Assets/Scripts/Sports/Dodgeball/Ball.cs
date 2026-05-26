@@ -857,6 +857,31 @@ namespace Sportland.Sports.Dodgeball
         }
 
         /// <summary>
+        /// Predicts the lateral world position where the ball first reaches the
+        /// ground on its current trajectory (projectile fall time × drag-aware
+        /// lateral distance). Ignores wall/player bounces — meant for AI to
+        /// position under an incoming throw; re-evaluate each frame so a wall
+        /// bounce self-corrects. Returns the current position if not moving.
+        /// </summary>
+        public Vector2 PredictGroundPoint()
+        {
+            Vector2 pos = transform.position;
+            Vector2 v = rb != null ? rb.linearVelocity : Vector2.zero;
+            float v0 = v.magnitude;
+            if (v0 < 0.01f) return pos;
+
+            // Time for Height to fall to 0:  0.5·g·t² − hv·t − H = 0.
+            float disc = heightVelocity * heightVelocity + 2f * gravity * Mathf.Max(0f, Height);
+            float t = gravity > 0.0001f ? (heightVelocity + Mathf.Sqrt(disc)) / gravity : 0f;
+            if (t <= 0f) return pos;
+
+            // Lateral distance covered in t under exponential drag.
+            float k = linearDamping;
+            float dist = k > 0.0001f ? (v0 / k) * (1f - Mathf.Exp(-k * t)) : v0 * t;
+            return pos + v.normalized * dist;
+        }
+
+        /// <summary>
         /// Lead-the-target aim point. Predicts where the target will be when
         /// the ball arrives (drag-aware flight time) and blends from the
         /// target's current position (anticipation 0) to the full predicted
