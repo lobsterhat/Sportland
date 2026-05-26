@@ -46,6 +46,15 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("At/below this predicted height, jump over the throw.")]
         [SerializeField] private float lowBallThreshold = 0.6f;
 
+        [Header("Offense (throwing)")]
+        [Tooltip("Seconds the AI holds the ball (winds up) before throwing.")]
+        [SerializeField] private float windupTime = 0.7f;
+        [Tooltip("Release speed (u/s) at throwSpeed rating 0 and 100; the rating lerps between them.")]
+        [SerializeField] private float minThrowSpeed = 12f;
+        [SerializeField] private float maxThrowSpeed = 36f;
+        [Tooltip("At accuracy 0, the aim scatters up to this many units per unit of distance (→0 at accuracy 100).")]
+        [SerializeField] private float accuracyErrorPerUnit = 0.15f;
+
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
         private DodgeballAttributes attr;
@@ -57,6 +66,9 @@ namespace Sportland.Sports.Dodgeball
         private bool armedThisThreat;
         private bool jumpedThisThreat;
 
+        private float holdStartTime = -1f;       // when we picked up the ball (wind-up clock)
+        private PlayerZoneTracker throwTarget;
+
         private void Awake()
         {
             movement = GetComponent<PlayerMovement>();
@@ -67,11 +79,15 @@ namespace Sportland.Sports.Dodgeball
         private void Update()
         {
             if (ball == null) ball = FindFirstObjectByType<Ball>();
-            if (ball == null || tracker.HasBall) { EndThreat(); Idle(); return; }
+            if (ball == null) { EndThreat(); Idle(); return; }
+
+            // Holding the ball: go on offense — wind up and throw at an opponent.
+            if (tracker.HasBall) { EndThreat(); Offense(); return; }
+            holdStartTime = -1f;   // not holding — reset any wind-up
 
             // Backrow (outfielders) can't be eliminated, so they don't fear the
             // ball: no retreat, no evasion — just hold formation while the
-            // infielders defend. (Offensive positioning comes later.)
+            // infielders defend.
             if (tracker.Spawn.role != PlayerRole.Infielder) { EndThreat(); Idle(); return; }
 
             if (IsIncomingThreat(out Vector2 ballDir))
@@ -103,6 +119,7 @@ namespace Sportland.Sports.Dodgeball
 
             var carrier = ball.Carrier;
             if (carrier != null && carrier.Spawn.team != tracker.Spawn.team) Prepare(carrier);
+            else if (carrier == null && BallIsLoose() && IsClosestTeammateToBall()) ChaseLooseBall();
             else Idle();
         }
 
@@ -234,6 +251,104 @@ namespace Sportland.Sports.Dodgeball
                 : new Vector2(home.x, away.y >= 0f ? zone.max.y : zone.min.y);  // depth = Y, spread in X
 
             MoveToward(ClampToZone(target));
+        }
+
+        // ── Offense (holding the ball) ──
+
+        // Plant, face a target opponent, wind up, then throw.
+        private void Offense()
+        {
+            movement.IsRunning = false;
+            movement.SetStance(false);
+            movement.ApplyMove(Vector2.zero);   // plant to throw
+
+            if (throwTarget == null || throwTarget.Spawn.team == tracker.Spawn.team)
+                throwTarget = PickThrowTarget();
+            if (throwTarget == null) return;    // nobody to throw at — just hold
+
+            movement.SetFacing((Vector2)throwTarget.transform.position - (Vector2)transform.position);
+
+            if (holdStartTime < 0f) holdStartTime = Time.time;
+            if (Time.time - holdStartTime >= windupTime)
+            {
+                ThrowAtTarget(throwTarget);
+                holdStartTime = -1f;
+                throwTarget = null;
+            }
+        }
+
+        // Nearest opposing infielder. Outfielders can't be eliminated, so they
+        // aren't worth targeting.
+        private PlayerZoneTracker PickThrowTarget()
+        {
+            PlayerZoneTracker best = null;
+            float bestDistSq = float.MaxValue;
+            Vector2 me = transform.position;
+            var team = tracker.Spawn.team;
+
+            var trackers = PlayerZoneTracker.All;
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null || t.Spawn.team == team || t.Spawn.role != PlayerRole.Infielder) continue;
+                float d = ((Vector2)t.transform.position - me).sqrMagnitude;
+                if (d < bestDistSq) { bestDistSq = d; best = t; }
+            }
+            return best;
+        }
+
+        private void ThrowAtTarget(PlayerZoneTracker target)
+        {
+            float power = Mathf.Lerp(minThrowSpeed, maxThrowSpeed, attr != null ? attr.ThrowSpeed01 : 0.6f);
+            float anticipation = attr != null ? attr.Anticipation01 : 0f;
+            var targetRb = target.GetComponent<Rigidbody2D>();
+            Vector2 targetVel = targetRb != null ? targetRb.linearVelocity : Vector2.zero;
+
+            Vector2 aim = ball.LeadAim(transform.position, target.transform.position, targetVel, power, anticipation);
+            ball.ThrowAt(ApplyAccuracy(aim), power);
+        }
+
+        // Scatter the aim; the miss grows with distance and with how far below
+        // 100 the thrower's accuracy rating is.
+        private Vector2 ApplyAccuracy(Vector2 aimPoint)
+        {
+            float acc01 = attr != null ? attr.ThrowAccuracy01 : 0.6f;
+            float dist = Vector2.Distance(transform.position, aimPoint);
+            float maxError = (1f - acc01) * accuracyErrorPerUnit * dist;
+            return aimPoint + Random.insideUnitCircle * maxError;
+        }
+
+        // ── Loose-ball retrieval ──
+
+        private bool BallIsLoose() =>
+            (ball.CurrentState == Ball.State.Loose || ball.CurrentState == Ball.State.Bouncing)
+            && tracker.AssignedZone.Contains(ball.transform.position);
+
+        // True if no same-team infielder is closer to the ball than I am, so
+        // only the nearest one commits to the chase (not the whole line).
+        private bool IsClosestTeammateToBall()
+        {
+            Vector2 ballPos = ball.transform.position;
+            float myDistSq = ((Vector2)transform.position - ballPos).sqrMagnitude;
+            var team = tracker.Spawn.team;
+            var trackers = PlayerZoneTracker.All;
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null || t == tracker) continue;
+                if (t.Spawn.team != team || t.Spawn.role != PlayerRole.Infielder) continue;
+                if (((Vector2)t.transform.position - ballPos).sqrMagnitude < myDistSq) return false;
+            }
+            return true;
+        }
+
+        private void ChaseLooseBall()
+        {
+            movement.IsRunning = true;
+            movement.SetStance(false);
+            Vector2 ballPos = ball.transform.position;
+            movement.SetFacing(ballPos - (Vector2)transform.position);
+            MoveToward(ClampToZone(ballPos));
         }
 
         private void Idle()
