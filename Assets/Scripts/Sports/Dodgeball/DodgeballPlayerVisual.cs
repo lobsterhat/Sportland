@@ -20,10 +20,19 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private Color teamBColor = new Color(1.00f, 0.55f, 0.55f, 1f);
         [SerializeField] private Color outOfZoneTint = new Color(1f, 0.85f, 0.2f, 1f);
 
+        [Header("Facing arrow")]
+        [SerializeField] private Color arrowColor = new Color(1f, 0.95f, 0.3f, 0.95f);
+        [Tooltip("How far from the player center the pointer orbits.")]
+        [SerializeField] private float arrowDistance = 0.9f;
+        [SerializeField] private float arrowSize = 0.35f;
+        [SerializeField] private int arrowSortingOrder = 26;
+
         private Material bodyMaterial;
         private SpriteRenderer spriteRenderer;
         private PlayerZoneTracker tracker;
         private Color baseColor;
+        private PlayerMovement movement;
+        private Transform arrowTransform;
 
         public void Configure(Team team, PlayerRole role, PlayerZoneTracker zoneTracker)
         {
@@ -40,10 +49,15 @@ namespace Sportland.Sports.Dodgeball
                 BuildBody(baseColor);
                 BuildRoleMark(role, baseColor);
             }
+
+            movement = GetComponentInParent<PlayerMovement>();
+            BuildFacingArrow();
         }
 
         private void Update()
         {
+            UpdateFacingArrow();
+
             if (tracker == null) return;
             Color target = tracker.IsInZone ? baseColor : outOfZoneTint;
 
@@ -118,6 +132,52 @@ namespace Sportland.Sports.Dodgeball
                 float a = i * Mathf.PI * 2f / segs;
                 lr.SetPosition(i, new Vector3(Mathf.Cos(a) * r, Mathf.Sin(a) * r, 0f));
             }
+        }
+
+        private void BuildFacingArrow()
+        {
+            if (arrowTransform != null) return;
+
+            // Parent to the player root (not this Visual child) so the jump bob
+            // and duck squash don't distort the pointer.
+            Transform parent = transform.parent != null ? transform.parent : transform;
+            var go = new GameObject("FacingArrow");
+            go.transform.SetParent(parent, false);
+
+            var mf = go.AddComponent<MeshFilter>();
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = CreateMat(arrowColor);
+            mr.sortingOrder = arrowSortingOrder;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+
+            float s = arrowSize;
+            var verts = new Vector3[]
+            {
+                new Vector3( s * 0.6f,  0f,       0f),   // tip (+X); rotated to Facing each frame
+                new Vector3(-s * 0.4f,  s * 0.5f, 0f),
+                new Vector3(-s * 0.4f, -s * 0.5f, 0f),
+            };
+            var tris = new int[] { 0, 1, 2 };
+            var mesh = new Mesh { name = "FacingArrow", vertices = verts, triangles = tris };
+            mesh.RecalculateNormals();
+            mf.mesh = mesh;
+
+            arrowTransform = go.transform;
+        }
+
+        // Orbit the pointer around the player in the current Facing direction.
+        private void UpdateFacingArrow()
+        {
+            if (arrowTransform == null) return;
+            if (movement == null) movement = GetComponentInParent<PlayerMovement>();
+            if (movement == null) return;
+
+            Vector2 f = movement.Facing;
+            if (f.sqrMagnitude < 0.0001f) return;
+            float ang = Mathf.Atan2(f.y, f.x) * Mathf.Rad2Deg;
+            arrowTransform.localPosition = new Vector3(f.x * arrowDistance, f.y * arrowDistance, 0f);
+            arrowTransform.localRotation = Quaternion.Euler(0f, 0f, ang);
         }
 
         private static Material CreateMat(Color c)
