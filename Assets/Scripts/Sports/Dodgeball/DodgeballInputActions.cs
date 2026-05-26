@@ -19,6 +19,8 @@ namespace Sportland.Sports.Dodgeball
     ///                                                   target = teammate most aligned
     ///                                                   with last move direction)
     ///   Catch       — Circle / E                       (active grab of a nearby ball)
+    ///   Stance      — R2 / Left-Ctrl                   (toggle defensive stance: face the ball,
+    ///                                                   move slower, full catch/evade)
     ///   ReturnBall  — L1 / 1                           (debug: snap ball to player)
     /// </summary>
     public class DodgeballInputActions
@@ -29,6 +31,7 @@ namespace Sportland.Sports.Dodgeball
         public InputAction Throw      { get; private set; }
         public InputAction Pass       { get; private set; }
         public InputAction Catch      { get; private set; }
+        public InputAction Stance     { get; private set; }
         public InputAction ReturnBall { get; private set; }
 
         // Per-direction D-pad press actions. The input layer watches their
@@ -90,6 +93,10 @@ namespace Sportland.Sports.Dodgeball
             Catch = actionMap.AddAction("Catch", InputActionType.Button);
             Catch.AddBinding("<Keyboard>/e");
             Catch.AddBinding("<Gamepad>/buttonEast");   // Circle
+
+            Stance = actionMap.AddAction("Stance", InputActionType.Button);
+            Stance.AddBinding("<Keyboard>/leftCtrl");
+            Stance.AddBinding("<Gamepad>/rightTrigger");   // R2
 
             ReturnBall = actionMap.AddAction("ReturnBall", InputActionType.Button);
             ReturnBall.AddBinding("<Keyboard>/1");

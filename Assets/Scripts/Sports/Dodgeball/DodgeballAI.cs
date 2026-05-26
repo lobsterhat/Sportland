@@ -76,6 +76,7 @@ namespace Sportland.Sports.Dodgeball
 
             if (IsIncomingThreat(out Vector2 ballDir))
             {
+                movement.SetStance(true);   // reacting to a live throw — fully set
                 Vector2 ballPos = ball.transform.position;
                 float distToBall = Vector2.Distance(transform.position, ballPos);
                 float predictedHeight = ball.PredictHeightAfter(distToBall);
@@ -218,6 +219,7 @@ namespace Sportland.Sports.Dodgeball
         private void Prepare(PlayerZoneTracker carrier)
         {
             movement.IsRunning = false;
+            movement.SetStance(true);   // set and watching the ball
             Vector2 me = transform.position;
             Vector2 carrierPos = carrier.transform.position;
             movement.SetFacing(carrierPos - me);
@@ -237,6 +239,7 @@ namespace Sportland.Sports.Dodgeball
         private void Idle()
         {
             movement.IsRunning = false;
+            movement.SetStance(false);
             Vector2 home = tracker.Spawn.position;
             Vector2 delta = home - (Vector2)transform.position;
             movement.ApplyMove(delta.sqrMagnitude > homeDeadzone * homeDeadzone

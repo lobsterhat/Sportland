@@ -71,6 +71,10 @@ namespace Sportland.Sports.Dodgeball
         private bool isRunning;
         private float idleTime;
 
+        // Defensive stance (R2 / Left-Ctrl toggle): face the ball + move slower.
+        private bool inStance;
+        private Ball cachedBall;   // for stance facing
+
         // Direction memory for second-tap-while-moving run detection. The
         // previous D-pad press direction is held until movement has been
         // idle for longer than directionMemorySeconds; pressing that same
@@ -98,6 +102,7 @@ namespace Sportland.Sports.Dodgeball
             actions.Pass.started         += OnPassStarted;
             actions.Pass.canceled        += OnPassCanceled;
             actions.Catch.performed      += OnCatchPressed;
+            actions.Stance.performed     += OnStancePressed;
             actions.ReturnBall.performed += OnReturnBallPressed;
             actions.DpadUp.started       += OnDpadUpPressed;
             actions.DpadDown.started     += OnDpadDownPressed;
@@ -119,6 +124,7 @@ namespace Sportland.Sports.Dodgeball
                 actions.Pass.started         -= OnPassStarted;
                 actions.Pass.canceled        -= OnPassCanceled;
                 actions.Catch.performed      -= OnCatchPressed;
+                actions.Stance.performed     -= OnStancePressed;
                 actions.ReturnBall.performed -= OnReturnBallPressed;
                 actions.DpadUp.started       -= OnDpadUpPressed;
                 actions.DpadDown.started     -= OnDpadDownPressed;
@@ -153,6 +159,17 @@ namespace Sportland.Sports.Dodgeball
                 {
                     previousDpadDirIndex = -1;
                 }
+            }
+
+            // Defensive stance: drop it on gaining the ball; otherwise face the
+            // ball each frame so the player backpedals/strafes. PlayerMovement
+            // applies the slow-down; the catch/evade upside comes for free.
+            if (inStance && tracker.HasBall) { inStance = false; movement.SetStance(false); }
+            if (inStance)
+            {
+                if (cachedBall == null) cachedBall = FindAnyObjectByType<Ball>();
+                if (cachedBall != null)
+                    movement.SetFacing((Vector2)cachedBall.transform.position - (Vector2)transform.position);
             }
 
             movement.IsRunning = isRunning || actions.Sprint.IsPressed();
@@ -407,6 +424,15 @@ namespace Sportland.Sports.Dodgeball
             // ball at the player's feet is still a free walk-over pickup.)
             if (tracker.HasBall) return;
             tracker.ArmCatch();
+        }
+
+        // Toggle the defensive stance. No stance while carrying the ball — that's
+        // offense. Update() faces the ball and PlayerMovement applies the slow-down.
+        private void OnStancePressed(InputAction.CallbackContext _)
+        {
+            if (tracker.HasBall) return;
+            inStance = !inStance;
+            movement.SetStance(inStance);
         }
 
         private void OnReturnBallPressed(InputAction.CallbackContext _)
