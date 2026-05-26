@@ -233,7 +233,7 @@ namespace Sportland.Sports.Dodgeball
         private void OnThrowPressed(InputAction.CallbackContext _)
         {
             var ball = tracker.HeldBall;
-            if (ball == null) return;
+            if (ball == null) { SwitchToClosestLooseBallTeammate(); return; }
             if (!tracker.IsInZone && !movement.IsAirborne) return;   // can't throw from outside your zone
 
             float power = ThrowReleaseSpeed();
@@ -434,6 +434,30 @@ namespace Sportland.Sports.Dodgeball
         {
             var ball = FindAnyObjectByType<Ball>();
             if (ball != null) ball.ForcePickup(tracker);
+        }
+
+        // Square/Q with no ball in hand: if the ball is loose (it has hit a
+        // player or the ground — i.e. not held / passing / thrown), hand control
+        // to the teammate closest to it so you can make a play on the ball.
+        private void SwitchToClosestLooseBallTeammate()
+        {
+            var ball = FindAnyObjectByType<Ball>();
+            if (ball == null) return;
+            if (ball.CurrentState != Ball.State.Loose && ball.CurrentState != Ball.State.Bouncing) return;
+
+            PlayerZoneTracker best = null;
+            float bestDistSq = float.MaxValue;
+            Vector2 ballPos = ball.transform.position;
+            var team = tracker.Spawn.team;
+            var trackers = PlayerZoneTracker.All;
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null || t.Spawn.team != team) continue;
+                float d = ((Vector2)t.transform.position - ballPos).sqrMagnitude;
+                if (d < bestDistSq) { bestDistSq = d; best = t; }
+            }
+            if (best != null && best != tracker) TransferControl(best.gameObject);
         }
 
         /// <summary>
