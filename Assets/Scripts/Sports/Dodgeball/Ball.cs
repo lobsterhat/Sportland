@@ -40,6 +40,7 @@ namespace Sportland.Sports.Dodgeball
             [Range(0f, 1f)] public float speedPenalty = 0.40f;
             [Range(0f, 1f)] public float facingBonus = 0.15f;     // facing the ball head-on
             [Range(0f, 1f)] public float facingPenalty = 0.60f;   // facing fully away
+            [Range(0f, 1f)] public float stancePenalty = 0.35f;   // not set in a defensive stance
             [Range(0f, 1f)] public float timingBonus = 0.20f;     // press right as the ball arrives
             [Range(0f, 1f)] public float timingPenalty = 0.30f;   // press at the edge of the window
             [Range(0f, 1f)] public float luckBonus = 0.15f;       // random upside scaled by luck
@@ -56,6 +57,8 @@ namespace Sportland.Sports.Dodgeball
             public float speedPenalty;     // subtracted (the only "throw speed" influence)
             public float facingAlignment;  // -1..1 (+1 = head-on into the ball)
             public float facingFactor;     // signed
+            public bool  inStance;         // catcher set in a defensive stance
+            public float stanceFactor;     // signed (penalty when not in stance)
             public bool  armed;            // catch press active
             public float timingScore;      // 0..1
             public float timingFactor;     // signed
@@ -535,6 +538,7 @@ namespace Sportland.Sports.Dodgeball
             var genAttr   = catcher.GetComponent<GeneralAttributes>();
             f.catching01 = catchAttr != null ? catchAttr.Catching01 : 0.6f;
             f.luck01     = genAttr != null ? genAttr.Luck01 : 0.5f;
+            var move = catcher.GetComponent<PlayerMovement>();
 
             // Base from catching ability.
             f.baseChance = Mathf.Lerp(catchTuning.minBaseChance, catchTuning.maxBaseChance, f.catching01);
@@ -557,7 +561,6 @@ namespace Sportland.Sports.Dodgeball
             }
             else
             {
-                var move = catcher.GetComponent<PlayerMovement>();
                 Vector2 facing = move != null ? move.Facing : Vector2.right;
                 f.facingAlignment = -Vector2.Dot(facing.normalized, vel.normalized); // +1 = head-on
                 f.facingFactor = Mathf.Lerp(-catchTuning.facingPenalty, catchTuning.facingBonus,
@@ -581,8 +584,12 @@ namespace Sportland.Sports.Dodgeball
             // Luck: random upside that grows with the luck rating.
             f.luckContribution = applyLuck ? Random.value * f.luck01 * catchTuning.luckBonus : 0f;
 
+            // Defensive stance: a flat-footed catcher (not set) takes a penalty.
+            f.inStance = move != null && move.InDefensiveStance;
+            f.stanceFactor = f.inStance ? 0f : -catchTuning.stancePenalty;
+
             f.rawChance = f.baseChance - f.speedPenalty
-                        + f.facingFactor + f.timingFactor + f.luckContribution;
+                        + f.facingFactor + f.stanceFactor + f.timingFactor + f.luckContribution;
             f.finalChance = Mathf.Clamp01(f.rawChance);
             return f;
         }
