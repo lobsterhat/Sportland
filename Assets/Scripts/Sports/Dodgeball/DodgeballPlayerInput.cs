@@ -73,7 +73,8 @@ namespace Sportland.Sports.Dodgeball
 
         // Defensive stance (R2 / Left-Ctrl toggle): face the ball + move slower.
         private bool inStance;
-        private Ball cachedBall;   // for stance facing
+        private Ball cachedBall;            // ball ref (stance facing + attach subscription)
+        private bool subscribedToBall;
 
         // Direction memory for second-tap-while-moving run detection. The
         // previous D-pad press direction is held until movement has been
@@ -81,10 +82,6 @@ namespace Sportland.Sports.Dodgeball
         // direction inside the window engages run.
         private int previousDpadDirIndex = -1;
         private float lastMovementActiveTime = -10f;
-
-        // Pending pass we issued: the catch handler watches for this ball so it
-        // can hand control off to the teammate who receives it.
-        private Ball passedBall;
 
         private void Awake()
         {
@@ -109,6 +106,7 @@ namespace Sportland.Sports.Dodgeball
             actions.DpadRight.started    += OnDpadRightPressed;
 
             Current = this;
+            EnsureBallSubscription();
         }
 
         private void OnEnable()  => actions?.Enable();
@@ -131,7 +129,7 @@ namespace Sportland.Sports.Dodgeball
                 actions.DpadRight.started    -= OnDpadRightPressed;
                 actions.Disable();
             }
-            if (passedBall != null) passedBall.OnAttached -= OnPassedBallCaught;
+            if (cachedBall != null && subscribedToBall) cachedBall.OnAttached -= OnBallAttached;
             if (Current == this) Current = null;
 
             // Hand the player back to its CPU brain when control leaves.
@@ -141,6 +139,8 @@ namespace Sportland.Sports.Dodgeball
 
         private void Update()
         {
+            EnsureBallSubscription();
+
             Vector2 input = actions.Move.ReadValue<Vector2>();
             if (input.sqrMagnitude > 0.04f)
             {
@@ -357,28 +357,11 @@ namespace Sportland.Sports.Dodgeball
             var target = FindPassTarget();
             if (target == null) return;
 
-            // Clear any stale subscription before recording the new pass.
-            if (passedBall != null) passedBall.OnAttached -= OnPassedBallCaught;
-            passedBall = ball;
-            passedBall.OnAttached += OnPassedBallCaught;
-
             // Parametric drive — ball lerps to target's current position; lob
             // adds an arc, chest stays flat. Speed sets the flight duration.
             ball.Pass(target.transform.position,
                       isChest ? chestPassSpeed : lobPassSpeed,
                       isLob: !isChest);
-        }
-
-        private void OnPassedBallCaught(PlayerZoneTracker catcher)
-        {
-            if (passedBall == null) return;
-            passedBall.OnAttached -= OnPassedBallCaught;
-            passedBall = null;
-
-            // Control follows the ball to whichever teammate receives the pass;
-            // an opponent interception leaves control where it was.
-            if (catcher != null && catcher.Spawn.team == tracker.Spawn.team)
-                TransferControl(catcher.gameObject);
         }
 
         /// <summary>
@@ -434,6 +417,27 @@ namespace Sportland.Sports.Dodgeball
         {
             var ball = FindAnyObjectByType<Ball>();
             if (ball != null) ball.ForcePickup(tracker);
+        }
+
+        // Control follows possession: whenever a player on our team gains the
+        // ball — catch, loose-ball pickup, retrieval, or pass — hand control to
+        // them. An opponent gaining the ball leaves control where it is.
+        private void OnBallAttached(PlayerZoneTracker carrier)
+        {
+            if (carrier == null || carrier == tracker) return;
+            if (carrier.Spawn.team != tracker.Spawn.team) return;
+            TransferControl(carrier.gameObject);
+        }
+
+        // Subscribe once to the ball's attach event (the ball may not exist yet
+        // at Awake, so this is retried from Update until it takes).
+        private void EnsureBallSubscription()
+        {
+            if (subscribedToBall) return;
+            if (cachedBall == null) cachedBall = FindAnyObjectByType<Ball>();
+            if (cachedBall == null) return;
+            cachedBall.OnAttached += OnBallAttached;
+            subscribedToBall = true;
         }
 
         // Square/Q with no ball in hand: if the ball is loose (it has hit a
