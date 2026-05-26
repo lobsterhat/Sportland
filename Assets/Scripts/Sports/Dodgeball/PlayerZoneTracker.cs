@@ -20,7 +20,8 @@ namespace Sportland.Sports.Dodgeball
     {
         // --- Tunables ---------------------------------------------------------
         [Header("Rule timings")]
-        [SerializeField] private float returnGraceSeconds = 3f;
+        [Tooltip("Neutral-zone grace: seconds after crossing out of your zone before holding the ball there forfeits it.")]
+        [SerializeField] private float returnGraceSeconds = 2f;
         [SerializeField] private int   crossingsForWarning = 3;
         [SerializeField] private float crossingWindowSeconds = 30f;
 
@@ -191,14 +192,42 @@ namespace Sportland.Sports.Dodgeball
                 returnExpiryFired = true;
                 OnReturnTimerExpired?.Invoke(this);
 
-                // If still holding the ball at expiry, that's also a turnover
-                // (covers the case where they left without the ball, then
-                // picked one up while out of zone).
+                // Still holding the ball past the neutral-zone grace → forfeit it
+                // to the opposing team (covers leaving without the ball then
+                // picking one up out of zone). Airborne is the line-cross exception.
                 if (HasBall && !movement.IsAirborne)
                 {
-                    OnTurnoverFromOutOfZoneWithBall?.Invoke(this);
+                    ForfeitHeldBall();
                 }
             }
+        }
+
+        // Failed to clear the neutral zone in time while holding the ball:
+        // issue a warning and hand possession to the nearest opposing infielder.
+        private void ForfeitHeldBall()
+        {
+            var ball = HeldBall;
+            OnWarningIssued?.Invoke(this);
+            Debug.Log($"[Dodgeball] {Spawn.id} held the ball past the neutral-zone grace — warning + forfeit.");
+            if (ball == null) return;
+            var opp = NearestOpponentInfielder();
+            if (opp != null) ball.ForcePickup(opp);
+        }
+
+        private PlayerZoneTracker NearestOpponentInfielder()
+        {
+            PlayerZoneTracker best = null;
+            float bestDistSq = float.MaxValue;
+            Vector2 me = transform.position;
+            for (int i = 0; i < All.Count; i++)
+            {
+                var t = All[i];
+                if (t == null || t == this || t.Spawn.team == Spawn.team) continue;
+                if (t.Spawn.role != PlayerRole.Infielder) continue;
+                float d = ((Vector2)t.transform.position - me).sqrMagnitude;
+                if (d < bestDistSq) { bestDistSq = d; best = t; }
+            }
+            return best;
         }
 
         /// <summary>
