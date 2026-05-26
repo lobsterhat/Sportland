@@ -54,6 +54,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float maxThrowSpeed = 36f;
         [Tooltip("At accuracy 0, the aim scatters up to this many units per unit of distance (→0 at accuracy 100).")]
         [SerializeField] private float accuracyErrorPerUnit = 0.15f;
+        [Tooltip("Base lateral speed (u/s) of an outfielder's lob back to an infielder; scales up with distance.")]
+        [SerializeField] private float passSpeed = 12f;
 
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
@@ -85,20 +87,16 @@ namespace Sportland.Sports.Dodgeball
             if (tracker.HasBall) { EndThreat(); Offense(); return; }
             holdStartTime = -1f;   // not holding — reset any wind-up
 
-            // Ball has left the play area: the nearest backrow player fetches it
-            // (leaving its strip — retrieval is allowed out of zone).
-            if (ball.IsOutOfPlay && BallSettled()
-                && tracker.Spawn.role != PlayerRole.Infielder && IsClosestOutfielderToBall())
+            // Outfielders don't defend (can't be eliminated): they fetch a loose
+            // ball that's settled in their strip, otherwise hold formation. Once
+            // they grab one, Offense lobs it back to an infielder.
+            if (tracker.Spawn.role != PlayerRole.Infielder)
             {
                 EndThreat();
-                RetrieveOutOfPlay();
+                if (BallIsLoose()) ChaseLooseBall();
+                else Idle();
                 return;
             }
-
-            // Backrow (outfielders) can't be eliminated, so they don't fear the
-            // ball: no retreat, no evasion — just hold formation while the
-            // infielders defend.
-            if (tracker.Spawn.role != PlayerRole.Infielder) { EndThreat(); Idle(); return; }
 
             if (IsIncomingThreat(out Vector2 ballDir))
             {
@@ -282,7 +280,11 @@ namespace Sportland.Sports.Dodgeball
             }
 
             movement.IsRunning = false;
-            movement.ApplyMove(Vector2.zero);   // plant to throw
+            movement.ApplyMove(Vector2.zero);   // plant to throw / pass
+
+            // Outfielders feed the front court: lob the ball back to an infielder
+            // rather than throwing at opponents.
+            if (tracker.Spawn.role != PlayerRole.Infielder) { PassToInfielder(); return; }
 
             if (throwTarget == null || throwTarget.Spawn.team == tracker.Spawn.team)
                 throwTarget = PickThrowTarget();
@@ -375,31 +377,38 @@ namespace Sportland.Sports.Dodgeball
             MoveToward(ClampToZone(ballPos));
         }
 
-        // Backrow fetch of an out-of-play ball — chase the actual ball position
-        // (unclamped, leaving the strip); the passive pickup then secures it.
-        private void RetrieveOutOfPlay()
+        // Outfielder offense: lob the ball back to the nearest teammate infielder
+        // (over the opposing court — Ball.Pass raises the arc to clear opponents).
+        private void PassToInfielder()
         {
-            movement.IsRunning = true;
-            movement.SetStance(false);
-            Vector2 ballPos = ball.transform.position;
-            movement.SetFacing(ballPos - (Vector2)transform.position);
-            MoveToward(ballPos);
+            var target = NearestTeammateInfielder();
+            if (target == null) return;   // no infielder to feed — just hold
+
+            movement.SetFacing((Vector2)target.transform.position - (Vector2)transform.position);
+
+            if (holdStartTime < 0f) holdStartTime = Time.time;
+            if (Time.time - holdStartTime >= windupTime)
+            {
+                ball.Pass(target.transform.position, passSpeed, isLob: true);
+                holdStartTime = -1f;
+            }
         }
 
-        // True if no other outfielder (either team) is closer to the ball, so
-        // only the nearest backrow player commits to the retrieval.
-        private bool IsClosestOutfielderToBall()
+        private PlayerZoneTracker NearestTeammateInfielder()
         {
-            Vector2 ballPos = ball.transform.position;
-            float myDistSq = ((Vector2)transform.position - ballPos).sqrMagnitude;
+            PlayerZoneTracker best = null;
+            float bestDistSq = float.MaxValue;
+            Vector2 me = transform.position;
+            var team = tracker.Spawn.team;
             var trackers = PlayerZoneTracker.All;
             for (int i = 0; i < trackers.Count; i++)
             {
                 var t = trackers[i];
-                if (t == null || t == tracker || t.Spawn.role == PlayerRole.Infielder) continue;
-                if (((Vector2)t.transform.position - ballPos).sqrMagnitude < myDistSq) return false;
+                if (t == null || t.Spawn.team != team || t.Spawn.role != PlayerRole.Infielder) continue;
+                float d = ((Vector2)t.transform.position - me).sqrMagnitude;
+                if (d < bestDistSq) { bestDistSq = d; best = t; }
             }
-            return true;
+            return best;
         }
 
         private void Idle()
