@@ -235,6 +235,7 @@ namespace Sportland.Sports.Dodgeball
         {
             var ball = tracker.HeldBall;
             if (ball == null) return;
+            if (!tracker.IsInZone && !movement.IsAirborne) return;   // can't throw from outside your zone
 
             float power = ThrowReleaseSpeed();
             var target = FindThrowTargetInCone(lastMoveDirection);
@@ -353,6 +354,7 @@ namespace Sportland.Sports.Dodgeball
 
         private void DoPass(Ball ball, bool isChest)
         {
+            if (!tracker.IsInZone && !movement.IsAirborne) return;   // can't pass from outside your zone
             var target = FindPassTarget();
             if (target == null) return;
 
