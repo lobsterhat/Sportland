@@ -98,6 +98,8 @@ namespace Sportland.Sports.Dodgeball
 
         [Header("Physics")]
         [SerializeField] private float linearDamping = 1.4f;
+        [Tooltip("Speed kept when bouncing off a boundary wall (0 = dead stop, 1 = perfectly elastic).")]
+        [SerializeField, Range(0f, 1f)] private float wallRestitution = 0.6f;
 
         [Header("Height (measured above the visible floor)")]
         [Tooltip("Local Y offset from ball.transform.position down to the visible floor. " +
@@ -290,7 +292,28 @@ namespace Sportland.Sports.Dodgeball
                 case State.Loose:    UpdateLoose(); break;
             }
 
+            ReflectOffBoundaries();
             ApplyVisualHeight();
+        }
+
+        // Keep the ball inside the outfield's outer edge: clamp the lateral
+        // position and reflect the velocity so it bounces off the boundary wall.
+        private void ReflectOffBoundaries()
+        {
+            if (state != State.Thrown && state != State.Bouncing && state != State.Loose) return;
+
+            float maxX = CourtSetup.HalfWidth + ZoneFactory.StripDepth - ballRadius;
+            float maxY = CourtSetup.HalfHeight + ZoneFactory.StripDepth - ballRadius;
+            Vector3 p = transform.position;
+            Vector2 v = rb.linearVelocity;
+            bool changed = false;
+
+            if (p.x < -maxX) { p.x = -maxX; if (v.x < 0f) v.x = -v.x * wallRestitution; changed = true; }
+            else if (p.x > maxX) { p.x = maxX; if (v.x > 0f) v.x = -v.x * wallRestitution; changed = true; }
+            if (p.y < -maxY) { p.y = -maxY; if (v.y < 0f) v.y = -v.y * wallRestitution; changed = true; }
+            else if (p.y > maxY) { p.y = maxY; if (v.y > 0f) v.y = -v.y * wallRestitution; changed = true; }
+
+            if (changed) { transform.position = p; rb.linearVelocity = v; }
         }
 
         private void UpdateCarried()

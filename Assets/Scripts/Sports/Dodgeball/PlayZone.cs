@@ -67,10 +67,12 @@ namespace Sportland.Sports.Dodgeball
 
             if (spawn.id.EndsWith("_Back"))
             {
-                // Back strip: behind the opposing team's baseline.
+                // Back strip: behind the opposing team's baseline. Runs the full
+                // court height so the left/right ends also cover the corners.
+                float fh = hh + StripDepth;
                 return surroundsRightHalf
-                    ? new PlayZone { min = new Vector2( hw,           -hh),              max = new Vector2( hw + StripDepth,  hh) }
-                    : new PlayZone { min = new Vector2(-hw - StripDepth, -hh),           max = new Vector2(-hw,               hh) };
+                    ? new PlayZone { min = new Vector2( hw,            -fh), max = new Vector2( hw + StripDepth,  fh) }
+                    : new PlayZone { min = new Vector2(-hw - StripDepth, -fh), max = new Vector2(-hw,               fh) };
             }
             if (spawn.id.EndsWith("_Top"))
             {

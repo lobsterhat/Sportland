@@ -54,16 +54,19 @@ namespace Sportland.Sports.Dodgeball
             CreateRectFill("HalfA", new Vector2(-hw, -hh), new Vector2(0f, hh), teamAHalfColor, HalfFillOrder);
             CreateRectFill("HalfB", new Vector2(0f, -hh), new Vector2(hw, hh), teamBHalfColor, HalfFillOrder);
 
-            CreateRectOutline("A_Back",   new Vector2(hw, -hh),  new Vector2(hw + strip, hh),  teamAStripColor, StripOutlineOrder);
+            CreateRectOutline("A_Back",   new Vector2(hw, -(hh + strip)),  new Vector2(hw + strip, hh + strip),  teamAStripColor, StripOutlineOrder);
             CreateRectOutline("A_Top",    new Vector2(0f, hh),   new Vector2(hw, hh + strip), teamAStripColor, StripOutlineOrder);
             CreateRectOutline("A_Bottom", new Vector2(0f, -hh - strip), new Vector2(hw, -hh), teamAStripColor, StripOutlineOrder);
 
-            CreateRectOutline("B_Back",   new Vector2(-hw - strip, -hh),  new Vector2(-hw, hh), teamBStripColor, StripOutlineOrder);
+            CreateRectOutline("B_Back",   new Vector2(-hw - strip, -(hh + strip)),  new Vector2(-hw, hh + strip), teamBStripColor, StripOutlineOrder);
             CreateRectOutline("B_Top",    new Vector2(-hw, hh),   new Vector2(0f, hh + strip), teamBStripColor, StripOutlineOrder);
             CreateRectOutline("B_Bottom", new Vector2(-hw, -hh - strip), new Vector2(0f, -hh), teamBStripColor, StripOutlineOrder);
 
             CreateRectOutline("CourtBoundary", new Vector2(-hw, -hh), new Vector2(hw, hh), boundaryColor, BoundaryOrder);
             CreateLine("CenterLine", new Vector2(0f, -hh), new Vector2(0f, hh), centerLineColor, CenterLineOrder);
+
+            // Outer boundary wall — the ball bounces off this (see Ball.ReflectOffBoundaries).
+            CreateRectOutline("OuterBoundary", new Vector2(-(hw + strip), -(hh + strip)), new Vector2(hw + strip, hh + strip), boundaryColor, BoundaryOrder);
         }
 
         private GameObject CreateRectFill(string goName, Vector2 min, Vector2 max, Color color, int sortingOrder)
