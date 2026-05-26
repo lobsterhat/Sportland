@@ -65,6 +65,7 @@ namespace Sportland.Sports.Dodgeball
         private float dashTimer = -1f;
         private float dashCooldownTimer = -1f;
         private Vector2 dashDir = Vector2.right;
+        private bool facingOverriddenThisFrame;
         private float spriteBaseY;
         private Vector3 spriteBaseScale = Vector3.one;
         private Transform spriteChild; // visual sprite that we'll bob up/down
@@ -94,7 +95,11 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Orient the player without moving (e.g. AI facing the ball while set).</summary>
         public void SetFacing(Vector2 dir)
         {
-            if (dir.sqrMagnitude > 0.0001f) Facing = dir.normalized;
+            if (dir.sqrMagnitude > 0.0001f)
+            {
+                Facing = dir.normalized;
+                facingOverriddenThisFrame = true;   // keep ApplyMove from snapping facing back to the move dir
+            }
         }
 
         public System.Action<PlayerMovement> OnLanded;
@@ -124,7 +129,7 @@ namespace Sportland.Sports.Dodgeball
         {
             if (IsDashing) return;   // the dash drives velocity directly; ignore steering input
             Vector2 clamped = input.sqrMagnitude > 1f ? input.normalized : input;
-            if (clamped.sqrMagnitude > 0.04f) Facing = clamped.normalized;
+            if (!facingOverriddenThisFrame && clamped.sqrMagnitude > 0.04f) Facing = clamped.normalized;
             float speed = IsRunning ? runSpeed : walkSpeed;
             Vector2 target = clamped * speed;
             Vector2 current = rb.linearVelocity;
@@ -210,6 +215,13 @@ namespace Sportland.Sports.Dodgeball
                 spriteChild.localScale = new Vector3(
                     spriteBaseScale.x, spriteBaseScale.y * yScale, spriteBaseScale.z);
             }
+        }
+
+        private void LateUpdate()
+        {
+            // Cleared after every controller's Update has run, so next frame
+            // ApplyMove resumes steering-based facing unless SetFacing is called again.
+            facingOverriddenThisFrame = false;
         }
     }
 }
