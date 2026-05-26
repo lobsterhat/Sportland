@@ -42,6 +42,12 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Minimum time between dashes (seconds).")]
         [SerializeField] private float dashCooldown = 0.35f;
 
+        [Header("Defensive stance")]
+        [Tooltip("Movement speed multiplier while set in a defensive stance (slower, but defensively ready).")]
+        [SerializeField] private float stanceSpeedMultiplier = 0.8f;
+        [Tooltip("Dash speed multiplier when NOT in stance — a flat-footed sidestep is weaker.")]
+        [SerializeField] private float dashOutOfStanceScale = 0.5f;
+
         [Header("Body / duck")]
         [Tooltip("Height (above feet) of the top of the body while standing — the hit ceiling.")]
         [SerializeField] private float standBodyTop = 1.6f;
@@ -65,6 +71,7 @@ namespace Sportland.Sports.Dodgeball
         private float dashTimer = -1f;
         private float dashCooldownTimer = -1f;
         private Vector2 dashDir = Vector2.right;
+        private float dashActiveSpeed;
         private bool facingOverriddenThisFrame;
         private float spriteBaseY;
         private Vector3 spriteBaseScale = Vector3.one;
@@ -73,6 +80,10 @@ namespace Sportland.Sports.Dodgeball
         public bool IsAirborne => jumpTimer >= 0f;
         public bool IsDucking => duckTimer >= 0f;
         public bool IsDashing => dashTimer >= 0f;
+
+        /// <summary>Set/ready defensive posture: slower movement, but full catch/evade (the AI sets this while defending; the human toggles it).</summary>
+        public bool InDefensiveStance { get; private set; }
+        public void SetStance(bool on) => InDefensiveStance = on;
 
         /// <summary>Current vertical offset of the jump arc above the player's ground position (0 when grounded).</summary>
         public float CurrentJumpHeight { get; private set; }
@@ -130,7 +141,7 @@ namespace Sportland.Sports.Dodgeball
             if (IsDashing) return;   // the dash drives velocity directly; ignore steering input
             Vector2 clamped = input.sqrMagnitude > 1f ? input.normalized : input;
             if (!facingOverriddenThisFrame && clamped.sqrMagnitude > 0.04f) Facing = clamped.normalized;
-            float speed = IsRunning ? runSpeed : walkSpeed;
+            float speed = (IsRunning ? runSpeed : walkSpeed) * (InDefensiveStance ? stanceSpeedMultiplier : 1f);
             Vector2 target = clamped * speed;
             Vector2 current = rb.linearVelocity;
             IsAccelerating = (target - current).sqrMagnitude > 0.0001f;
@@ -159,6 +170,7 @@ namespace Sportland.Sports.Dodgeball
             if (IsAirborne || IsDucking || IsDashing || dashCooldownTimer >= 0f) return;
             if (dir.sqrMagnitude < 0.0001f) return;
             dashDir = dir.normalized;
+            dashActiveSpeed = dashSpeed * (InDefensiveStance ? 1f : dashOutOfStanceScale);   // flat-footed dodge is weaker
             Facing = dashDir;
             dashTimer = 0f;
         }
@@ -198,7 +210,7 @@ namespace Sportland.Sports.Dodgeball
                 }
                 else
                 {
-                    rb.linearVelocity = dashDir * dashSpeed;
+                    rb.linearVelocity = dashDir * dashActiveSpeed;
                 }
             }
             else if (dashCooldownTimer >= 0f)
