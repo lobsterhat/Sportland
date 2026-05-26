@@ -82,10 +82,9 @@ namespace Sportland.Sports.Dodgeball
         private int previousDpadDirIndex = -1;
         private float lastMovementActiveTime = -10f;
 
-        // Pending pass we issued: the catch handler watches for this ball to
-        // arrive at intendedPassTarget so it can hand control off.
+        // Pending pass we issued: the catch handler watches for this ball so it
+        // can hand control off to the teammate who receives it.
         private Ball passedBall;
-        private PlayerZoneTracker intendedPassTarget;
 
         private void Awake()
         {
@@ -361,7 +360,6 @@ namespace Sportland.Sports.Dodgeball
             // Clear any stale subscription before recording the new pass.
             if (passedBall != null) passedBall.OnAttached -= OnPassedBallCaught;
             passedBall = ball;
-            intendedPassTarget = target;
             passedBall.OnAttached += OnPassedBallCaught;
 
             // Parametric drive — ball lerps to target's current position; lob
@@ -375,17 +373,12 @@ namespace Sportland.Sports.Dodgeball
         {
             if (passedBall == null) return;
             passedBall.OnAttached -= OnPassedBallCaught;
-
-            var target = intendedPassTarget;
             passedBall = null;
-            intendedPassTarget = null;
 
-            // Only the intended teammate's catch triggers a control handoff;
-            // interceptions leave control where it was.
-            if (catcher == target)
-            {
+            // Control follows the ball to whichever teammate receives the pass;
+            // an opponent interception leaves control where it was.
+            if (catcher != null && catcher.Spawn.team == tracker.Spawn.team)
                 TransferControl(catcher.gameObject);
-            }
         }
 
         /// <summary>
