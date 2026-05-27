@@ -15,9 +15,10 @@ namespace Sportland.Sports.Dodgeball
     ///                                                   a held direction dashes, neutral stick
     ///                                                   ducks a high throw / jumps a low one)
     ///   Throw       — Square / Q                       (only fires while holding the ball)
-    ///   Pass        — Triangle / F                     (tap = lob, hold = chest;
-    ///                                                   target = teammate most aligned
-    ///                                                   with last move direction)
+    ///   Pass        — Triangle / F                     (with the ball: tap = lob,
+    ///                                                   hold = chest; empty-handed:
+    ///                                                   switch to the infielder
+    ///                                                   nearest the ball)
     ///   Catch       — Circle / E                       (active grab of a nearby ball)
     ///   Stance      — R2 / Left-Ctrl                   (toggle defensive stance: face the ball,
     ///                                                   move slower, full catch/evade)

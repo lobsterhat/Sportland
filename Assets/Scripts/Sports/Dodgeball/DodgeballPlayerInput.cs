@@ -336,6 +336,9 @@ namespace Sportland.Sports.Dodgeball
 
         private void OnPassStarted(InputAction.CallbackContext _)
         {
+            // Empty-handed, Triangle/F switches control to the infielder nearest
+            // the ball (to defend or make a play); with the ball it starts a pass.
+            if (!tracker.HasBall) { SwitchToClosestInfielderToBall(); return; }
             passPressTime = Time.unscaledTime;
         }
 
@@ -458,6 +461,28 @@ namespace Sportland.Sports.Dodgeball
             {
                 var t = trackers[i];
                 if (t == null || t.Spawn.team != team) continue;
+                float d = ((Vector2)t.transform.position - ballPos).sqrMagnitude;
+                if (d < bestDistSq) { bestDistSq = d; best = t; }
+            }
+            if (best != null && best != tracker) TransferControl(best.gameObject);
+        }
+
+        // Empty-handed Triangle/F: hand control to the infielder closest to the
+        // ball, so you can step up to defend an incoming throw or make a play.
+        private void SwitchToClosestInfielderToBall()
+        {
+            if (cachedBall == null) cachedBall = FindAnyObjectByType<Ball>();
+            if (cachedBall == null) return;
+            Vector2 ballPos = cachedBall.transform.position;
+
+            PlayerZoneTracker best = null;
+            float bestDistSq = float.MaxValue;
+            var team = tracker.Spawn.team;
+            var trackers = PlayerZoneTracker.All;
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null || t.Spawn.team != team || t.Spawn.role != PlayerRole.Infielder) continue;
                 float d = ((Vector2)t.transform.position - ballPos).sqrMagnitude;
                 if (d < bestDistSq) { bestDistSq = d; best = t; }
             }
