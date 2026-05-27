@@ -69,6 +69,12 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Spawn the debug cannon (C / R1) that fires balls at the controlled player.")]
         [SerializeField] private bool spawnDebugCannon = true;
 
+        [Header("Match")]
+        [Tooltip("Scoring rules asset. Leave null to default to Mode 1 (running hits).")]
+        [SerializeField] private GameMode gameMode;
+        [Tooltip("Run the match scorer (score + clock + win condition).")]
+        [SerializeField] private bool runMatch = true;
+
         [Header("Runtime")]
         [SerializeField] private List<GameObject> spawnedPlayers = new List<GameObject>();
 
@@ -79,6 +85,7 @@ namespace Sportland.Sports.Dodgeball
             SpawnBall();
             if (showDiagnosticsHud) gameObject.AddComponent<DodgeballDiagnosticsHUD>();
             if (spawnDebugCannon) gameObject.AddComponent<DodgeballCannon>();
+            if (runMatch) gameObject.AddComponent<DodgeballMatch>().Configure(gameMode);
         }
 
         private void SpawnBall()
