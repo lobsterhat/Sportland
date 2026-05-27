@@ -16,5 +16,14 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>Luck on a 0..1 scale.</summary>
         public float Luck01 => Mathf.Clamp01(luck / 100f);
+
+        [Tooltip("Energy / HP for the energy game mode (Mode 3). Configurable per player — hits drain it; 0 = out.")]
+        public float maxEnergy = 100f;
+
+        [Tooltip("0..100. Resilience: higher = less damage taken per hit. (May fold into a 'strength' stat later.)")]
+        [Range(0f, 100f)] public float toughness = 50f;
+
+        /// <summary>Toughness on a 0..1 scale.</summary>
+        public float Toughness01 => Mathf.Clamp01(toughness / 100f);
     }
 }

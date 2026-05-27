@@ -58,6 +58,12 @@ namespace Sportland.Sports.Dodgeball
         [Header("On catch")]
         public CatchEffect catchEffect = CatchEffect.TurnoverOnly;
 
+        [Header("Energy (Mode 3 — VictimOutcome.DamageEnergy)")]
+        [Tooltip("Energy lost per unit of ball impact speed, before toughness reduction.")]
+        public float damagePerSpeed = 1.5f;
+        [Tooltip("Fraction of damage a max-toughness (100) player shrugs off; scales with the victim's toughness.")]
+        [Range(0f, 1f)] public float toughnessReduction = 0.5f;
+
         [Header("Roster (per team)")]
         public int infieldersPerTeam = 3;
         public int outfieldersPerTeam = 3;

@@ -26,8 +26,10 @@ namespace Sportland.Sports.Dodgeball
         private Team? winner;
 
         // Mode 2: hits taken per player. Mode 4: players benched (recallable).
+        // Mode 3: current energy per player (lazily seeded from maxEnergy).
         private readonly Dictionary<PlayerZoneTracker, int> hitCounts = new Dictionary<PlayerZoneTracker, int>();
         private readonly List<PlayerZoneTracker> benched = new List<PlayerZoneTracker>();
+        private readonly Dictionary<PlayerZoneTracker, float> energy = new Dictionary<PlayerZoneTracker, float>();
 
         private GUIStyle style;
         private Texture2D bg;
@@ -42,6 +44,7 @@ namespace Sportland.Sports.Dodgeball
             winner = null;
             hitCounts.Clear();
             benched.Clear();
+            energy.Clear();
         }
 
         private void Awake()
@@ -80,7 +83,7 @@ namespace Sportland.Sports.Dodgeball
 
         // A landed hit: score for the throwing team, then apply the victim
         // outcome. Eliminations only affect infielders — the backrow is immune.
-        private void OnBallHit(PlayerZoneTracker victim, HitZone zone)
+        private void OnBallHit(PlayerZoneTracker victim, HitZone zone, float ballSpeed)
         {
             if (matchOver || victim == null) return;
             var attacker = ball != null ? ball.RecentThrower : null;
@@ -97,13 +100,30 @@ namespace Sportland.Sports.Dodgeball
                     hitCounts[victim] = ++n;
                     if (n >= mode.hitsToOut) TakeOut(victim, permanent: true);
                     break;
+                case VictimOutcome.DamageEnergy: // Mode 3
+                    if (ApplyDamage(victim, ballSpeed) <= 0f) TakeOut(victim, permanent: true);
+                    break;
                 case VictimOutcome.Sideline:     // Mode 4
                     TakeOut(victim, permanent: false);
                     break;
-                case VictimOutcome.DamageEnergy: // Mode 3 — TODO: energy/damage model, then TakeOut at 0.
                 case VictimOutcome.None:         // Mode 1 — hits only score.
                     break;
             }
+        }
+
+        // Drain the victim's energy by the ball's impact speed, softened by the
+        // victim's toughness. Returns the energy remaining.
+        private float ApplyDamage(PlayerZoneTracker victim, float ballSpeed)
+        {
+            var gen = victim.GetComponent<GeneralAttributes>();
+            float maxE = gen != null ? gen.maxEnergy : 100f;
+            float tough01 = gen != null ? gen.Toughness01 : 0.5f;
+
+            if (!energy.TryGetValue(victim, out float e)) e = maxE;
+            float dmg = ballSpeed * mode.damagePerSpeed * (1f - tough01 * mode.toughnessReduction);
+            e -= Mathf.Max(0f, dmg);
+            energy[victim] = e;
+            return e;
         }
 
         // A caught opponent throw. Mode 4: score + recall the catching team's bench.
@@ -205,16 +225,29 @@ namespace Sportland.Sports.Dodgeball
             string counts = mode.endOnTeamWipeout
                 ? $"   [A:{CountActiveInfielders(Team.A)} B:{CountActiveInfielders(Team.B)}]"
                 : "";
+            string nrg = mode.victimOutcome == VictimOutcome.DamageEnergy ? ControlledEnergyLabel() : "";
             string label = matchOver
                 ? (winner.HasValue ? $"FINAL   A {scoreA} – {scoreB} B   ({winner} wins)"
                                    : $"FINAL   A {scoreA} – {scoreB} B   (tie)")
-                : $"A {scoreA} – {scoreB} B    {time}{counts}";
+                : $"A {scoreA} – {scoreB} B    {time}{counts}{nrg}";
 
-            const float w = 440f, h = 30f;
+            const float w = 520f, h = 30f;
             float x = (Screen.width - w) * 0.5f;
             var r = new Rect(x, 8f, w, h);
             GUI.DrawTexture(r, bg);
             GUI.Label(r, label, style);
+        }
+
+        // Mode 3 readout: the energy of whoever the human currently controls.
+        private string ControlledEnergyLabel()
+        {
+            var cur = DodgeballPlayerInput.Current;
+            var t = cur != null ? cur.GetComponent<PlayerZoneTracker>() : null;
+            if (t == null) return "";
+            var gen = t.GetComponent<GeneralAttributes>();
+            float maxE = gen != null ? gen.maxEnergy : 100f;
+            float e = energy.TryGetValue(t, out float v) ? v : maxE;
+            return $"   NRG {Mathf.CeilToInt(Mathf.Max(0f, e))}/{Mathf.CeilToInt(maxE)}";
         }
 
         private void EnsureStyle()

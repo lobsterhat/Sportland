@@ -240,8 +240,8 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Fires whenever the ball attaches to a player (pickup, pass catch, or ForcePickup).</summary>
         public event System.Action<PlayerZoneTracker> OnAttached;
 
-        /// <summary>Fires when a thrown ball caroms off an opponent. Args: hit player, zone.</summary>
-        public event System.Action<PlayerZoneTracker, HitZone> OnHit;
+        /// <summary>Fires when a thrown ball caroms off an opponent. Args: hit player, zone, impact speed (u/s).</summary>
+        public event System.Action<PlayerZoneTracker, HitZone, float> OnHit;
 
         /// <summary>Fires when a player skill-catches an opponent's throw. Args: catcher.</summary>
         public event System.Action<PlayerZoneTracker> OnCaught;
@@ -742,7 +742,7 @@ namespace Sportland.Sports.Dodgeball
             bounceArcApex = apex;
             state = State.Bouncing;
 
-            OnHit?.Invoke(hit, zone);
+            OnHit?.Invoke(hit, zone, incoming.magnitude);
         }
 
         // ── Release / attach API ──
