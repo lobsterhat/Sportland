@@ -1,30 +1,23 @@
 {
   "permissions": {
     "allow": [
-      "Bash(git -C \"D:/Unity/Sportland\" log --oneline -20)",
-      "Bash(git -C \"D:/Unity/Sportland\" status --short)",
-      "Bash(git -C \"D:/Unity/Sportland\" branch --show-current)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/DodgeballAI.cs)",
-      "Bash(git -C D:/Unity/Sportland commit -m ' *)",
-      "Bash(git -C \"D:/Unity/Sportland\" log --oneline -1)",
-      "Bash(git -C \"D:/Unity/Sportland\" --no-pager diff --stat)",
-      "Bash(git -C \"D:/Unity/Sportland\" --no-pager diff)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/DodgeballInputActions.cs Assets/Scripts/Sports/Dodgeball/DodgeballPlayerInput.cs Assets/Scripts/Sports/Dodgeball/PlayerMovement.cs)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/DodgeballPlayerInput.cs)",
-      "Bash(git -C \"D:/Unity/Sportland\" log --oneline -4)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Prefabs/Dodgeball/Dodgeball.prefab)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/Ball.cs)",
-      "Bash(git -C \"D:/Unity/Sportland\" log --oneline -5)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/Ball.cs Assets/Scripts/Sports/Dodgeball/DodgeballPlayerInput.cs Assets/Prefabs/Dodgeball/Dodgeball.prefab)",
-      "Bash(git -C \"D:/Unity/Sportland\" log --oneline -3)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/PlayerMovement.cs)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/DodgeballPlayerVisual.cs)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/DodgeballInputActions.cs Assets/Scripts/Sports/Dodgeball/DodgeballPlayerInput.cs Assets/Scripts/Sports/Dodgeball/DodgeballAI.cs)",
-      "Bash(git -C \"D:/Unity/Sportland\" log --oneline -6)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/DodgeballDiagnosticsHUD.cs)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/PlayerZoneTracker.cs)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/Ball.cs Assets/Scripts/Sports/Dodgeball/PlayZone.cs Assets/Scripts/Sports/Dodgeball/DodgeballCourtRenderer.cs)",
-      "Bash(git -C \"D:/Unity/Sportland\" add Assets/Scripts/Sports/Dodgeball/Ball.cs Assets/Scripts/Sports/Dodgeball/DodgeballAI.cs)"
+      "Edit(D:/Unity/Sportland/**)",
+      "Write(D:/Unity/Sportland/**)",
+      "Bash(git -C \"D:/Unity/Sportland\" add:*)",
+      "Bash(git -C \"D:/Unity/Sportland\" commit:*)",
+      "Bash(git -C \"D:/Unity/Sportland\" status:*)",
+      "Bash(git -C \"D:/Unity/Sportland\" diff:*)",
+      "Bash(git -C \"D:/Unity/Sportland\" --no-pager diff:*)",
+      "Bash(git -C \"D:/Unity/Sportland\" log:*)",
+      "Bash(git -C \"D:/Unity/Sportland\" branch:*)",
+      "PowerShell([guid]::NewGuid\\(\\).ToString\\(\"N\"\\); [guid]::NewGuid\\(\\).ToString\\(\"N\"\\))",
+      "Skill(update-config)",
+      "Skill(update-config:*)",
+      "PowerShell(try { Get-Content \"D:/Unity/Sportland/claude/.claude/settings.local.json\" -Raw | ConvertFrom-Json | Out-Null; \"VALID JSON\" } catch { \"INVALID: $_\" })",
+      "Bash(git -C D:/Unity/Sportland commit -m ' *)"
+    ],
+    "ask": [
+      "Bash(git -C \"D:/Unity/Sportland\" push:*)"
     ]
   }
 }
