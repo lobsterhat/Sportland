@@ -83,7 +83,7 @@ namespace Sportland.Sports.Dodgeball
 
         // A landed hit: score for the throwing team, then apply the victim
         // outcome. Eliminations only affect infielders — the backrow is immune.
-        private void OnBallHit(PlayerZoneTracker victim, HitZone zone, float ballSpeed)
+        private void OnBallHit(PlayerZoneTracker victim, Ball.HitZone zone, float ballSpeed)
         {
             if (matchOver || victim == null) return;
             var attacker = ball != null ? ball.RecentThrower : null;
