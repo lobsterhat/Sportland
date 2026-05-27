@@ -1,14 +1,16 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Sportland.Sports.Dodgeball
 {
     /// <summary>
-    /// Runtime match scorer. Reads a GameMode (the rules), consumes Ball.OnHit,
-    /// keeps the live score + clock, draws a scoreboard, and resolves the win.
+    /// Runtime match scorer. Reads a GameMode (the rules), consumes Ball.OnHit
+    /// and Ball.OnCaught, keeps the live score + clock + eliminations, draws a
+    /// scoreboard, and resolves the win.
     ///
-    /// First slice fully implements Mode 1 (running hits: timed, points per hit,
-    /// most points wins). The other modes' victim outcomes (elimination / energy
-    /// / sideline + catch revive + wipeout) are stubbed in OnBallHit for now.
+    /// Implemented: Mode 1 (running hits), Mode 2 (count-to-out removal), and
+    /// Mode 4 (sideline + catch-revive + wipeout). Mode 3 (energy) is stubbed
+    /// pending the per-player energy/damage model.
     /// </summary>
     public class DodgeballMatch : MonoBehaviour
     {
@@ -23,6 +25,10 @@ namespace Sportland.Sports.Dodgeball
         private bool matchOver;
         private Team? winner;
 
+        // Mode 2: hits taken per player. Mode 4: players benched (recallable).
+        private readonly Dictionary<PlayerZoneTracker, int> hitCounts = new Dictionary<PlayerZoneTracker, int>();
+        private readonly List<PlayerZoneTracker> benched = new List<PlayerZoneTracker>();
+
         private GUIStyle style;
         private Texture2D bg;
 
@@ -34,6 +40,8 @@ namespace Sportland.Sports.Dodgeball
             scoreA = scoreB = 0;
             matchOver = false;
             winner = null;
+            hitCounts.Clear();
+            benched.Clear();
         }
 
         private void Awake()
@@ -43,7 +51,11 @@ namespace Sportland.Sports.Dodgeball
 
         private void OnDestroy()
         {
-            if (ball != null && subscribed) ball.OnHit -= OnBallHit;
+            if (ball != null && subscribed)
+            {
+                ball.OnHit -= OnBallHit;
+                ball.OnCaught -= OnBallCaught;
+            }
         }
 
         private void Update()
@@ -52,11 +64,7 @@ namespace Sportland.Sports.Dodgeball
             if (matchOver || !mode.isTimed) return;
 
             timeRemaining -= Time.deltaTime;
-            if (timeRemaining <= 0f)
-            {
-                timeRemaining = 0f;
-                EndMatch();
-            }
+            if (timeRemaining <= 0f) { timeRemaining = 0f; EndMatch(); }
         }
 
         // The ball may not exist at Awake; subscribe once it's found.
@@ -66,11 +74,12 @@ namespace Sportland.Sports.Dodgeball
             if (ball == null) ball = FindFirstObjectByType<Ball>();
             if (ball == null) return;
             ball.OnHit += OnBallHit;
+            ball.OnCaught += OnBallCaught;
             subscribed = true;
         }
 
-        // A landed hit (carom): award points to the throwing team and apply the
-        // mode's outcome to the player who got hit.
+        // A landed hit: score for the throwing team, then apply the victim
+        // outcome. Eliminations only affect infielders — the backrow is immune.
         private void OnBallHit(PlayerZoneTracker victim, HitZone zone)
         {
             if (matchOver || victim == null) return;
@@ -79,17 +88,99 @@ namespace Sportland.Sports.Dodgeball
 
             if (mode.pointsPerHit != 0) AddScore(attacker.Spawn.team, mode.pointsPerHit);
 
+            if (victim.Spawn.role != PlayerRole.Infielder) return;   // backrow can't be eliminated
+
             switch (mode.victimOutcome)
             {
-                case VictimOutcome.None:
-                    break;   // Mode 1 — hits only score; nobody leaves.
                 case VictimOutcome.CountToOut:   // Mode 2
-                case VictimOutcome.DamageEnergy: // Mode 3
+                    hitCounts.TryGetValue(victim, out int n);
+                    hitCounts[victim] = ++n;
+                    if (n >= mode.hitsToOut) TakeOut(victim, permanent: true);
+                    break;
                 case VictimOutcome.Sideline:     // Mode 4
-                    // TODO: per-player hit count / energy / benching, then the
-                    // endOnTeamWipeout check. Needs an elimination system first.
+                    TakeOut(victim, permanent: false);
+                    break;
+                case VictimOutcome.DamageEnergy: // Mode 3 — TODO: energy/damage model, then TakeOut at 0.
+                case VictimOutcome.None:         // Mode 1 — hits only score.
                     break;
             }
+        }
+
+        // A caught opponent throw. Mode 4: score + recall the catching team's bench.
+        private void OnBallCaught(PlayerZoneTracker catcher)
+        {
+            if (matchOver || catcher == null) return;
+            if (mode.catchEffect != CatchEffect.ScoreAndReviveTeam) return;
+
+            if (mode.pointsPerCatch != 0) AddScore(catcher.Spawn.team, mode.pointsPerCatch);
+            RecallTeam(catcher.Spawn.team);
+        }
+
+        // Remove a player from play. permanent = gone for good (Modes 2/3);
+        // otherwise benched and recallable (Mode 4). Hands control off first if
+        // the player was the one being driven, then checks for a wipeout.
+        private void TakeOut(PlayerZoneTracker player, bool permanent)
+        {
+            if (player.GetComponent<DodgeballPlayerInput>() != null)
+            {
+                var heir = NearestActiveTeammate(player);
+                if (heir != null) DodgeballPlayerInput.TransferControl(heir.gameObject);
+            }
+
+            player.gameObject.SetActive(false);   // OnDisable drops it from PlayerZoneTracker.All
+            if (!permanent && !benched.Contains(player)) benched.Add(player);
+
+            CheckWipeout();
+        }
+
+        // Mode 4 catch: bring every benched player on this team back at their spawn.
+        private void RecallTeam(Team team)
+        {
+            for (int i = benched.Count - 1; i >= 0; i--)
+            {
+                var p = benched[i];
+                if (p == null) { benched.RemoveAt(i); continue; }
+                if (p.Spawn.team != team) continue;
+                benched.RemoveAt(i);
+                p.transform.position = p.Spawn.position;
+                p.gameObject.SetActive(true);   // OnEnable re-adds it to PlayerZoneTracker.All
+            }
+        }
+
+        private static PlayerZoneTracker NearestActiveTeammate(PlayerZoneTracker player)
+        {
+            PlayerZoneTracker best = null;
+            float bestDistSq = float.MaxValue;
+            Vector2 me = player.transform.position;
+            var team = player.Spawn.team;
+            var all = PlayerZoneTracker.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var t = all[i];
+                if (t == null || t == player || t.Spawn.team != team) continue;
+                float d = ((Vector2)t.transform.position - me).sqrMagnitude;
+                if (d < bestDistSq) { bestDistSq = d; best = t; }
+            }
+            return best;
+        }
+
+        private static int CountActiveInfielders(Team team)
+        {
+            int n = 0;
+            var all = PlayerZoneTracker.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var t = all[i];
+                if (t != null && t.Spawn.team == team && t.Spawn.role == PlayerRole.Infielder) n++;
+            }
+            return n;
+        }
+
+        private void CheckWipeout()
+        {
+            if (!mode.endOnTeamWipeout) return;
+            if (CountActiveInfielders(Team.A) == 0) EndMatch(Team.B);
+            else if (CountActiveInfielders(Team.B) == 0) EndMatch(Team.A);
         }
 
         private void AddScore(Team team, int points)
@@ -97,10 +188,11 @@ namespace Sportland.Sports.Dodgeball
             if (team == Team.A) scoreA += points; else scoreB += points;
         }
 
-        private void EndMatch()
+        private void EndMatch(Team? forcedWinner = null)
         {
+            if (matchOver) return;
             matchOver = true;
-            winner = scoreA == scoreB ? (Team?)null : (scoreA > scoreB ? Team.A : Team.B);
+            winner = forcedWinner ?? (scoreA == scoreB ? (Team?)null : (scoreA > scoreB ? Team.A : Team.B));
         }
 
         private void OnGUI()
@@ -110,12 +202,15 @@ namespace Sportland.Sports.Dodgeball
             string time = mode.isTimed
                 ? $"{Mathf.FloorToInt(timeRemaining) / 60}:{Mathf.FloorToInt(timeRemaining) % 60:00}"
                 : "";
+            string counts = mode.endOnTeamWipeout
+                ? $"   [A:{CountActiveInfielders(Team.A)} B:{CountActiveInfielders(Team.B)}]"
+                : "";
             string label = matchOver
                 ? (winner.HasValue ? $"FINAL   A {scoreA} – {scoreB} B   ({winner} wins)"
                                    : $"FINAL   A {scoreA} – {scoreB} B   (tie)")
-                : $"A {scoreA} – {scoreB} B    {time}";
+                : $"A {scoreA} – {scoreB} B    {time}{counts}";
 
-            const float w = 380f, h = 30f;
+            const float w = 440f, h = 30f;
             float x = (Screen.width - w) * 0.5f;
             var r = new Rect(x, 8f, w, h);
             GUI.DrawTexture(r, bg);

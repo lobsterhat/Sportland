@@ -243,6 +243,9 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Fires when a thrown ball caroms off an opponent. Args: hit player, zone.</summary>
         public event System.Action<PlayerZoneTracker, HitZone> OnHit;
 
+        /// <summary>Fires when a player skill-catches an opponent's throw. Args: catcher.</summary>
+        public event System.Action<PlayerZoneTracker> OnCaught;
+
         private void Awake()
         {
             rb = GetComponent<Rigidbody2D>();
@@ -524,7 +527,7 @@ namespace Sportland.Sports.Dodgeball
                 var f = BuildCatchFactors(t, applyLuck: true);
                 float roll = Random.value;
                 RecordCatchAttempt(f, roll);
-                if (roll < f.finalChance) { AttachTo(t); return true; }
+                if (roll < f.finalChance) { AttachTo(t); if (caromOnMiss) OnCaught?.Invoke(t); return true; }
                 ResolveMiss(t);
                 return true;
             }
