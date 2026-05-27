@@ -42,6 +42,16 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Minimum time between dashes (seconds).")]
         [SerializeField] private float dashCooldown = 0.35f;
 
+        [Header("Dive (lunge catch)")]
+        [Tooltip("Lunge speed (u/s) of a diving catch attempt.")]
+        [SerializeField] private float diveSpeed = 11f;
+        [Tooltip("How long the dive lunge lasts (seconds).")]
+        [SerializeField] private float diveDuration = 0.35f;
+        [Tooltip("Prone recovery (seconds) after a dive lands, before the player can act again.")]
+        [SerializeField] private float diveRecovery = 0.6f;
+        [Tooltip("Extra catch radius (u) while diving — arms extended toward the ball.")]
+        [SerializeField] private float diveReach = 0.7f;
+
         [Header("Defensive stance")]
         [Tooltip("Movement speed multiplier while set in a defensive stance (slower, but defensively ready).")]
         [SerializeField] private float stanceSpeedMultiplier = 0.8f;
@@ -72,6 +82,9 @@ namespace Sportland.Sports.Dodgeball
         private float dashCooldownTimer = -1f;
         private Vector2 dashDir = Vector2.right;
         private float dashActiveSpeed;
+        private float diveTimer = -1f;
+        private float recoverTimer = -1f;
+        private Vector2 diveDir = Vector2.right;
         private bool facingOverriddenThisFrame;
         private float spriteBaseY;
         private Vector3 spriteBaseScale = Vector3.one;
@@ -80,6 +93,12 @@ namespace Sportland.Sports.Dodgeball
         public bool IsAirborne => jumpTimer >= 0f;
         public bool IsDucking => duckTimer >= 0f;
         public bool IsDashing => dashTimer >= 0f;
+        /// <summary>Lunging for a diving catch (drives velocity, extended catch reach).</summary>
+        public bool IsDiving => diveTimer >= 0f;
+        /// <summary>Prone after a dive — can't move or act until back on feet.</summary>
+        public bool IsRecovering => recoverTimer >= 0f;
+        /// <summary>Extra catch radius while diving (arms out); read by Ball.</summary>
+        public float DiveReach => diveReach;
 
         /// <summary>Set/ready defensive posture: slower movement, but full catch/evade (the AI sets this while defending; the human toggles it).</summary>
         public bool InDefensiveStance { get; private set; }
@@ -138,7 +157,7 @@ namespace Sportland.Sports.Dodgeball
         /// </summary>
         public void ApplyMove(Vector2 input)
         {
-            if (IsDashing) return;   // the dash drives velocity directly; ignore steering input
+            if (IsDashing || IsDiving || IsRecovering) return;   // dash/dive drive velocity directly; recovery is prone
             Vector2 clamped = input.sqrMagnitude > 1f ? input.normalized : input;
             if (!facingOverriddenThisFrame && clamped.sqrMagnitude > 0.04f) Facing = clamped.normalized;
             float speed = (IsRunning ? runSpeed : walkSpeed) * (InDefensiveStance ? stanceSpeedMultiplier : 1f);
@@ -151,13 +170,13 @@ namespace Sportland.Sports.Dodgeball
 
         public void TryJump()
         {
-            if (!IsAirborne && !IsDucking && !IsDashing) jumpTimer = 0f;
+            if (!IsAirborne && !IsDucking && !IsDashing && !IsDiving && !IsRecovering) jumpTimer = 0f;
         }
 
         /// <summary>Start/refresh a duck. Holds for duckDuration after the last call. Ignored while airborne or dashing.</summary>
         public void Duck()
         {
-            if (!IsAirborne && !IsDashing) duckTimer = 0f;
+            if (!IsAirborne && !IsDashing && !IsDiving && !IsRecovering) duckTimer = 0f;
         }
 
         /// <summary>
@@ -167,12 +186,27 @@ namespace Sportland.Sports.Dodgeball
         /// </summary>
         public void Dash(Vector2 dir)
         {
-            if (IsAirborne || IsDucking || IsDashing || dashCooldownTimer >= 0f) return;
+            if (IsAirborne || IsDucking || IsDashing || IsDiving || IsRecovering || dashCooldownTimer >= 0f) return;
             if (dir.sqrMagnitude < 0.0001f) return;
             dashDir = dir.normalized;
             dashActiveSpeed = dashSpeed * (InDefensiveStance ? 1f : dashOutOfStanceScale);   // flat-footed dodge is weaker
             Facing = dashDir;
             dashTimer = 0f;
+        }
+
+        /// <summary>
+        /// Lunge toward <paramref name="dir"/> for a diving catch — drives velocity
+        /// for diveDuration, then a prone recovery (diveRecovery) before the player
+        /// can act again. The catch reach is extended (DiveReach) while diving.
+        /// Ignored mid jump/duck/dash/dive/recovery.
+        /// </summary>
+        public void Dive(Vector2 dir)
+        {
+            if (IsAirborne || IsDucking || IsDashing || IsDiving || IsRecovering) return;
+            if (dir.sqrMagnitude < 0.0001f) return;
+            diveDir = dir.normalized;
+            Facing = diveDir;
+            diveTimer = 0f;
         }
 
         private void Update()
@@ -217,6 +251,19 @@ namespace Sportland.Sports.Dodgeball
             {
                 dashCooldownTimer += Time.deltaTime;
                 if (dashCooldownTimer >= dashCooldown) dashCooldownTimer = -1f;
+            }
+
+            if (IsDiving)
+            {
+                diveTimer += Time.deltaTime;
+                if (diveTimer >= diveDuration) { diveTimer = -1f; recoverTimer = 0f; }  // landed → prone recovery
+                else rb.linearVelocity = diveDir * diveSpeed;
+            }
+            else if (IsRecovering)
+            {
+                rb.linearVelocity = Vector2.zero;   // prone — no movement until back on feet
+                recoverTimer += Time.deltaTime;
+                if (recoverTimer >= diveRecovery) recoverTimer = -1f;
             }
 
             // Sprite: bob up with the jump arc, squash down while ducking.

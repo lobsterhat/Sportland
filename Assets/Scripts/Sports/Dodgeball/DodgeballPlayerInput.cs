@@ -45,6 +45,8 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Neutral-stick evade auto-picks a verb from the incoming throw's predicted " +
                  "arrival height: at/above this, duck under it; below, jump over it.")]
         [SerializeField] private float evadeDuckHeight = 0.75f;
+        [Tooltip("Empty-handed, pressing evade within this range of a loose/deflected ball dives for it.")]
+        [SerializeField] private float diveTriggerRange = 3f;
 
         [Header("Throw aim assist")]
         [Tooltip("Half-angle of the throw cone (degrees). Opponents whose bearing from the thrower " +
@@ -171,6 +173,9 @@ namespace Sportland.Sports.Dodgeball
                     movement.SetFacing((Vector2)cachedBall.transform.position - (Vector2)transform.position);
             }
 
+            // Keep the catch armed through a dive so the extended-reach grab lands.
+            if (movement.IsDiving) tracker.ArmCatch();
+
             movement.IsRunning = isRunning || actions.Sprint.IsPressed();
             movement.ApplyMove(input);
         }
@@ -182,6 +187,8 @@ namespace Sportland.Sports.Dodgeball
         private void OnEvadePressed(InputAction.CallbackContext _)
         {
             if (tracker.HasBall) { movement.TryJump(); return; }
+
+            if (TryDiveForBall()) return;   // near a loose/deflected ball → lunge for it
 
             Vector2 dir = actions.Move.ReadValue<Vector2>();
             if (dir.sqrMagnitude > 0.04f) { movement.Dash(dir); return; }
@@ -195,6 +202,30 @@ namespace Sportland.Sports.Dodgeball
             {
                 movement.Duck();   // nothing incoming — brief crouch
             }
+        }
+
+        // If a deflected (bouncing) or loose ball is nearby, dive toward where it
+        // will land and arm a catch (the dive extends the catch reach). A fresh
+        // incoming throw is left to the normal duck/jump/dodge evade. Returns
+        // true if a dive was started.
+        private bool TryDiveForBall()
+        {
+            if (cachedBall == null) cachedBall = FindAnyObjectByType<Ball>();
+            if (cachedBall == null) return false;
+
+            var st = cachedBall.CurrentState;
+            if (st != Ball.State.Bouncing && st != Ball.State.Loose) return false;
+
+            Vector2 me = transform.position;
+            Vector2 landing = cachedBall.PredictGroundPoint();
+            float near = Mathf.Min(Vector2.Distance(me, cachedBall.transform.position),
+                                   Vector2.Distance(me, landing));
+            if (near > diveTriggerRange) return false;
+
+            movement.Dive(landing - me);
+            if (!movement.IsDiving) return false;   // blocked (mid jump/dash/dive/recovery)
+            tracker.ArmCatch();
+            return true;
         }
 
         // Predicted arrival height of an in-flight thrown ball at our position,

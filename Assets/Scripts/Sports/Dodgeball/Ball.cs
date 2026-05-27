@@ -383,6 +383,12 @@ namespace Sportland.Sports.Dodgeball
             float t = Mathf.Clamp01(bounceArcTimer / bounceArcDuration);
             Height = Mathf.Lerp(bounceStartHeight, 0f, t)
                    + bounceArcApex * Mathf.Sin(t * Mathf.PI);
+
+            // A deflected ball stays live: it can be caught (incl. a diving catch)
+            // or picked up while bouncing — no re-carom (caromOnMiss: false).
+            TryPickup();
+            if (state != State.Bouncing) return;
+
             if (t < 1f) return;
 
             // Hit the ground. Bleed lateral velocity and start the next, smaller
@@ -463,7 +469,7 @@ namespace Sportland.Sports.Dodgeball
                 var t = trackers[i];
                 if (t == null || t == recentThrower) continue;
 
-                float radius = (IsHumanControlled(t) || HasAI(t)) ? catchRadius : pickupRadius;
+                float radius = CatchRadiusFor(t);
                 if (Vector2.SqrMagnitude((Vector2)t.transform.position - ballPos) > radius * radius)
                     continue;
 
@@ -484,7 +490,7 @@ namespace Sportland.Sports.Dodgeball
                 var t = trackers[i];
                 if (t == null || t == recentThrower) continue;
 
-                float radius = (IsHumanControlled(t) || HasAI(t)) ? catchRadius : pickupRadius;
+                float radius = CatchRadiusFor(t);
                 if (Vector2.SqrMagnitude((Vector2)t.transform.position - ballPos) > radius * radius)
                     continue;
 
@@ -553,6 +559,16 @@ namespace Sportland.Sports.Dodgeball
             var m = t.GetComponent<PlayerMovement>();
             if (m == null) return Height <= pickupMaxHeight;
             return Height >= m.BodyBottom && Height <= m.BodyTop;
+        }
+
+        // Catch/pickup reach for a player — the larger catch radius for a
+        // controlled or AI player, extended further while diving (arms out).
+        private float CatchRadiusFor(PlayerZoneTracker t)
+        {
+            float r = (IsHumanControlled(t) || HasAI(t)) ? catchRadius : pickupRadius;
+            var m = t.GetComponent<PlayerMovement>();
+            if (m != null && m.IsDiving) r += m.DiveReach;
+            return r;
         }
 
         private static bool IsHumanControlled(PlayerZoneTracker t)
