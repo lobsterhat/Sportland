@@ -27,12 +27,21 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float arrowSize = 0.35f;
         [SerializeField] private int arrowSortingOrder = 26;
 
+        [Header("Controlled-player ring")]
+        [SerializeField] private Color ringColor = new Color(1f, 0.9f, 0.15f, 0.95f);
+        [Tooltip("Ground-ring half-extents (x wide, y flat) so it reads as lying on the floor.")]
+        [SerializeField] private float ringRadiusX = 0.6f;
+        [SerializeField] private float ringRadiusY = 0.24f;
+        [SerializeField] private float ringWidth = 0.06f;
+        [SerializeField] private int ringSortingOrder = 1;
+
         private Material bodyMaterial;
         private SpriteRenderer spriteRenderer;
         private PlayerZoneTracker tracker;
         private Color baseColor;
         private PlayerMovement movement;
         private Transform arrowTransform;
+        private Transform ringTransform;
 
         public void Configure(Team team, PlayerRole role, PlayerZoneTracker zoneTracker)
         {
@@ -52,10 +61,12 @@ namespace Sportland.Sports.Dodgeball
 
             movement = GetComponentInParent<PlayerMovement>();
             BuildFacingArrow();
+            BuildControlRing();
         }
 
         private void Update()
         {
+            UpdateControlIndicators();
             UpdateFacingArrow();
 
             if (tracker == null) return;
@@ -163,13 +174,14 @@ namespace Sportland.Sports.Dodgeball
             mesh.RecalculateNormals();
             mf.mesh = mesh;
 
+            go.SetActive(false);   // shown only while controlled (UpdateControlIndicators)
             arrowTransform = go.transform;
         }
 
         // Orbit the pointer around the player in the current Facing direction.
         private void UpdateFacingArrow()
         {
-            if (arrowTransform == null) return;
+            if (arrowTransform == null || !arrowTransform.gameObject.activeSelf) return;
             if (movement == null) movement = GetComponentInParent<PlayerMovement>();
             if (movement == null) return;
 
@@ -178,6 +190,53 @@ namespace Sportland.Sports.Dodgeball
             float ang = Mathf.Atan2(f.y, f.x) * Mathf.Rad2Deg;
             arrowTransform.localPosition = new Vector3(f.x * arrowDistance, f.y * arrowDistance, 0f);
             arrowTransform.localRotation = Quaternion.Euler(0f, 0f, ang);
+        }
+
+        // A flat yellow ring at the player's feet marking the human-controlled
+        // player. Ground-fixed (parented to the root, not the bobbing Visual).
+        private void BuildControlRing()
+        {
+            if (ringTransform != null) return;
+
+            Transform parent = transform.parent != null ? transform.parent : transform;
+            var go = new GameObject("ControlRing");
+            go.transform.SetParent(parent, false);
+            float footY = movement != null ? movement.FootOffset : -0.79f;
+            go.transform.localPosition = new Vector3(0f, footY, 0f);
+
+            const int segs = 28;
+            var lr = go.AddComponent<LineRenderer>();
+            lr.useWorldSpace = false;
+            lr.loop = true;
+            lr.positionCount = segs;
+            lr.startWidth = ringWidth;
+            lr.endWidth = ringWidth;
+            lr.material = CreateMat(ringColor);
+            lr.startColor = ringColor;
+            lr.endColor = ringColor;
+            lr.sortingOrder = ringSortingOrder;
+            lr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            lr.receiveShadows = false;
+            for (int i = 0; i < segs; i++)
+            {
+                float a = i * Mathf.PI * 2f / segs;
+                lr.SetPosition(i, new Vector3(Mathf.Cos(a) * ringRadiusX, Mathf.Sin(a) * ringRadiusY, 0f));
+            }
+
+            go.SetActive(false);   // shown only while controlled
+            ringTransform = go.transform;
+        }
+
+        // The ring + facing arrow mark the human-controlled player, so show them
+        // only on whoever currently holds a DodgeballPlayerInput.
+        private void UpdateControlIndicators()
+        {
+            if (movement == null) movement = GetComponentInParent<PlayerMovement>();
+            bool controlled = movement != null && movement.GetComponent<DodgeballPlayerInput>() != null;
+            if (ringTransform != null && ringTransform.gameObject.activeSelf != controlled)
+                ringTransform.gameObject.SetActive(controlled);
+            if (arrowTransform != null && arrowTransform.gameObject.activeSelf != controlled)
+                arrowTransform.gameObject.SetActive(controlled);
         }
 
         private static Material CreateMat(Color c)
