@@ -33,7 +33,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float ringRadiusX = 0.6f;
         [SerializeField] private float ringRadiusY = 0.24f;
         [SerializeField] private float ringWidth = 0.06f;
-        [SerializeField] private int ringSortingOrder = 1;
+        [Tooltip("Below the player sprite (order 0) but above the court (center line -2) so it sits under the player.")]
+        [SerializeField] private int ringSortingOrder = -1;
 
         private Material bodyMaterial;
         private SpriteRenderer spriteRenderer;
