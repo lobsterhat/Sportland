@@ -71,6 +71,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private bool spawnDebugCannon = true;
         [Tooltip("Float a jersey number (e.g. A2) above each player for identification.")]
         [SerializeField] private bool showPlayerLabels = true;
+        [Tooltip("Show the play-by-play log panel (top-right, under the cannon).")]
+        [SerializeField] private bool showPlayByPlay = true;
 
         [Header("Match")]
         [Tooltip("Scoring rules asset. Leave null to use Start Mode below (built in code).")]
@@ -97,6 +99,7 @@ namespace Sportland.Sports.Dodgeball
             if (showDiagnosticsHud) gameObject.AddComponent<DodgeballDiagnosticsHUD>();
             if (spawnDebugCannon) gameObject.AddComponent<DodgeballCannon>();
             if (showPlayerLabels) gameObject.AddComponent<DodgeballPlayerLabels>();
+            if (showPlayByPlay) gameObject.AddComponent<DodgeballPlayByPlay>();
             if (runMatch)
             {
                 match = gameObject.AddComponent<DodgeballMatch>();
@@ -154,6 +157,7 @@ namespace Sportland.Sports.Dodgeball
             }
             if (ball != null) ball.ResetLoose(Vector2.zero);
             if (match != null) match.Configure(mode);
+            DodgeballPlayByPlay.Clear();   // fresh log for the new match
         }
 
         private void SpawnBall()

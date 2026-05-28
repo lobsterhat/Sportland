@@ -221,6 +221,12 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>True if the most recent release was a throw (offensive) rather than a pass to a teammate. Lets a catch put the thrower out only for actual throws.</summary>
         public bool LastReleaseWasThrow { get; private set; }
 
+        /// <summary>The thrower's intended target at release (set by the controller), for the play-by-play log. May be null (e.g. an untargeted throw).</summary>
+        public PlayerZoneTracker IntendedTarget { get; set; }
+
+        /// <summary>True if the ball has caromed off a player since the last release — lets the log say "deflects and is caught".</summary>
+        public bool DeflectedSinceRelease { get; private set; }
+
         /// <summary>Current trajectory state.</summary>
         public State CurrentState => state;
 
@@ -261,6 +267,12 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>Fires when a player skill-catches an opponent's throw. Args: catcher.</summary>
         public event System.Action<PlayerZoneTracker> OnCaught;
+
+        /// <summary>Fires on release. Args: thrower, intended target (may be null), isThrow (vs pass). For the play-by-play log.</summary>
+        public event System.Action<PlayerZoneTracker, PlayerZoneTracker, bool> OnReleased;
+
+        /// <summary>Fires when the ball settles to a loose ball (a play ended without a catch/possession). For the play-by-play log.</summary>
+        public event System.Action OnBecameLoose;
 
         private void Awake()
         {
@@ -449,6 +461,7 @@ namespace Sportland.Sports.Dodgeball
             ConfirmPendingHits();   // settled without a catch — any pending hits stand
             state = State.Loose;
             rb.simulated = true;
+            OnBecameLoose?.Invoke();
         }
 
         private void ApplyVisualHeight()
@@ -755,6 +768,7 @@ namespace Sportland.Sports.Dodgeball
 
         private void Carom(PlayerZoneTracker hit, HitZone zone)
         {
+            DeflectedSinceRelease = true;   // a deflection — for the play-by-play log
             Vector2 incoming = rb.linearVelocity;
 
             // A struck pass is parametric (rb asleep, zero velocity): rebuild the
@@ -992,9 +1006,11 @@ namespace Sportland.Sports.Dodgeball
             rb.linearVelocity = direction.normalized * power;
             heightVelocity = verticalVelocity;
             groundedSinceRelease = false;
+            DeflectedSinceRelease = false;
             LastReleaseWasThrow = true;
             state = State.Thrown;
             RecordRelease(power);
+            OnReleased?.Invoke(recentThrower, IntendedTarget, true);
         }
 
         /// <summary>
@@ -1126,9 +1142,11 @@ namespace Sportland.Sports.Dodgeball
             rb.linearVelocity = dir * power;
             heightVelocity = vy;
             groundedSinceRelease = false;
+            DeflectedSinceRelease = false;
             LastReleaseWasThrow = true;
             state = State.Thrown;
             RecordRelease(power);
+            OnReleased?.Invoke(recentThrower, IntendedTarget, true);
         }
 
         /// <summary>
@@ -1177,11 +1195,13 @@ namespace Sportland.Sports.Dodgeball
             // trajectory's baseline starts there, not at carryHeight.
             passLaunchHeight = Height;
             groundedSinceRelease = false;
+            DeflectedSinceRelease = false;
             LastReleaseWasThrow = false;
             state = State.Passing;
 
             rb.simulated = false;
             RecordRelease(effectiveSpeed);
+            OnReleased?.Invoke(recentThrower, IntendedTarget, false);
         }
 
         // True if an opponent (other team) stands within lobLaneRadius of the

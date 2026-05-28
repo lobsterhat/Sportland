@@ -269,6 +269,7 @@ namespace Sportland.Sports.Dodgeball
 
             float power = ThrowReleaseSpeed();
             var target = FindThrowTargetInCone(lastMoveDirection);
+            ball.IntendedTarget = target;   // for the play-by-play log (may be null)
             if (target != null)
             {
                 // Anticipation leads the target; accuracy then scatters the aim.
@@ -393,6 +394,7 @@ namespace Sportland.Sports.Dodgeball
 
             // Parametric drive — ball lerps to target's current position; lob
             // adds an arc, chest stays flat. Speed sets the flight duration.
+            ball.IntendedTarget = target;
             ball.Pass(target.transform.position,
                       isChest ? chestPassSpeed : lobPassSpeed,
                       isLob: !isChest);

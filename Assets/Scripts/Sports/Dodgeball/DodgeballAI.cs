@@ -342,6 +342,7 @@ namespace Sportland.Sports.Dodgeball
             Vector2 targetVel = targetRb != null ? targetRb.linearVelocity : Vector2.zero;
 
             Vector2 aim = ball.LeadAim(transform.position, target.transform.position, targetVel, power, anticipation);
+            ball.IntendedTarget = target;
             ball.ThrowAt(ApplyAccuracy(aim), power);
         }
 
@@ -433,6 +434,7 @@ namespace Sportland.Sports.Dodgeball
             if (holdStartTime < 0f) holdStartTime = Time.time;
             if (Time.time - holdStartTime >= windupTime)
             {
+                ball.IntendedTarget = target;
                 ball.Pass(target.transform.position, passSpeed, isLob: true);
                 holdStartTime = -1f;
             }

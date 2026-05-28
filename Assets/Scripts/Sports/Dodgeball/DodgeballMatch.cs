@@ -34,6 +34,13 @@ namespace Sportland.Sports.Dodgeball
         private GUIStyle style;
         private Texture2D bg;
 
+        // --- Play-by-play log (assembled here; shown by DodgeballPlayByPlay) ---
+        private bool playOpen;
+        private PlayerZoneTracker playThrower, playTarget, playVictim, playCatcher, playElim;
+        private bool playIsThrow, playDeflected;
+        private Team? playScoreTeam;
+        private int playScorePoints;
+
         /// <summary>Assign the rules (CourtSetup passes its GameMode; null = default Mode 1).</summary>
         public void Configure(GameMode gameMode)
         {
@@ -45,6 +52,7 @@ namespace Sportland.Sports.Dodgeball
             hitCounts.Clear();
             benched.Clear();
             energy.Clear();
+            playOpen = false;
         }
 
         private void Awake()
@@ -58,6 +66,8 @@ namespace Sportland.Sports.Dodgeball
             {
                 ball.OnHit -= OnBallHit;
                 ball.OnCaught -= OnBallCaught;
+                ball.OnReleased -= OnBallReleased;
+                ball.OnBecameLoose -= OnBallBecameLoose;
             }
         }
 
@@ -78,6 +88,8 @@ namespace Sportland.Sports.Dodgeball
             if (ball == null) return;
             ball.OnHit += OnBallHit;
             ball.OnCaught += OnBallCaught;
+            ball.OnReleased += OnBallReleased;
+            ball.OnBecameLoose += OnBallBecameLoose;
             subscribed = true;
         }
 
@@ -89,26 +101,36 @@ namespace Sportland.Sports.Dodgeball
             var attacker = ball != null ? ball.RecentThrower : null;
             if (attacker == null || attacker.Spawn.team == victim.Spawn.team) return;  // need an opponent's hit
 
-            if (mode.pointsPerHit != 0) AddScore(attacker.Spawn.team, mode.pointsPerHit);
-
-            if (victim.Spawn.role != PlayerRole.Infielder) return;   // backrow can't be eliminated
-
-            switch (mode.victimOutcome)
+            if (mode.pointsPerHit != 0)
             {
-                case VictimOutcome.CountToOut:   // Mode 2
-                    hitCounts.TryGetValue(victim, out int n);
-                    hitCounts[victim] = ++n;
-                    if (n >= mode.hitsToOut) TakeOut(victim, permanent: true);
-                    break;
-                case VictimOutcome.DamageEnergy: // Mode 3
-                    if (ApplyDamage(victim, ballSpeed) <= 0f) TakeOut(victim, permanent: true);
-                    break;
-                case VictimOutcome.Sideline:     // Mode 4
-                    TakeOut(victim, permanent: false);
-                    break;
-                case VictimOutcome.None:         // Mode 1 — hits only score.
-                    break;
+                AddScore(attacker.Spawn.team, mode.pointsPerHit);
+                RecordScore(attacker.Spawn.team, mode.pointsPerHit);
             }
+
+            if (victim.Spawn.role == PlayerRole.Infielder)   // backrow can't be eliminated
+            {
+                switch (mode.victimOutcome)
+                {
+                    case VictimOutcome.CountToOut:   // Mode 2
+                        hitCounts.TryGetValue(victim, out int n);
+                        hitCounts[victim] = ++n;
+                        if (n >= mode.hitsToOut) TakeOut(victim, permanent: true);
+                        break;
+                    case VictimOutcome.DamageEnergy: // Mode 3
+                        if (ApplyDamage(victim, ballSpeed) <= 0f) TakeOut(victim, permanent: true);
+                        break;
+                    case VictimOutcome.Sideline:     // Mode 4
+                        TakeOut(victim, permanent: false);
+                        break;
+                    case VictimOutcome.None:         // Mode 1 — hits only score.
+                        break;
+                }
+            }
+
+            // Play-by-play: a hit resolves the current play.
+            playVictim = victim;
+            playDeflected = ball != null && ball.DeflectedSinceRelease;
+            FlushPlay();
         }
 
         // Drain the victim's energy by the ball's impact speed, softened by the
@@ -135,11 +157,20 @@ namespace Sportland.Sports.Dodgeball
 
             if (mode.catchEffect == CatchEffect.ScoreAndReviveTeam)
             {
-                if (mode.pointsPerCatch != 0) AddScore(catcher.Spawn.team, mode.pointsPerCatch);
+                if (mode.pointsPerCatch != 0)
+                {
+                    AddScore(catcher.Spawn.team, mode.pointsPerCatch);
+                    RecordScore(catcher.Spawn.team, mode.pointsPerCatch);
+                }
                 RecallTeam(catcher.Spawn.team);
             }
 
             TakeOutThrowerOnCatch(catcher);
+
+            // Play-by-play: a catch resolves the current play.
+            playCatcher = catcher;
+            playDeflected = ball != null && ball.DeflectedSinceRelease;
+            FlushPlay();
         }
 
         // Catching a THROW (an offensive attack — not an intercepted pass to a
@@ -168,6 +199,76 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
+        // ── Play-by-play (debug log) ──
+
+        // A throw/pass was released — open a fresh play.
+        private void OnBallReleased(PlayerZoneTracker thrower, PlayerZoneTracker target, bool isThrow)
+        {
+            playOpen = true;
+            playThrower = thrower;
+            playTarget = target;
+            playIsThrow = isThrow;
+            playVictim = playCatcher = playElim = null;
+            playDeflected = false;
+            playScoreTeam = null;
+            playScorePoints = 0;
+        }
+
+        // The ball settled with no hit/catch: a throw logs as a miss; an
+        // uneventful pass (reached a teammate or rolled out) isn't worth a line.
+        private void OnBallBecameLoose()
+        {
+            if (!playOpen) return;
+            if (playIsThrow) FlushPlay();
+            else playOpen = false;
+        }
+
+        private void RecordScore(Team team, int points)
+        {
+            if (!playOpen) return;
+            playScoreTeam = team;
+            playScorePoints = points;
+        }
+
+        // Build one line from the current play and append it to the log.
+        private void FlushPlay()
+        {
+            if (!playOpen) return;
+            playOpen = false;
+            if (playThrower == null) return;
+
+            string line = playTarget != null
+                ? $"{Label(playThrower)} {(playIsThrow ? "throws at" : "passes to")} {Label(playTarget)}"
+                : $"{Label(playThrower)} {(playIsThrow ? "throws" : "passes")}";
+
+            if (playCatcher != null)
+                line += playDeflected
+                    ? $" and deflects and is caught by {Label(playCatcher)}"
+                    : $" and is caught by {Label(playCatcher)}";
+            else if (playVictim != null)
+                line += playIsThrow
+                    ? (playVictim == playTarget ? " and hits" : $" and hits {Label(playVictim)}")
+                    : $" and is deflected by {Label(playVictim)}";
+            else
+                line += " and misses";
+
+            line += " - " + PlayResult();
+            DodgeballPlayByPlay.Log(line);
+        }
+
+        private string PlayResult()
+        {
+            string s = null;
+            if (playScoreTeam.HasValue && playScorePoints != 0)
+                s = $"+{playScorePoints} {ColorName(playScoreTeam.Value)}";
+            if (playElim != null)
+                s = s == null ? $"{Label(playElim)} out" : $"{s}, {Label(playElim)} out";
+            return s ?? "No Score";
+        }
+
+        private static string ColorName(Team t) => t == Team.A ? "Blue" : "Red";
+        private static string Label(PlayerZoneTracker p) => $"{ColorName(p.Spawn.team)} {p.Number}";
+
         // Remove a player from play. permanent = gone for good (Modes 2/3);
         // otherwise benched and recallable (Mode 4). Hands control off first if
         // the player was the one being driven, then checks for a wipeout.
@@ -181,6 +282,7 @@ namespace Sportland.Sports.Dodgeball
 
             player.gameObject.SetActive(false);   // OnDisable drops it from PlayerZoneTracker.All
             if (!permanent && !benched.Contains(player)) benched.Add(player);
+            if (playOpen) playElim = player;   // note it for the play-by-play
 
             CheckWipeout();
         }
