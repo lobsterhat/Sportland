@@ -218,6 +218,9 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Player credited with the most recent release (thrower/passer/cannon source), or null.</summary>
         public PlayerZoneTracker RecentThrower => recentThrower;
 
+        /// <summary>True if the most recent release was a throw (offensive) rather than a pass to a teammate. Lets a catch put the thrower out only for actual throws.</summary>
+        public bool LastReleaseWasThrow { get; private set; }
+
         /// <summary>Current trajectory state.</summary>
         public State CurrentState => state;
 
@@ -969,6 +972,7 @@ namespace Sportland.Sports.Dodgeball
             rb.linearVelocity = direction.normalized * power;
             heightVelocity = verticalVelocity;
             groundedSinceRelease = false;
+            LastReleaseWasThrow = true;
             state = State.Thrown;
             RecordRelease(power);
         }
@@ -1102,6 +1106,7 @@ namespace Sportland.Sports.Dodgeball
             rb.linearVelocity = dir * power;
             heightVelocity = vy;
             groundedSinceRelease = false;
+            LastReleaseWasThrow = true;
             state = State.Thrown;
             RecordRelease(power);
         }
@@ -1152,6 +1157,7 @@ namespace Sportland.Sports.Dodgeball
             // trajectory's baseline starts there, not at carryHeight.
             passLaunchHeight = Height;
             groundedSinceRelease = false;
+            LastReleaseWasThrow = false;
             state = State.Passing;
 
             rb.simulated = false;

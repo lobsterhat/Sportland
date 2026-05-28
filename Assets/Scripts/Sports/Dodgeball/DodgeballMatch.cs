@@ -126,14 +126,46 @@ namespace Sportland.Sports.Dodgeball
             return e;
         }
 
-        // A caught opponent throw. Mode 4: score + recall the catching team's bench.
+        // A caught opponent throw. Mode 4 scores + recalls the catching team's
+        // bench; and in every mode that removes players, the catch also puts the
+        // thrower out — the classic dodgeball rule.
         private void OnBallCaught(PlayerZoneTracker catcher)
         {
             if (matchOver || catcher == null) return;
-            if (mode.catchEffect != CatchEffect.ScoreAndReviveTeam) return;
 
-            if (mode.pointsPerCatch != 0) AddScore(catcher.Spawn.team, mode.pointsPerCatch);
-            RecallTeam(catcher.Spawn.team);
+            if (mode.catchEffect == CatchEffect.ScoreAndReviveTeam)
+            {
+                if (mode.pointsPerCatch != 0) AddScore(catcher.Spawn.team, mode.pointsPerCatch);
+                RecallTeam(catcher.Spawn.team);
+            }
+
+            TakeOutThrowerOnCatch(catcher);
+        }
+
+        // Catching a THROW (an offensive attack — not an intercepted pass to a
+        // teammate) puts the thrower out, the way this mode removes players: gone
+        // for good in the elimination modes (CountToOut / DamageEnergy), benched
+        // in the hybrid (Sideline). Mode 1 (None) has no eliminations, so a catch
+        // is a turnover only. Backrow throwers are immune.
+        private void TakeOutThrowerOnCatch(PlayerZoneTracker catcher)
+        {
+            if (ball == null || !ball.LastReleaseWasThrow) return;   // only a caught throw, not a picked pass
+            var thrower = ball.RecentThrower;
+            if (thrower == null || thrower.Spawn.team == catcher.Spawn.team) return;
+            if (thrower.Spawn.role != PlayerRole.Infielder) return;   // backrow can't be eliminated
+
+            switch (mode.victimOutcome)
+            {
+                case VictimOutcome.CountToOut:    // Mode 2 — out for good
+                case VictimOutcome.DamageEnergy:  // Mode 3 — out for good
+                    TakeOut(thrower, permanent: true);
+                    break;
+                case VictimOutcome.Sideline:      // Mode 4 — benched (recallable)
+                    TakeOut(thrower, permanent: false);
+                    break;
+                case VictimOutcome.None:          // Mode 1 — no eliminations
+                    break;
+            }
         }
 
         // Remove a player from play. permanent = gone for good (Modes 2/3);
