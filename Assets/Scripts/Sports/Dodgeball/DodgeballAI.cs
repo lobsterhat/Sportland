@@ -60,6 +60,8 @@ namespace Sportland.Sports.Dodgeball
         [Header("Loose-ball retrieval")]
         [Tooltip("Dive for a bouncing (deflected) ball when its predicted landing is within this distance — a lunging catch with arms extended. The dive may cross the zone line (legal while airborne).")]
         [SerializeField] private float diveRange = 3f;
+        [Tooltip("Speed when ambling toward a loose ball, as a fraction of walk speed — there's no urgency, so it shouldn't sprint. 1 = full walk.")]
+        [SerializeField, Range(0.2f, 1f)] private float looseChaseSpeed = 0.6f;
 
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
@@ -381,7 +383,7 @@ namespace Sportland.Sports.Dodgeball
 
         private void ChaseLooseBall()
         {
-            movement.IsRunning = true;
+            movement.IsRunning = false;   // amble after a loose ball — no need to sprint
             movement.SetStance(false);
             Vector2 me = transform.position;
             Vector2 ballPos = ball.transform.position;
@@ -402,7 +404,7 @@ namespace Sportland.Sports.Dodgeball
                 }
             }
 
-            MoveToward(ClampToZone(ballPos));
+            MoveToward(ClampToZone(ballPos), looseChaseSpeed);
         }
 
         // Read the throw's predicted landing and get under it (clamped to our
@@ -463,10 +465,10 @@ namespace Sportland.Sports.Dodgeball
                 ? Vector2.ClampMagnitude(delta, 1f) : Vector2.zero);
         }
 
-        private void MoveToward(Vector2 target)
+        private void MoveToward(Vector2 target, float maxInput = 1f)
         {
             Vector2 delta = target - (Vector2)transform.position;
-            movement.ApplyMove(delta.sqrMagnitude > 0.0004f ? Vector2.ClampMagnitude(delta, 1f) : Vector2.zero);
+            movement.ApplyMove(delta.sqrMagnitude > 0.0004f ? Vector2.ClampMagnitude(delta, maxInput) : Vector2.zero);
         }
 
         private Vector2 ClampToZone(Vector2 pos) => tracker.AssignedZone.Clamp(pos);
