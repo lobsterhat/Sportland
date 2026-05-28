@@ -68,7 +68,54 @@ namespace Sportland.Sports.Dodgeball
         public int infieldersPerTeam = 3;
         public int outfieldersPerTeam = 3;
 
+        /// <summary>Built-in mode presets for quick testing (no .asset needed).</summary>
+        public enum Preset { RunningHits, Elimination, Energy, Hybrid }
+
+        /// <summary>
+        /// Build one of the four planned modes in code (so the modes are testable
+        /// without authoring assets). See the class summary for the field map.
+        /// </summary>
+        public static GameMode Create(Preset preset)
+        {
+            var m = CreateInstance<GameMode>();
+            switch (preset)
+            {
+                case Preset.RunningHits:   // Mode 1 — most hits over the clock
+                    m.modeName = "Running Hits";
+                    m.isTimed = true; m.secondsPerPeriod = 120f; m.endOnTeamWipeout = false;
+                    m.pointsPerHit = 1; m.pointsPerCatch = 0;
+                    m.victimOutcome = VictimOutcome.None;
+                    m.catchEffect = CatchEffect.TurnoverOnly;
+                    break;
+
+                case Preset.Elimination:   // Mode 2 — N hits and you're out
+                    m.modeName = "Elimination";
+                    m.isTimed = false; m.endOnTeamWipeout = true;
+                    m.pointsPerHit = 0; m.pointsPerCatch = 0;
+                    m.victimOutcome = VictimOutcome.CountToOut; m.hitsToOut = 3;
+                    m.catchEffect = CatchEffect.TurnoverOnly;
+                    break;
+
+                case Preset.Energy:        // Mode 3 — drain energy to eliminate
+                    m.modeName = "Energy";
+                    m.isTimed = false; m.endOnTeamWipeout = true;
+                    m.pointsPerHit = 0; m.pointsPerCatch = 0;
+                    m.victimOutcome = VictimOutcome.DamageEnergy;
+                    m.catchEffect = CatchEffect.TurnoverOnly;
+                    break;
+
+                case Preset.Hybrid:        // Mode 4 — sideline + catch-revive, timed
+                    m.modeName = "Hybrid";
+                    m.isTimed = true; m.secondsPerPeriod = 120f; m.endOnTeamWipeout = true;
+                    m.pointsPerHit = 1; m.pointsPerCatch = 1;
+                    m.victimOutcome = VictimOutcome.Sideline;
+                    m.catchEffect = CatchEffect.ScoreAndReviveTeam;
+                    break;
+            }
+            return m;
+        }
+
         /// <summary>Fallback Mode 1 (running hits) used when no asset is assigned.</summary>
-        public static GameMode CreateDefault() => CreateInstance<GameMode>();
+        public static GameMode CreateDefault() => Create(Preset.RunningHits);
     }
 }

@@ -941,6 +941,26 @@ namespace Sportland.Sports.Dodgeball
             EnterLoose();                  // wakes physics; falls to the floor and rolls
         }
 
+        /// <summary>
+        /// Reset to a loose ball at a ground position (Height 0) — used by the
+        /// match restarter when switching test modes. Detaches any carrier and
+        /// clears thrower / pending-hit state so it's a clean neutral ball.
+        /// </summary>
+        public void ResetLoose(Vector2 groundPos)
+        {
+            if (carrier != null) { carrier.HeldBall = null; carrier = null; carrierMovement = null; }
+            recentThrower = null;
+            throwerCooldownRemaining = 0f;
+            pendingHits.Clear();
+            transform.position = new Vector3(groundPos.x, groundPos.y, transform.position.z);
+            Height = 0f;
+            heightVelocity = 0f;
+            groundedSinceRelease = true;
+            LastReleaseWasThrow = false;
+            EnterLoose();
+            rb.linearVelocity = Vector2.zero;
+        }
+
         // A held ball may only be released (thrown or passed) from your own area,
         // or while airborne — the jump exception that lets you leap over the line
         // to throw/pass. A grounded player in the opponent's area can't release it

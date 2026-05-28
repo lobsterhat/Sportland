@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Sportland.Sports.Dodgeball
 {
@@ -70,13 +71,21 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private bool spawnDebugCannon = true;
 
         [Header("Match")]
-        [Tooltip("Scoring rules asset. Leave null to default to Mode 1 (running hits).")]
+        [Tooltip("Scoring rules asset. Leave null to use Start Mode below (built in code).")]
         [SerializeField] private GameMode gameMode;
+        [Tooltip("Which built-in mode to start in when no Game Mode asset is assigned.")]
+        [SerializeField] private GameMode.Preset startMode = GameMode.Preset.RunningHits;
         [Tooltip("Run the match scorer (score + clock + win condition).")]
         [SerializeField] private bool runMatch = true;
+        [Tooltip("Switch modes at runtime for testing: M cycles; F1-F4 pick Running Hits / Elimination / Energy / Hybrid. Resets the match.")]
+        [SerializeField] private bool allowRuntimeModeSwitch = true;
 
         [Header("Runtime")]
         [SerializeField] private List<GameObject> spawnedPlayers = new List<GameObject>();
+
+        private DodgeballMatch match;
+        private Ball ball;
+        private GameMode.Preset currentPreset;
 
         private void Awake()
         {
@@ -85,7 +94,63 @@ namespace Sportland.Sports.Dodgeball
             SpawnBall();
             if (showDiagnosticsHud) gameObject.AddComponent<DodgeballDiagnosticsHUD>();
             if (spawnDebugCannon) gameObject.AddComponent<DodgeballCannon>();
-            if (runMatch) gameObject.AddComponent<DodgeballMatch>().Configure(gameMode);
+            if (runMatch)
+            {
+                match = gameObject.AddComponent<DodgeballMatch>();
+                currentPreset = startMode;
+                match.Configure(gameMode != null ? gameMode : GameMode.Create(startMode));
+            }
+        }
+
+        private void Update()
+        {
+            if (!allowRuntimeModeSwitch || match == null) return;
+            var kb = Keyboard.current;
+            if (kb == null) return;
+
+            if (kb.f1Key.wasPressedThisFrame)      SwitchMode(GameMode.Preset.RunningHits);
+            else if (kb.f2Key.wasPressedThisFrame) SwitchMode(GameMode.Preset.Elimination);
+            else if (kb.f3Key.wasPressedThisFrame) SwitchMode(GameMode.Preset.Energy);
+            else if (kb.f4Key.wasPressedThisFrame) SwitchMode(GameMode.Preset.Hybrid);
+            else if (kb.mKey.wasPressedThisFrame)  SwitchMode(NextPreset(currentPreset));
+        }
+
+        private static GameMode.Preset NextPreset(GameMode.Preset p)
+        {
+            switch (p)
+            {
+                case GameMode.Preset.RunningHits: return GameMode.Preset.Elimination;
+                case GameMode.Preset.Elimination: return GameMode.Preset.Energy;
+                case GameMode.Preset.Energy:      return GameMode.Preset.Hybrid;
+                default:                          return GameMode.Preset.RunningHits;
+            }
+        }
+
+        // Rebuild the chosen mode and reset to a fresh match in it.
+        private void SwitchMode(GameMode.Preset preset)
+        {
+            currentPreset = preset;
+            RestartInMode(GameMode.Create(preset));
+            Debug.Log($"[Dodgeball] Switched to mode: {preset}");
+        }
+
+        // Revive + reposition every spawned player (incl. any eliminated under a
+        // previous mode), reset the ball to a loose ball at center, and reconfigure
+        // the scorer — a clean fresh match in the new mode.
+        private void RestartInMode(GameMode mode)
+        {
+            for (int i = 0; i < spawnedPlayers.Count; i++)
+            {
+                var go = spawnedPlayers[i];
+                if (go == null) continue;
+                var tracker = go.GetComponent<PlayerZoneTracker>();
+                if (tracker != null) go.transform.position = tracker.Spawn.position;
+                var body = go.GetComponent<Rigidbody2D>();
+                if (body != null) body.linearVelocity = Vector2.zero;
+                if (!go.activeSelf) go.SetActive(true);   // re-adds to PlayerZoneTracker.All
+            }
+            if (ball != null) ball.ResetLoose(Vector2.zero);
+            if (match != null) match.Configure(mode);
         }
 
         private void SpawnBall()
@@ -103,6 +168,7 @@ namespace Sportland.Sports.Dodgeball
                 ballGO.AddComponent<Ball>();
             }
             ballGO.transform.localPosition = Vector3.zero;
+            ball = ballGO.GetComponent<Ball>();
         }
 
         private void BuildCourt()

@@ -258,10 +258,11 @@ namespace Sportland.Sports.Dodgeball
                 ? $"   [A:{CountActiveInfielders(Team.A)} B:{CountActiveInfielders(Team.B)}]"
                 : "";
             string nrg = mode.victimOutcome == VictimOutcome.DamageEnergy ? ControlledEnergyLabel() : "";
+            string modeTag = mode != null && !string.IsNullOrEmpty(mode.modeName) ? $"{mode.modeName}   " : "";
             string label = matchOver
-                ? (winner.HasValue ? $"FINAL   A {scoreA} – {scoreB} B   ({winner} wins)"
-                                   : $"FINAL   A {scoreA} – {scoreB} B   (tie)")
-                : $"A {scoreA} – {scoreB} B    {time}{counts}{nrg}";
+                ? (winner.HasValue ? $"{modeTag}FINAL   A {scoreA} – {scoreB} B   ({winner} wins)"
+                                   : $"{modeTag}FINAL   A {scoreA} – {scoreB} B   (tie)")
+                : $"{modeTag}A {scoreA} – {scoreB} B    {time}{counts}{nrg}";
 
             const float w = 520f, h = 30f;
             float x = (Screen.width - w) * 0.5f;
