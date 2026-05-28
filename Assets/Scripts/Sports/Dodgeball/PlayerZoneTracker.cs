@@ -194,8 +194,9 @@ namespace Sportland.Sports.Dodgeball
 
                 // Still holding the ball past the neutral-zone grace → forfeit it
                 // to the opposing team (covers leaving without the ball then
-                // picking one up out of zone). Airborne is the line-cross exception.
-                if (HasBall && !movement.IsAirborne)
+                // picking one up out of zone). Being off the ground (jump or dive)
+                // is the line-cross exception — only a grounded carrier forfeits.
+                if (HasBall && movement.IsGrounded)
                 {
                     ForfeitHeldBall();
                 }
@@ -236,8 +237,11 @@ namespace Sportland.Sports.Dodgeball
         /// </summary>
         public bool CanCatchBall()
         {
-            // Restricted area = anywhere outside your assigned zone.
-            return IsInZone;
+            // Restricted area = anywhere outside your assigned zone — but a
+            // diving lunge that crosses the line is legal while you're still
+            // airborne (not grounded). The turnover only bites if you touch
+            // down out of zone, so a dive can snag a ball just past the line.
+            return IsInZone || !movement.IsGrounded;
         }
 
         /// <summary>

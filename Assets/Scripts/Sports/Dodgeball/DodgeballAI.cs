@@ -57,6 +57,10 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Base lateral speed (u/s) of an outfielder's lob back to an infielder; scales up with distance.")]
         [SerializeField] private float passSpeed = 12f;
 
+        [Header("Loose-ball retrieval")]
+        [Tooltip("Dive for a bouncing (deflected) ball when its predicted landing is within this distance — a lunging catch with arms extended. The dive may cross the zone line (legal while airborne).")]
+        [SerializeField] private float diveRange = 3f;
+
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
         private DodgeballAttributes attr;
@@ -379,8 +383,25 @@ namespace Sportland.Sports.Dodgeball
         {
             movement.IsRunning = true;
             movement.SetStance(false);
+            Vector2 me = transform.position;
             Vector2 ballPos = ball.transform.position;
-            movement.SetFacing(ballPos - (Vector2)transform.position);
+            movement.SetFacing(ballPos - me);
+
+            // A deflected ball (Bouncing) is still live to grab: if its predicted
+            // landing is close, lunge for it. The dive is unclamped so it can carry
+            // us across the zone line — legal as long as we don't touch down out of
+            // zone — and it extends our reach (arms out) to snag the deflection.
+            // (Ball auto-catches an AI within reach via TryTakeBall, no arm needed.)
+            if (ball.CurrentState == Ball.State.Bouncing)
+            {
+                Vector2 land = ball.PredictGroundPoint();
+                if (Vector2.Distance(me, land) <= diveRange)
+                {
+                    movement.Dive(land - me);
+                    return;
+                }
+            }
+
             MoveToward(ClampToZone(ballPos));
         }
 

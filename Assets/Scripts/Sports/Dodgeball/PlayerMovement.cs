@@ -97,6 +97,13 @@ namespace Sportland.Sports.Dodgeball
         public bool IsDiving => diveTimer >= 0f;
         /// <summary>Prone after a dive — can't move or act until back on feet.</summary>
         public bool IsRecovering => recoverTimer >= 0f;
+        /// <summary>
+        /// Feet on the floor: not mid-jump and not mid-dive (a dive is a low
+        /// airborne lunge). Prone recovery counts as grounded — you've landed.
+        /// Used to authorize line-crossing: a dive over a boundary is legal as
+        /// long as you don't actually touch down out of your zone.
+        /// </summary>
+        public bool IsGrounded => !IsAirborne && !IsDiving;
         /// <summary>Extra catch radius while diving (arms out); read by Ball.</summary>
         public float DiveReach => diveReach;
 
