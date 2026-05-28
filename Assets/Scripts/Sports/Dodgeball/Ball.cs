@@ -196,6 +196,14 @@ namespace Sportland.Sports.Dodgeball
         private float bounceArcApex;
         private float bounceStartHeight;
 
+        // A hit "in the air": recorded on carom but only fires OnHit (counts)
+        // once the ball touches the floor. A catch by the victim's team before
+        // then nullifies it — the dodgeball "caught before it hit the ground" rule.
+        private PlayerZoneTracker pendingHitVictim;
+        private HitZone pendingHitZone;
+        private float pendingHitSpeed;
+        private bool hasPendingHit;
+
         // Thrown state vertical kinematics. Positive = rising; gravity pulls
         // it negative; ground impacts flip it via bounceRestitution.
         private float heightVelocity;
@@ -354,6 +362,7 @@ namespace Sportland.Sports.Dodgeball
             if (Height <= 0f && heightVelocity < 0f)
             {
                 Height = 0f;
+                ConfirmPendingHit();   // touched the floor — a pending hit now stands
                 rb.linearVelocity *= bounceLateralFriction;
                 heightVelocity = -heightVelocity * bounceRestitution;
 
@@ -394,6 +403,10 @@ namespace Sportland.Sports.Dodgeball
 
             if (t < 1f) return;
 
+            // First ground contact locks in any pending hit — past this point a
+            // catch can no longer nullify it (the ball has touched the floor).
+            ConfirmPendingHit();
+
             // Hit the ground. Bleed lateral velocity and start the next, smaller
             // bounce — or roll if it would be too short to read.
             rb.linearVelocity *= bounceLateralFriction;
@@ -422,6 +435,7 @@ namespace Sportland.Sports.Dodgeball
 
         private void EnterLoose()
         {
+            ConfirmPendingHit();   // settled on the floor without a catch — hit stands
             state = State.Loose;
             rb.simulated = true;
         }
@@ -774,7 +788,38 @@ namespace Sportland.Sports.Dodgeball
             bounceArcApex = apex;
             state = State.Bouncing;
 
-            OnHit?.Invoke(hit, zone, incoming.magnitude);
+            // Defer the hit: record it as pending instead of firing OnHit now.
+            // It only counts (ConfirmPendingHit) once the ball touches the floor;
+            // if the victim's team catches it while still airborne the hit is
+            // wiped (CancelPendingHit) and never scores. A chained carom locks in
+            // the previous pending hit before recording the new one.
+            if (hasPendingHit) ConfirmPendingHit();
+            pendingHitVictim = hit;
+            pendingHitZone = zone;
+            pendingHitSpeed = incoming.magnitude;
+            hasPendingHit = true;
+        }
+
+        // The pending hit's flight ended on the floor (or the thrower's own team
+        // recovered the ricochet) without the victim's team catching it: it
+        // stands — fire OnHit now.
+        private void ConfirmPendingHit()
+        {
+            if (!hasPendingHit) return;
+            var victim = pendingHitVictim;
+            HitZone zone = pendingHitZone;
+            float speed = pendingHitSpeed;
+            hasPendingHit = false;
+            pendingHitVictim = null;
+            OnHit?.Invoke(victim, zone, speed);
+        }
+
+        // The victim's team caught the ball while the hit was still airborne:
+        // wipe it (OnHit never fires).
+        private void CancelPendingHit()
+        {
+            hasPendingHit = false;
+            pendingHitVictim = null;
         }
 
         // ── Release / attach API ──
@@ -789,6 +834,12 @@ namespace Sportland.Sports.Dodgeball
         {
             bool fromOpponent = recentThrower != null && recentThrower.Spawn.team != t.Spawn.team;
             bool liveBall = state == State.Thrown || state == State.Passing || state == State.Bouncing;
+
+            // Resolve any still-airborne hit: the victim's team catching it
+            // (fromOpponent) wipes the hit; anyone else securing it (the thrower's
+            // own team recovering the ricochet) locks it in.
+            if (fromOpponent) CancelPendingHit(); else ConfirmPendingHit();
+
             AttachTo(t);
             if (fromOpponent && liveBall) OnCaught?.Invoke(t);
         }
