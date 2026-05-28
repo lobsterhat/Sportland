@@ -69,6 +69,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private bool showDiagnosticsHud = true;
         [Tooltip("Spawn the debug cannon (C / R1) that fires balls at the controlled player.")]
         [SerializeField] private bool spawnDebugCannon = true;
+        [Tooltip("Float a jersey number (e.g. A2) above each player for identification.")]
+        [SerializeField] private bool showPlayerLabels = true;
 
         [Header("Match")]
         [Tooltip("Scoring rules asset. Leave null to use Start Mode below (built in code).")]
@@ -94,6 +96,7 @@ namespace Sportland.Sports.Dodgeball
             SpawnBall();
             if (showDiagnosticsHud) gameObject.AddComponent<DodgeballDiagnosticsHUD>();
             if (spawnDebugCannon) gameObject.AddComponent<DodgeballCannon>();
+            if (showPlayerLabels) gameObject.AddComponent<DodgeballPlayerLabels>();
             if (runMatch)
             {
                 match = gameObject.AddComponent<DodgeballMatch>();
@@ -192,13 +195,15 @@ namespace Sportland.Sports.Dodgeball
 
         private void SpawnAllPlayers()
         {
+            int aCount = 0, bCount = 0;
             foreach (var spawn in GetAllSpawns())
             {
-                SpawnPlayer(spawn);
+                int number = spawn.team == Team.A ? ++aCount : ++bCount;
+                SpawnPlayer(spawn, number);
             }
         }
 
-        private void SpawnPlayer(PlayerSpawn spawn)
+        private void SpawnPlayer(PlayerSpawn spawn, int number)
         {
             var go = BuildPlayer();
             go.name = spawn.id;
@@ -207,6 +212,7 @@ namespace Sportland.Sports.Dodgeball
             var tracker = go.GetComponent<PlayerZoneTracker>();
             if (tracker == null) tracker = go.AddComponent<PlayerZoneTracker>();
             tracker.Initialize(spawn);
+            tracker.Number = number;
 
             // Ability ratings used by skill checks (catching, etc.). Defaults
             // are uniform for now; tune per-player in the Inspector later.

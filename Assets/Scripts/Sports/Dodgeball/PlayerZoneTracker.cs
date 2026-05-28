@@ -32,6 +32,9 @@ namespace Sportland.Sports.Dodgeball
         public PlayerSpawn Spawn;
         public PlayZone AssignedZone;
 
+        /// <summary>Per-team jersey number (1-6) for on-screen identification / debugging.</summary>
+        public int Number;
+
         // --- Runtime state ---------------------------------------------------
         public bool IsInZone { get; private set; } = true;
         public Ball HeldBall { get; set; }
