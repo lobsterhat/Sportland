@@ -8,9 +8,9 @@ namespace Sportland.Sports.Dodgeball
     ///   - 3-second return window
     ///   - Crossing-count warning (3 crossings in 30s, rolling window)
     ///   - "Cannot catch while out of zone"
-    ///   - "Holding ball while out of zone = turnover"
+    ///   - "Grounded out of your area with the ball = drop it (loose)"
     ///   - Jump exception: while airborne, a player holding the ball may
-    ///     cross a line and throw before landing without triggering turnover.
+    ///     cross a line and throw/pass before landing without dropping it.
     ///
     /// Penalty-after-warning behavior is intentionally left as a hook
     /// (OnPenaltyTriggered) — wire it once we decide the penalty.
@@ -20,7 +20,7 @@ namespace Sportland.Sports.Dodgeball
     {
         // --- Tunables ---------------------------------------------------------
         [Header("Rule timings")]
-        [Tooltip("Neutral-zone grace: seconds after crossing out of your zone before holding the ball there forfeits it.")]
+        [Tooltip("Seconds a player may be out of their assigned zone before the return-window timer fires (positioning rule via OnReturnTimerExpired).")]
         [SerializeField] private float returnGraceSeconds = 2f;
         [SerializeField] private int   crossingsForWarning = 3;
         [SerializeField] private float crossingWindowSeconds = 30f;
@@ -78,16 +78,10 @@ namespace Sportland.Sports.Dodgeball
         private void Awake()
         {
             movement = GetComponent<PlayerMovement>();
-            movement.OnLanded += HandleLanded;
         }
 
         private void OnEnable() => All.Add(this);
         private void OnDisable() => All.Remove(this);
-
-        private void OnDestroy()
-        {
-            if (movement != null) movement.OnLanded -= HandleLanded;
-        }
 
         public void Initialize(PlayerSpawn spawn)
         {
@@ -98,21 +92,12 @@ namespace Sportland.Sports.Dodgeball
             returnExpiryFired = false;
         }
 
-        private void HandleLanded(PlayerMovement _)
-        {
-            // The airborne exception ends here: if we land out-of-zone still
-            // holding the ball, it's a turnover.
-            if (!IsInZone && HasBall)
-            {
-                OnTurnoverFromOutOfZoneWithBall?.Invoke(this);
-            }
-        }
-
         private void Update()
         {
             UpdateZoneState();
             PruneOldCrossings();
             CheckReturnTimer();
+            EnforceCarrierInZone();
         }
 
         private void UpdateZoneState()
@@ -134,15 +119,8 @@ namespace Sportland.Sports.Dodgeball
                 outOfZoneSince = Time.time;
                 RecordCrossing();
 
-                // Holding the ball while out of zone is a turnover —
-                // UNLESS the player is airborne (jump-over-line exception).
-                // The airborne case is re-checked in HandleLanded: release
-                // before landing = no turnover; still holding on landing = turnover.
-                if (HasBall && !movement.IsAirborne)
-                {
-                    OnTurnoverFromOutOfZoneWithBall?.Invoke(this);
-                }
-
+                // (Being grounded out of your area while holding the ball is
+                // handled per-frame by EnforceCarrierInZone — you drop it.)
                 OnLeftZone?.Invoke(this);
             }
         }
@@ -191,44 +169,26 @@ namespace Sportland.Sports.Dodgeball
             {
                 returnExpiryFired = true;
                 OnReturnTimerExpired?.Invoke(this);
-
-                // Still holding the ball past the neutral-zone grace → forfeit it
-                // to the opposing team (covers leaving without the ball then
-                // picking one up out of zone). Being off the ground (jump or dive)
-                // is the line-cross exception — only a grounded carrier forfeits.
-                if (HasBall && movement.IsGrounded)
-                {
-                    ForfeitHeldBall();
-                }
             }
         }
 
-        // Failed to clear the neutral zone in time while holding the ball:
-        // issue a warning and hand possession to the nearest opposing infielder.
-        private void ForfeitHeldBall()
+        // A carrier may be out of their area only while airborne — the jump/dive
+        // exception that lets them release a throw or pass over the line. The
+        // instant they're grounded out of their area still holding the ball they
+        // drop it (it goes loose); they can't pick it back up until they're home
+        // (CanCatchBall), so the opposing team in that area recovers it.
+        private void EnforceCarrierInZone()
+        {
+            if (HasBall && !IsInZone && movement.IsGrounded)
+                DropHeldBall();
+        }
+
+        private void DropHeldBall()
         {
             var ball = HeldBall;
-            OnWarningIssued?.Invoke(this);
-            Debug.Log($"[Dodgeball] {Spawn.id} held the ball past the neutral-zone grace — warning + forfeit.");
-            if (ball == null) return;
-            var opp = NearestOpponentInfielder();
-            if (opp != null) ball.ForcePickup(opp);
-        }
-
-        private PlayerZoneTracker NearestOpponentInfielder()
-        {
-            PlayerZoneTracker best = null;
-            float bestDistSq = float.MaxValue;
-            Vector2 me = transform.position;
-            for (int i = 0; i < All.Count; i++)
-            {
-                var t = All[i];
-                if (t == null || t == this || t.Spawn.team == Spawn.team) continue;
-                if (t.Spawn.role != PlayerRole.Infielder) continue;
-                float d = ((Vector2)t.transform.position - me).sqrMagnitude;
-                if (d < bestDistSq) { bestDistSq = d; best = t; }
-            }
-            return best;
+            OnTurnoverFromOutOfZoneWithBall?.Invoke(this);   // hook for HUD / audio
+            Debug.Log($"[Dodgeball] {Spawn.id} grounded out of their area with the ball — dropped it.");
+            if (ball != null) ball.Drop();
         }
 
         /// <summary>
@@ -239,8 +199,8 @@ namespace Sportland.Sports.Dodgeball
         {
             // Restricted area = anywhere outside your assigned zone — but a
             // diving lunge that crosses the line is legal while you're still
-            // airborne (not grounded). The turnover only bites if you touch
-            // down out of zone, so a dive can snag a ball just past the line.
+            // airborne (not grounded). You only drop the ball once you touch
+            // down out of zone, so a dive can still snag a ball just past it.
             return IsInZone || !movement.IsGrounded;
         }
 

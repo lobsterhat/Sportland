@@ -202,7 +202,7 @@ namespace Sportland.Sports.Dodgeball
         // ball touches the floor. If the victim's team catches it before then,
         // every pending hit is wiped — the "caught before it hit the ground"
         // rule. Repeated touches of the same player still count once.
-        private struct PendingHit { public PlayerZoneTracker victim; public HitZone zone; public float speed; }
+        private struct PendingHit { public PlayerZoneTracker victim; public HitZone zone; public float speed; public bool victimOutOfZone; }
         private readonly List<PendingHit> pendingHits = new List<PendingHit>();
 
         // True once the ball has touched the floor since the last release. A
@@ -810,7 +810,11 @@ namespace Sportland.Sports.Dodgeball
             if (victim == null) return;
             for (int i = 0; i < pendingHits.Count; i++)
                 if (pendingHits[i].victim == victim) return;   // already struck this segment
-            pendingHits.Add(new PendingHit { victim = victim, zone = zone, speed = speed });
+            pendingHits.Add(new PendingHit
+            {
+                victim = victim, zone = zone, speed = speed,
+                victimOutOfZone = !victim.IsInZone,   // hit while out of their area can't be saved by a catch
+            });
         }
 
         // Flight ended on the floor (or the thrower's own team recovered the
@@ -826,11 +830,29 @@ namespace Sportland.Sports.Dodgeball
             pendingHits.Clear();
         }
 
-        // The victim's team caught the ball before it hit the floor: wipe every
-        // hit collected this airborne segment (none fire OnHit).
-        private void CancelPendingHits()
+        // The victim's team caught the ball out of the air. A victim struck while
+        // IN their area is saved (hit nullified); a victim struck while OUT of
+        // their area is NOT saved — that hit stands and earns the catch no credit.
+        // Returns true if the catch should still score: a clean interception, or
+        // it saved at least one in-zone teammate.
+        private bool ResolveAirborneCatch()
         {
+            bool hadPending = pendingHits.Count > 0;
+            bool savedInZone = false;
+            for (int i = 0; i < pendingHits.Count; i++)
+            {
+                var h = pendingHits[i];
+                if (h.victimOutOfZone)
+                {
+                    if (h.victim != null) OnHit?.Invoke(h.victim, h.zone, h.speed);   // stands — no save
+                }
+                else
+                {
+                    savedInZone = true;   // nullified: not fired
+                }
+            }
             pendingHits.Clear();
+            return !hadPending || savedInZone;
         }
 
         // ── Release / attach API ──
@@ -847,16 +869,19 @@ namespace Sportland.Sports.Dodgeball
             // A scoring catch must take the ball out of the air: a live state AND
             // the ball hasn't touched the floor since release (a pickup off the
             // hop is possession only, not a catch).
-            bool isCatch = fromOpponent && !groundedSinceRelease
+            bool airborneCatch = fromOpponent && !groundedSinceRelease
                            && (state == State.Thrown || state == State.Passing || state == State.Bouncing);
 
-            // Resolve any still-airborne hits: a scoring catch by the victim's team
-            // wipes them all; otherwise (the thrower's own team recovers it, or
-            // it's a post-bounce pickup) the hits stand.
-            if (isCatch) CancelPendingHits(); else ConfirmPendingHits();
+            // Resolve any still-airborne hits. An airborne catch by the victim's
+            // team saves in-zone victims (nullifies their hit) but NOT victims who
+            // were out of their area when hit — those hits stand and the catch
+            // scores no credit for them. Any other secure (the thrower's own team
+            // recovers it, or a post-bounce pickup) lets all pending hits stand.
+            bool countsAsCatch = airborneCatch && ResolveAirborneCatch();
+            if (!airborneCatch) ConfirmPendingHits();
 
             AttachTo(t);
-            if (isCatch) OnCaught?.Invoke(t);
+            if (countsAsCatch) OnCaught?.Invoke(t);
         }
 
         private void AttachTo(PlayerZoneTracker t)
@@ -887,6 +912,27 @@ namespace Sportland.Sports.Dodgeball
             throwerCooldownRemaining = 0f;
             transform.position = t.transform.position;
             AttachTo(t);
+        }
+
+        /// <summary>
+        /// The carrier loses the ball where they stand — it falls straight to a
+        /// loose ball (no throw). Used when a player is caught grounded outside
+        /// their area still holding it. recentThrower is cleared (a dropped ball
+        /// is no one's throw), so anyone may retrieve it — though the dropper
+        /// can't until they're back in their area (CanCatchBall).
+        /// </summary>
+        public void Drop()
+        {
+            if (carrier == null) return;
+            carrier.HeldBall = null;
+            carrier = null;
+            carrierMovement = null;
+            recentThrower = null;
+            throwerCooldownRemaining = 0f;
+            rb.linearVelocity = Vector2.zero;
+            heightVelocity = 0f;
+            groundedSinceRelease = true;   // dead ball — a pickup off it isn't a catch
+            EnterLoose();                  // wakes physics; falls to the floor and rolls
         }
 
         /// <summary>
