@@ -521,7 +521,7 @@ namespace Sportland.Sports.Dodgeball
             if (!live)
             {
                 // In-zone as usual, OR anyone may retrieve a ball that's left the play area.
-                if ((t.CanCatchBall() || IsOutOfPlay) && Height <= pickupMaxHeight) { AttachTo(t); return true; }
+                if ((t.CanCatchBall() || IsOutOfPlay) && Height <= pickupMaxHeight) { Attach(t); return true; }
                 return false;
             }
 
@@ -537,7 +537,7 @@ namespace Sportland.Sports.Dodgeball
                 var f = BuildCatchFactors(t, applyLuck: true);
                 float roll = Random.value;
                 RecordCatchAttempt(f, roll);
-                if (roll < f.finalChance) { AttachTo(t); if (caromOnMiss) OnCaught?.Invoke(t); return true; }
+                if (roll < f.finalChance) { Attach(t); return true; }
                 ResolveMiss(t);
                 return true;
             }
@@ -552,7 +552,7 @@ namespace Sportland.Sports.Dodgeball
             }
 
             // Pass / loose ball: humans must arm (pass-by), AI/uncontrolled auto-catch.
-            if (!human && t.CanCatchBall() && Height <= pickupMaxHeight) { RecordArrival(); AttachTo(t); return true; }
+            if (!human && t.CanCatchBall() && Height <= pickupMaxHeight) { RecordArrival(); Attach(t); return true; }
             return false;
         }
 
@@ -778,6 +778,20 @@ namespace Sportland.Sports.Dodgeball
         }
 
         // ── Release / attach API ──
+
+        // Secures the ball to t and fires OnCaught when this is a genuine catch:
+        // an opponent of the thrower/passer claiming a live ball — a throw, a
+        // pass, or the deflection still bouncing off another player. A dead
+        // loose-ball pickup, an out-of-bounds retrieval, or a teammate receiving
+        // a pass is possession only, not a catch. (state is read before AttachTo
+        // flips it to Carried.)
+        private void Attach(PlayerZoneTracker t)
+        {
+            bool fromOpponent = recentThrower != null && recentThrower.Spawn.team != t.Spawn.team;
+            bool liveBall = state == State.Thrown || state == State.Passing || state == State.Bouncing;
+            AttachTo(t);
+            if (fromOpponent && liveBall) OnCaught?.Invoke(t);
+        }
 
         private void AttachTo(PlayerZoneTracker t)
         {
