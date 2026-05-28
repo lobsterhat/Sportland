@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Sportland.Sports.Dodgeball
@@ -196,13 +197,17 @@ namespace Sportland.Sports.Dodgeball
         private float bounceArcApex;
         private float bounceStartHeight;
 
-        // A hit "in the air": recorded on carom but only fires OnHit (counts)
-        // once the ball touches the floor. A catch by the victim's team before
-        // then nullifies it — the dodgeball "caught before it hit the ground" rule.
-        private PlayerZoneTracker pendingHitVictim;
-        private HitZone pendingHitZone;
-        private float pendingHitSpeed;
-        private bool hasPendingHit;
+        // Hits collected "in the air": each distinct player struck since the
+        // last release is recorded here and only fires OnHit (counts) once the
+        // ball touches the floor. If the victim's team catches it before then,
+        // every pending hit is wiped — the "caught before it hit the ground"
+        // rule. Repeated touches of the same player still count once.
+        private struct PendingHit { public PlayerZoneTracker victim; public HitZone zone; public float speed; }
+        private readonly List<PendingHit> pendingHits = new List<PendingHit>();
+
+        // True once the ball has touched the floor since the last release. A
+        // pickup after this is possession only, never a (scoring) catch.
+        private bool groundedSinceRelease;
 
         // Thrown state vertical kinematics. Positive = rising; gravity pulls
         // it negative; ground impacts flip it via bounceRestitution.
@@ -362,7 +367,8 @@ namespace Sportland.Sports.Dodgeball
             if (Height <= 0f && heightVelocity < 0f)
             {
                 Height = 0f;
-                ConfirmPendingHit();   // touched the floor — a pending hit now stands
+                groundedSinceRelease = true;   // touched the floor: no scoring catch past here
+                ConfirmPendingHits();          // and any pending hits now stand
                 rb.linearVelocity *= bounceLateralFriction;
                 heightVelocity = -heightVelocity * bounceRestitution;
 
@@ -403,9 +409,11 @@ namespace Sportland.Sports.Dodgeball
 
             if (t < 1f) return;
 
-            // First ground contact locks in any pending hit — past this point a
-            // catch can no longer nullify it (the ball has touched the floor).
-            ConfirmPendingHit();
+            // First ground contact: the ball has touched the floor, so a pickup
+            // from here is possession, not a scoring catch — and any pending hits
+            // now stand (a catch can no longer nullify them).
+            groundedSinceRelease = true;
+            ConfirmPendingHits();
 
             // Hit the ground. Bleed lateral velocity and start the next, smaller
             // bounce — or roll if it would be too short to read.
@@ -435,7 +443,7 @@ namespace Sportland.Sports.Dodgeball
 
         private void EnterLoose()
         {
-            ConfirmPendingHit();   // settled on the floor without a catch — hit stands
+            ConfirmPendingHits();   // settled without a catch — any pending hits stand
             state = State.Loose;
             rb.simulated = true;
         }
@@ -788,60 +796,67 @@ namespace Sportland.Sports.Dodgeball
             bounceArcApex = apex;
             state = State.Bouncing;
 
-            // Defer the hit: record it as pending instead of firing OnHit now.
-            // It only counts (ConfirmPendingHit) once the ball touches the floor;
-            // if the victim's team catches it while still airborne the hit is
-            // wiped (CancelPendingHit) and never scores. A chained carom locks in
-            // the previous pending hit before recording the new one.
-            if (hasPendingHit) ConfirmPendingHit();
-            pendingHitVictim = hit;
-            pendingHitZone = zone;
-            pendingHitSpeed = incoming.magnitude;
-            hasPendingHit = true;
+            // Defer the hit: record it (one entry per distinct player) instead of
+            // firing OnHit now. It only counts once the ball touches the floor; if
+            // the victim's team catches it first, every hit collected this airborne
+            // segment is wiped. Repeated touches of a player count once.
+            AddPendingHit(hit, zone, incoming.magnitude);
         }
 
-        // The pending hit's flight ended on the floor (or the thrower's own team
-        // recovered the ricochet) without the victim's team catching it: it
-        // stands — fire OnHit now.
-        private void ConfirmPendingHit()
+        // Record a strike as a pending (airborne) hit — one entry per distinct
+        // player, so repeated touches of the same player still count once.
+        private void AddPendingHit(PlayerZoneTracker victim, HitZone zone, float speed)
         {
-            if (!hasPendingHit) return;
-            var victim = pendingHitVictim;
-            HitZone zone = pendingHitZone;
-            float speed = pendingHitSpeed;
-            hasPendingHit = false;
-            pendingHitVictim = null;
-            OnHit?.Invoke(victim, zone, speed);
+            if (victim == null) return;
+            for (int i = 0; i < pendingHits.Count; i++)
+                if (pendingHits[i].victim == victim) return;   // already struck this segment
+            pendingHits.Add(new PendingHit { victim = victim, zone = zone, speed = speed });
         }
 
-        // The victim's team caught the ball while the hit was still airborne:
-        // wipe it (OnHit never fires).
-        private void CancelPendingHit()
+        // Flight ended on the floor (or the thrower's own team recovered the
+        // ricochet) without the victim's team catching it: every pending hit
+        // stands — fire OnHit once per distinct player.
+        private void ConfirmPendingHits()
         {
-            hasPendingHit = false;
-            pendingHitVictim = null;
+            for (int i = 0; i < pendingHits.Count; i++)
+            {
+                var h = pendingHits[i];
+                if (h.victim != null) OnHit?.Invoke(h.victim, h.zone, h.speed);
+            }
+            pendingHits.Clear();
+        }
+
+        // The victim's team caught the ball before it hit the floor: wipe every
+        // hit collected this airborne segment (none fire OnHit).
+        private void CancelPendingHits()
+        {
+            pendingHits.Clear();
         }
 
         // ── Release / attach API ──
 
-        // Secures the ball to t and fires OnCaught when this is a genuine catch:
-        // an opponent of the thrower/passer claiming a live ball — a throw, a
-        // pass, or the deflection still bouncing off another player. A dead
-        // loose-ball pickup, an out-of-bounds retrieval, or a teammate receiving
-        // a pass is possession only, not a catch. (state is read before AttachTo
-        // flips it to Carried.)
+        // Secures the ball to t and fires OnCaught only for a genuine catch: an
+        // opponent of the thrower/passer taking a live ball out of the air — a
+        // throw, a pass, or a deflection caught before it touches the floor. A
+        // pickup off the hop (after the ball has grounded), a dead loose ball, an
+        // out-of-bounds retrieval, or a teammate receiving a pass is possession
+        // only, not a catch.
         private void Attach(PlayerZoneTracker t)
         {
             bool fromOpponent = recentThrower != null && recentThrower.Spawn.team != t.Spawn.team;
-            bool liveBall = state == State.Thrown || state == State.Passing || state == State.Bouncing;
+            // A scoring catch must take the ball out of the air: a live state AND
+            // the ball hasn't touched the floor since release (a pickup off the
+            // hop is possession only, not a catch).
+            bool isCatch = fromOpponent && !groundedSinceRelease
+                           && (state == State.Thrown || state == State.Passing || state == State.Bouncing);
 
-            // Resolve any still-airborne hit: the victim's team catching it
-            // (fromOpponent) wipes the hit; anyone else securing it (the thrower's
-            // own team recovering the ricochet) locks it in.
-            if (fromOpponent) CancelPendingHit(); else ConfirmPendingHit();
+            // Resolve any still-airborne hits: a scoring catch by the victim's team
+            // wipes them all; otherwise (the thrower's own team recovers it, or
+            // it's a post-bounce pickup) the hits stand.
+            if (isCatch) CancelPendingHits(); else ConfirmPendingHits();
 
             AttachTo(t);
-            if (fromOpponent && liveBall) OnCaught?.Invoke(t);
+            if (isCatch) OnCaught?.Invoke(t);
         }
 
         private void AttachTo(PlayerZoneTracker t)
@@ -894,6 +909,7 @@ namespace Sportland.Sports.Dodgeball
             rb.simulated = true;
             rb.linearVelocity = direction.normalized * power;
             heightVelocity = verticalVelocity;
+            groundedSinceRelease = false;
             state = State.Thrown;
             RecordRelease(power);
         }
@@ -1026,6 +1042,7 @@ namespace Sportland.Sports.Dodgeball
             rb.simulated = true;
             rb.linearVelocity = dir * power;
             heightVelocity = vy;
+            groundedSinceRelease = false;
             state = State.Thrown;
             RecordRelease(power);
         }
@@ -1075,6 +1092,7 @@ namespace Sportland.Sports.Dodgeball
             // Capture the visual height at the moment of release so the
             // trajectory's baseline starts there, not at carryHeight.
             passLaunchHeight = Height;
+            groundedSinceRelease = false;
             state = State.Passing;
 
             rb.simulated = false;
