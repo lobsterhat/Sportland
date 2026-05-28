@@ -280,11 +280,11 @@ namespace Sportland.Sports.Dodgeball
 
         private void Update()
         {
-            if (throwerCooldownRemaining > 0f)
-            {
-                throwerCooldownRemaining -= Time.deltaTime;
-                if (throwerCooldownRemaining <= 0f) recentThrower = null;
-            }
+            // Count down the self-recatch lockout only. Attribution
+            // (recentThrower) persists for the whole flight — cleared on the
+            // next release or a scripted pickup — so a hit or catch always
+            // knows who threw it, no matter how long the ball is in the air.
+            if (throwerCooldownRemaining > 0f) throwerCooldownRemaining -= Time.deltaTime;
 
             switch (state)
             {
@@ -335,8 +335,11 @@ namespace Sportland.Sports.Dodgeball
             Height = passIsLob
                 ? baseline + passApex * Mathf.Sin(t * Mathf.PI)
                 : baseline;
-            TryPickup();
-            if (state != State.Passing) return;  // pickup may have transitioned us
+            // A pass is a live ball: a teammate on the path receives it, but an
+            // opponent who steps in front either intercepts it (catch → turnover
+            // / score) or is struck by it (carom → hit), exactly like a throw.
+            TryLiveInteraction();
+            if (state != State.Passing) return;  // a catch / hit may have transitioned us
             if (t >= 1f) EnterLoose();
         }
 
@@ -365,7 +368,7 @@ namespace Sportland.Sports.Dodgeball
                 }
             }
 
-            TryThrownInteraction();
+            TryLiveInteraction();
             if (state != State.Thrown) return;
 
             // Only fall back to Loose once the ball has settled on the ground
@@ -467,7 +470,7 @@ namespace Sportland.Sports.Dodgeball
             for (int i = 0; i < trackers.Count; i++)
             {
                 var t = trackers[i];
-                if (t == null || t == recentThrower) continue;
+                if (t == null || (t == recentThrower && throwerCooldownRemaining > 0f)) continue;
 
                 float radius = CatchRadiusFor(t);
                 if (Vector2.SqrMagnitude((Vector2)t.transform.position - ballPos) > radius * radius)
@@ -477,9 +480,10 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
-        // Thrown state: a non-catch by an opponent of the thrower becomes a hit
-        // (carom); teammates may catch but a non-catch just passes them by.
-        private void TryThrownInteraction()
+        // Live ball (Thrown or Passing): an opponent of the thrower/passer who
+        // doesn't catch it is struck (carom → hit); a teammate on the path may
+        // catch it (a pass's intended receiver), and a non-catch passes by.
+        private void TryLiveInteraction()
         {
             var trackers = PlayerZoneTracker.All;
             Vector2 ballPos = transform.position;
@@ -488,7 +492,7 @@ namespace Sportland.Sports.Dodgeball
             for (int i = 0; i < trackers.Count; i++)
             {
                 var t = trackers[i];
-                if (t == null || t == recentThrower) continue;
+                if (t == null || (t == recentThrower && throwerCooldownRemaining > 0f)) continue;
 
                 float radius = CatchRadiusFor(t);
                 if (Vector2.SqrMagnitude((Vector2)t.transform.position - ballPos) > radius * radius)
@@ -724,6 +728,18 @@ namespace Sportland.Sports.Dodgeball
         private void Carom(PlayerZoneTracker hit, HitZone zone)
         {
             Vector2 incoming = rb.linearVelocity;
+
+            // A struck pass is parametric (rb asleep, zero velocity): rebuild the
+            // lateral velocity from the pass leg so the carom direction and the
+            // impact speed (damage / telemetry) are real, and wake the body so
+            // the resulting bounce runs on physics.
+            if (incoming.sqrMagnitude < 0.0001f && state == State.Passing)
+            {
+                float dur = Mathf.Max(0.0001f, passDurationCurrent);
+                incoming = (passEnd - passStart) / dur;
+                rb.simulated = true;
+            }
+
             Vector2 normal = (Vector2)transform.position - (Vector2)hit.transform.position;
             if (normal.sqrMagnitude < 0.0001f) normal = -incoming;
             normal = normal.sqrMagnitude > 0.0001f ? normal.normalized : Vector2.up;
