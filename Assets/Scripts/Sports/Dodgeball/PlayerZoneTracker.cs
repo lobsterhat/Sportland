@@ -5,12 +5,14 @@ namespace Sportland.Sports.Dodgeball
 {
     /// <summary>
     /// Tracks whether a player is in their assigned zone and enforces:
-    ///   - 3-second return window
     ///   - Crossing-count warning (3 crossings in 30s, rolling window)
-    ///   - "Cannot catch while out of zone"
-    ///   - "Grounded out of your area with the ball = drop it (loose)"
-    ///   - Jump exception: while airborne, a player holding the ball may
-    ///     cross a line and throw/pass before landing without dropping it.
+    ///   - Loose-ball retrieval is allowed anywhere; carry it home within the
+    ///     return window or drop it (EnforceCarrierInZone)
+    ///   - No releasing the ball (throw/pass) while grounded out of your area
+    ///     — an offensive play from the opponent's side — except while airborne
+    ///     (the jump exception); enforced in Ball.CarrierMayRelease
+    ///   - Catching a LIVE throw is illegal out of zone except a diving catch
+    ///     (CanCatchBall)
     ///
     /// Penalty-after-warning behavior is intentionally left as a hook
     /// (OnPenaltyTriggered) — wire it once we decide the penalty.
@@ -20,8 +22,8 @@ namespace Sportland.Sports.Dodgeball
     {
         // --- Tunables ---------------------------------------------------------
         [Header("Rule timings")]
-        [Tooltip("Seconds a player may be out of their assigned zone before the return-window timer fires (positioning rule via OnReturnTimerExpired).")]
-        [SerializeField] private float returnGraceSeconds = 2f;
+        [Tooltip("Return window (seconds): how long a player may be out of their area before the timer fires (OnReturnTimerExpired) and, if they're holding the ball there, they drop it. Long enough to cross, grab a loose ball, and carry it back.")]
+        [SerializeField] private float returnGraceSeconds = 3f;
         [SerializeField] private int   crossingsForWarning = 3;
         [SerializeField] private float crossingWindowSeconds = 30f;
 
@@ -172,14 +174,16 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
-        // A carrier may be out of their area only while airborne — the jump/dive
-        // exception that lets them release a throw or pass over the line. The
-        // instant they're grounded out of their area still holding the ball they
-        // drop it (it goes loose); they can't pick it back up until they're home
-        // (CanCatchBall), so the opposing team in that area recovers it.
+        // Crossing into another area to retrieve a loose ball and carry it back is
+        // fine, but you must return to your own side within the return window.
+        // Holding the ball out of your area past that window drops it (loose) —
+        // but only once grounded, so the jump/dive exception holds until you land.
+        // The clock runs from when you left your area, so re-grabbing a dropped
+        // ball out there buys no extra time (no stalling).
         private void EnforceCarrierInZone()
         {
-            if (HasBall && !IsInZone && movement.IsGrounded)
+            if (HasBall && !IsInZone && movement.IsGrounded
+                && outOfZoneSince >= 0f && Time.time - outOfZoneSince >= returnGraceSeconds)
                 DropHeldBall();
         }
 
@@ -187,7 +191,7 @@ namespace Sportland.Sports.Dodgeball
         {
             var ball = HeldBall;
             OnTurnoverFromOutOfZoneWithBall?.Invoke(this);   // hook for HUD / audio
-            Debug.Log($"[Dodgeball] {Spawn.id} grounded out of their area with the ball — dropped it.");
+            Debug.Log($"[Dodgeball] {Spawn.id} didn't return the ball to their area in time — dropped it.");
             if (ball != null) ball.Drop();
         }
 
@@ -197,10 +201,10 @@ namespace Sportland.Sports.Dodgeball
         /// </summary>
         public bool CanCatchBall()
         {
-            // Restricted area = anywhere outside your assigned zone — but a
-            // diving lunge that crosses the line is legal while you're still
-            // airborne (not grounded). You only drop the ball once you touch
-            // down out of zone, so a dive can still snag a ball just past it.
+            // Live-ball catch (interception): legal only in your own area, or
+            // while airborne — a diving lunge may cross the line to make the
+            // catch (you then have the return window to carry it home). Loose-ball
+            // retrieval is unrestricted and handled separately (Ball.TryTakeBall).
             return IsInZone || !movement.IsGrounded;
         }
 

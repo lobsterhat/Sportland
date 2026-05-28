@@ -542,8 +542,11 @@ namespace Sportland.Sports.Dodgeball
 
             if (!live)
             {
-                // In-zone as usual, OR anyone may retrieve a ball that's left the play area.
-                if ((t.CanCatchBall() || IsOutOfPlay) && Height <= pickupMaxHeight) { Attach(t); return true; }
+                // A loose / dead ball can be retrieved by anyone, anywhere — incl.
+                // crossing into the opponent's area to grab it and carry it back.
+                // (Catching a LIVE throw out of zone is still illegal — gated by
+                // CanCatchBall in the live paths below — except a diving catch.)
+                if (Height <= pickupMaxHeight) { Attach(t); return true; }
                 return false;
             }
 
@@ -935,6 +938,16 @@ namespace Sportland.Sports.Dodgeball
             EnterLoose();                  // wakes physics; falls to the floor and rolls
         }
 
+        // A held ball may only be released (thrown or passed) from your own area,
+        // or while airborne — the jump exception that lets you leap over the line
+        // to throw/pass. A grounded player in the opponent's area can't release it
+        // (no offensive play from their side); they must carry it home first.
+        private bool CarrierMayRelease()
+        {
+            if (carrier == null || carrier.IsInZone) return true;
+            return carrierMovement != null && !carrierMovement.IsGrounded;
+        }
+
         /// <summary>
         /// Velocity-driven release of the held ball — used for the Circle throw.
         /// Direction is normalized internally; power is units/sec. Vertical
@@ -943,7 +956,7 @@ namespace Sportland.Sports.Dodgeball
         /// </summary>
         public void Throw(Vector2 direction, float power, float verticalVelocity = 0f)
         {
-            if (carrier == null) return;
+            if (carrier == null || !CarrierMayRelease()) return;
             if (direction.sqrMagnitude < 0.0001f) direction = Vector2.right;
 
             recentThrower = carrier;
@@ -1101,7 +1114,7 @@ namespace Sportland.Sports.Dodgeball
         /// </summary>
         public void Pass(Vector2 target, float lateralSpeed, bool isLob)
         {
-            if (carrier == null) return;
+            if (carrier == null || !CarrierMayRelease()) return;
 
             Vector2 start = transform.position;
             Vector2 toTarget = target - start;
