@@ -14,7 +14,10 @@
       "Skill(update-config)",
       "Skill(update-config:*)",
       "PowerShell(try { Get-Content \"D:/Unity/Sportland/claude/.claude/settings.local.json\" -Raw | ConvertFrom-Json | Out-Null; \"VALID JSON\" } catch { \"INVALID: $_\" })",
-      "Bash(git -C D:/Unity/Sportland commit -m ' *)"
+      "Bash(git -C D:/Unity/Sportland commit -m ' *)",
+      "Bash(git -C \"D:/Unity/Sportland\" --no-pager log --oneline -4)",
+      "Bash(git -C \"D:/Unity/Sportland\" --no-pager log --oneline -5)",
+      "Bash(git -C \"D:/Unity/Sportland\" --no-pager log --oneline -6)"
     ],
     "ask": [
       "Bash(git -C \"D:/Unity/Sportland\" push:*)"
