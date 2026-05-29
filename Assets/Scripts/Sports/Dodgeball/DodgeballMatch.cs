@@ -37,7 +37,7 @@ namespace Sportland.Sports.Dodgeball
         // --- Play-by-play log (assembled here; shown by DodgeballPlayByPlay) ---
         private bool playOpen;
         private PlayerZoneTracker playThrower, playTarget, playVictim, playCatcher, playElim, playDeflector;
-        private bool playIsThrow, playCatchWasDive;
+        private bool playIsThrow, playCatchWasDive, playPassCompleted;
         private Ball.DodgeKind playDodge;
         private Team? playScoreTeam;
         private int playScorePoints;
@@ -69,6 +69,7 @@ namespace Sportland.Sports.Dodgeball
                 ball.OnCaught -= OnBallCaught;
                 ball.OnReleased -= OnBallReleased;
                 ball.OnBecameLoose -= OnBallBecameLoose;
+                ball.OnAttached -= OnBallAttached;
             }
         }
 
@@ -91,6 +92,7 @@ namespace Sportland.Sports.Dodgeball
             ball.OnCaught += OnBallCaught;
             ball.OnReleased += OnBallReleased;
             ball.OnBecameLoose += OnBallBecameLoose;
+            ball.OnAttached += OnBallAttached;
             subscribed = true;
         }
 
@@ -213,6 +215,7 @@ namespace Sportland.Sports.Dodgeball
             playIsThrow = isThrow;
             playVictim = playCatcher = playElim = playDeflector = null;
             playCatchWasDive = false;
+            playPassCompleted = false;
             playDodge = Ball.DodgeKind.None;
             playScoreTeam = null;
             playScorePoints = 0;
@@ -223,12 +226,19 @@ namespace Sportland.Sports.Dodgeball
         private void OnBallBecameLoose()
         {
             if (!playOpen) return;
-            if (playIsThrow)
-            {
-                if (ball != null) playDodge = ball.LastTargetDodge;
-                FlushPlay();
-            }
-            else playOpen = false;
+            if (playIsThrow && ball != null) playDodge = ball.LastTargetDodge;
+            FlushPlay();   // throw → miss; a pass that reached no one → incomplete
+        }
+
+        // A pass completing to a teammate. (Throws and opponent catches resolve
+        // via OnHit / OnCaught; OnAttached fires before OnCaught, so an opponent
+        // catch attaches to the other team here and is skipped.)
+        private void OnBallAttached(PlayerZoneTracker player)
+        {
+            if (!playOpen || playIsThrow || player == null) return;
+            if (playThrower == null || player.Spawn.team != playThrower.Spawn.team) return;
+            playPassCompleted = true;
+            FlushPlay();
         }
 
         private void RecordScore(Team team, int points)
@@ -261,10 +271,16 @@ namespace Sportland.Sports.Dodgeball
             }
             else if (playVictim != null)
                 line += playVictim == playTarget ? " and hits" : $" and hits {Label(playVictim)}";
-            else if (playTarget != null && playDodge != Ball.DodgeKind.None)
-                line += $" who {DodgeWord(playDodge)}";
+            else if (playIsThrow)
+                line += (playTarget != null && playDodge != Ball.DodgeKind.None)
+                    ? $" who {DodgeWord(playDodge)}"
+                    : " and misses";
             else
-                line += " and misses";
+            {
+                // A pass with no opponent involvement — just whether it landed.
+                DodgeballPlayByPlay.Log(line + (playPassCompleted ? " - complete" : " - incomplete"));
+                return;
+            }
 
             line += " - " + PlayResult();
             DodgeballPlayByPlay.Log(line);
