@@ -36,8 +36,8 @@ namespace Sportland.Sports.Dodgeball
 
         // --- Play-by-play log (assembled here; shown by DodgeballPlayByPlay) ---
         private bool playOpen;
-        private PlayerZoneTracker playThrower, playTarget, playVictim, playCatcher, playElim;
-        private bool playIsThrow, playDeflected;
+        private PlayerZoneTracker playThrower, playTarget, playVictim, playCatcher, playElim, playDeflector;
+        private bool playIsThrow, playCatchWasDive;
         private Ball.DodgeKind playDodge;
         private Team? playScoreTeam;
         private int playScorePoints;
@@ -130,7 +130,7 @@ namespace Sportland.Sports.Dodgeball
 
             // Play-by-play: a hit resolves the current play.
             playVictim = victim;
-            playDeflected = ball != null && ball.DeflectedSinceRelease;
+            playDeflector = ball != null ? ball.LastDeflector : null;
             FlushPlay();
         }
 
@@ -170,7 +170,9 @@ namespace Sportland.Sports.Dodgeball
 
             // Play-by-play: a catch resolves the current play.
             playCatcher = catcher;
-            playDeflected = ball != null && ball.DeflectedSinceRelease;
+            playDeflector = ball != null ? ball.LastDeflector : null;
+            var catcherMove = catcher.GetComponent<PlayerMovement>();
+            playCatchWasDive = catcherMove != null && catcherMove.IsDiving;
             FlushPlay();
         }
 
@@ -209,8 +211,8 @@ namespace Sportland.Sports.Dodgeball
             playThrower = thrower;
             playTarget = target;
             playIsThrow = isThrow;
-            playVictim = playCatcher = playElim = null;
-            playDeflected = false;
+            playVictim = playCatcher = playElim = playDeflector = null;
+            playCatchWasDive = false;
             playDodge = Ball.DodgeKind.None;
             playScoreTeam = null;
             playScorePoints = 0;
@@ -248,13 +250,17 @@ namespace Sportland.Sports.Dodgeball
                 : $"{Label(playThrower)} {(playIsThrow ? "throws" : "passes")}";
 
             if (playCatcher != null)
-                line += playDeflected
-                    ? $" and deflects and is caught by {Label(playCatcher)}"
-                    : $" and is caught by {Label(playCatcher)}";
+            {
+                string diveTag = playCatchWasDive ? " (dive)" : "";
+                if (playDeflector != null && playDeflector != playTarget)
+                    line += $" and deflects off of {Label(playDeflector)} and is caught{diveTag} by {Label(playCatcher)}";
+                else if (playDeflector != null)
+                    line += $" and deflects and is caught{diveTag} by {Label(playCatcher)}";
+                else
+                    line += $" and is caught{diveTag} by {Label(playCatcher)}";
+            }
             else if (playVictim != null)
-                line += playIsThrow
-                    ? (playVictim == playTarget ? " and hits" : $" and hits {Label(playVictim)}")
-                    : $" and is deflected by {Label(playVictim)}";
+                line += playVictim == playTarget ? " and hits" : $" and hits {Label(playVictim)}";
             else if (playTarget != null && playDodge != Ball.DodgeKind.None)
                 line += $" who {DodgeWord(playDodge)}";
             else
@@ -268,14 +274,14 @@ namespace Sportland.Sports.Dodgeball
         {
             string s = null;
             if (playScoreTeam.HasValue && playScorePoints != 0)
-                s = $"+{playScorePoints} {ColorName(playScoreTeam.Value)}";
+                s = $"+{playScorePoints} {TeamLetter(playScoreTeam.Value)} team";
             if (playElim != null)
                 s = s == null ? $"{Label(playElim)} out" : $"{s}, {Label(playElim)} out";
             return s ?? "No Score";
         }
 
-        private static string ColorName(Team t) => t == Team.A ? "Blue" : "Red";
-        private static string Label(PlayerZoneTracker p) => $"{ColorName(p.Spawn.team)} {p.Number}";
+        private static string TeamLetter(Team t) => t == Team.A ? "A" : "B";
+        private static string Label(PlayerZoneTracker p) => $"{TeamLetter(p.Spawn.team)}{p.Number}";
 
         private static string DodgeWord(Ball.DodgeKind d) => d switch
         {

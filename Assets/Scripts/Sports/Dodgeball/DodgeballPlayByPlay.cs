@@ -9,10 +9,11 @@ namespace Sportland.Sports.Dodgeball
     /// assembles each line and pushes it via the static Log(). IMGUI — no Canvas.
     ///
     /// Example lines:
-    ///   Blue 1 throws at Red 3 and hits - +1 Blue
-    ///   Blue 2 throws at Red 1 and deflects and is caught by Red 1 - +1 Red
-    ///   Blue 3 passes to Blue 6 and is deflected by Red 1 - +1 Blue
-    ///   Blue 1 throws at Red 1 and misses - No Score
+    ///   A1 throws at B3 and hits - +1 A team
+    ///   A2 throws at B1 and deflects and is caught by B1 - +1 B team
+    ///   A1 passes to A5 and hits B2 - +1 A team
+    ///   A3 passes to A5 and deflects off of B1 and is caught (dive) by B2 - No Score
+    ///   A1 throws at B1 who ducks - No Score
     /// </summary>
     public class DodgeballPlayByPlay : MonoBehaviour
     {
