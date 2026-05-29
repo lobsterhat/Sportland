@@ -28,6 +28,9 @@ namespace Sportland.Sports.Dodgeball
     {
         public enum HitZone { Head, Torso, Limb }
 
+        /// <summary>How a throw's intended target evaded it (for the play-by-play log).</summary>
+        public enum DodgeKind { None, Duck, Jump, Dive }
+
         public enum State { Carried, Passing, Thrown, Bouncing, Loose }
 
         /// <summary>Weights for the catch skill-check. All bonuses/penalties are additive on a 0..1 chance.</summary>
@@ -89,6 +92,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float throwerPickupCooldown = 0.4f;
         [Tooltip("A ball above this Height is overhead and not catchable.")]
         [SerializeField] private float pickupMaxHeight = 1.5f;
+        [Tooltip("How near a thrown ball must pass the intended target to register a duck/jump/dive in the play-by-play log.")]
+        [SerializeField] private float dodgeSampleRadius = 1.5f;
 
         [Header("Catch (skill check)")]
         [Tooltip("A human-controlled player must press Catch within this window (seconds) before the ball arrives.")]
@@ -226,6 +231,9 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>True if the ball has caromed off a player since the last release — lets the log say "deflects and is caught".</summary>
         public bool DeflectedSinceRelease { get; private set; }
+
+        /// <summary>How the intended target evaded a throw that passed near them (None until a duck/jump/dive is seen). For the play-by-play log.</summary>
+        public DodgeKind LastTargetDodge { get; private set; }
 
         /// <summary>Current trajectory state.</summary>
         public State CurrentState => state;
@@ -371,6 +379,21 @@ namespace Sportland.Sports.Dodgeball
             if (t >= 1f) EnterLoose();
         }
 
+        // While a throw is in flight, note if its intended target ducks / jumps /
+        // dives as the ball passes near them — surfaced as the "miss" reason in
+        // the play-by-play log. Keeps the strongest evade seen; only read on a miss.
+        private void SampleTargetDodge()
+        {
+            if (IntendedTarget == null) return;
+            Vector2 d = (Vector2)IntendedTarget.transform.position - (Vector2)transform.position;
+            if (d.sqrMagnitude > dodgeSampleRadius * dodgeSampleRadius) return;
+            var m = IntendedTarget.GetComponent<PlayerMovement>();
+            if (m == null) return;
+            if (m.IsDiving) LastTargetDodge = DodgeKind.Dive;
+            else if (m.IsAirborne) LastTargetDodge = DodgeKind.Jump;
+            else if (m.IsDucking) LastTargetDodge = DodgeKind.Duck;
+        }
+
         private void UpdateThrown()
         {
             // Gravity pulls the ball down continuously. Initial vertical
@@ -378,6 +401,7 @@ namespace Sportland.Sports.Dodgeball
             // from the launch height to the floor.
             heightVelocity -= gravity * Time.deltaTime;
             Height += heightVelocity * Time.deltaTime;
+            SampleTargetDodge();
 
             if (Height <= 0f && heightVelocity < 0f)
             {
@@ -1007,6 +1031,7 @@ namespace Sportland.Sports.Dodgeball
             heightVelocity = verticalVelocity;
             groundedSinceRelease = false;
             DeflectedSinceRelease = false;
+            LastTargetDodge = DodgeKind.None;
             LastReleaseWasThrow = true;
             state = State.Thrown;
             RecordRelease(power);
@@ -1143,6 +1168,7 @@ namespace Sportland.Sports.Dodgeball
             heightVelocity = vy;
             groundedSinceRelease = false;
             DeflectedSinceRelease = false;
+            LastTargetDodge = DodgeKind.None;
             LastReleaseWasThrow = true;
             state = State.Thrown;
             RecordRelease(power);
@@ -1196,6 +1222,7 @@ namespace Sportland.Sports.Dodgeball
             passLaunchHeight = Height;
             groundedSinceRelease = false;
             DeflectedSinceRelease = false;
+            LastTargetDodge = DodgeKind.None;
             LastReleaseWasThrow = false;
             state = State.Passing;
 

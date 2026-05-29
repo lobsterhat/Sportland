@@ -38,6 +38,7 @@ namespace Sportland.Sports.Dodgeball
         private bool playOpen;
         private PlayerZoneTracker playThrower, playTarget, playVictim, playCatcher, playElim;
         private bool playIsThrow, playDeflected;
+        private Ball.DodgeKind playDodge;
         private Team? playScoreTeam;
         private int playScorePoints;
 
@@ -210,6 +211,7 @@ namespace Sportland.Sports.Dodgeball
             playIsThrow = isThrow;
             playVictim = playCatcher = playElim = null;
             playDeflected = false;
+            playDodge = Ball.DodgeKind.None;
             playScoreTeam = null;
             playScorePoints = 0;
         }
@@ -219,7 +221,11 @@ namespace Sportland.Sports.Dodgeball
         private void OnBallBecameLoose()
         {
             if (!playOpen) return;
-            if (playIsThrow) FlushPlay();
+            if (playIsThrow)
+            {
+                if (ball != null) playDodge = ball.LastTargetDodge;
+                FlushPlay();
+            }
             else playOpen = false;
         }
 
@@ -249,6 +255,8 @@ namespace Sportland.Sports.Dodgeball
                 line += playIsThrow
                     ? (playVictim == playTarget ? " and hits" : $" and hits {Label(playVictim)}")
                     : $" and is deflected by {Label(playVictim)}";
+            else if (playTarget != null && playDodge != Ball.DodgeKind.None)
+                line += $" who {DodgeWord(playDodge)}";
             else
                 line += " and misses";
 
@@ -268,6 +276,14 @@ namespace Sportland.Sports.Dodgeball
 
         private static string ColorName(Team t) => t == Team.A ? "Blue" : "Red";
         private static string Label(PlayerZoneTracker p) => $"{ColorName(p.Spawn.team)} {p.Number}";
+
+        private static string DodgeWord(Ball.DodgeKind d) => d switch
+        {
+            Ball.DodgeKind.Duck => "ducks",
+            Ball.DodgeKind.Jump => "jumps",
+            Ball.DodgeKind.Dive => "dives",
+            _ => "dodges",
+        };
 
         // Remove a player from play. permanent = gone for good (Modes 2/3);
         // otherwise benched and recallable (Mode 4). Hands control off first if
