@@ -43,10 +43,10 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float dashCooldown = 0.35f;
 
         [Header("Dive (lunge catch)")]
-        [Tooltip("Lunge speed (u/s) of a diving catch attempt.")]
-        [SerializeField] private float diveSpeed = 11f;
-        [Tooltip("How long the dive lunge lasts (seconds).")]
-        [SerializeField] private float diveDuration = 0.35f;
+        [Tooltip("Launch speed (u/s) of a diving lunge; it eases to a stop over the dive so it reads as a real dive, not a constant-speed teleport.")]
+        [SerializeField] private float diveSpeed = 8f;
+        [Tooltip("How long the dive lunge lasts (seconds). Distance ≈ diveSpeed × this ÷ 2 (it decelerates).")]
+        [SerializeField] private float diveDuration = 0.5f;
         [Tooltip("Prone recovery (seconds) after a dive lands, before the player can act again.")]
         [SerializeField] private float diveRecovery = 0.6f;
         [Tooltip("Extra catch radius (u) while diving — arms extended toward the ball.")]
@@ -264,7 +264,12 @@ namespace Sportland.Sports.Dodgeball
             {
                 diveTimer += Time.deltaTime;
                 if (diveTimer >= diveDuration) { diveTimer = -1f; recoverTimer = 0f; }  // landed → prone recovery
-                else rb.linearVelocity = diveDir * diveSpeed;
+                else
+                {
+                    // Launch fast, ease to a stop — a real lunge, not a flat-speed lurch.
+                    float k = 1f - diveTimer / diveDuration;
+                    rb.linearVelocity = diveDir * (diveSpeed * k);
+                }
             }
             else if (IsRecovering)
             {
