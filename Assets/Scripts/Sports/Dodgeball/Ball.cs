@@ -282,6 +282,9 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Fires when the ball settles to a loose ball (a play ended without a catch/possession). For the play-by-play log.</summary>
         public event System.Action OnBecameLoose;
 
+        /// <summary>Fires when a player touches the ball while in the opposing team's half (out of their area). Args: the toucher. Counts as a hit on them — the opposing team scores +1 and the touch earns no catch credit.</summary>
+        public event System.Action<PlayerZoneTracker> OnViolationTouch;
+
         private void Awake()
         {
             rb = GetComponent<Rigidbody2D>();
@@ -909,6 +912,24 @@ namespace Sportland.Sports.Dodgeball
         // only, not a catch.
         private void Attach(PlayerZoneTracker t)
         {
+            // Touching the ball while grounded in the opposing team's half (out
+            // of your assigned area) is a hit on YOU — even a "catch" — so you
+            // don't get the catch credit and the opposing team scores. You still
+            // hold the ball briefly (the carrier-out-of-zone timer then forces a
+            // drop). Airborne touches (jumps / dives over the line) are exempt.
+            bool inOpposingHalf = t.Spawn.team == Team.A
+                ? t.transform.position.x > 0f
+                : t.transform.position.x < 0f;
+            var tm = t.GetComponent<PlayerMovement>();
+            bool grounded = tm == null || tm.IsGrounded;
+            if (!t.IsInZone && inOpposingHalf && grounded)
+            {
+                ConfirmPendingHits();   // prior in-air hits commit (no save)
+                AttachTo(t);
+                OnViolationTouch?.Invoke(t);   // +1 opposing team, no OnCaught
+                return;
+            }
+
             bool fromOpponent = recentThrower != null && recentThrower.Spawn.team != t.Spawn.team;
             // A scoring catch must take the ball out of the air: a live state AND
             // the ball hasn't touched the floor since release (a pickup off the
@@ -1017,7 +1038,8 @@ namespace Sportland.Sports.Dodgeball
         /// </summary>
         public void Throw(Vector2 direction, float power, float verticalVelocity = 0f)
         {
-            if (carrier == null || !CarrierMayRelease()) return;
+            if (carrier == null) return;
+            if (!CarrierMayRelease()) { Drop(); return; }   // pressing throw while ineligible drops the ball
             if (direction.sqrMagnitude < 0.0001f) direction = Vector2.right;
 
             recentThrower = carrier;
@@ -1183,7 +1205,8 @@ namespace Sportland.Sports.Dodgeball
         /// </summary>
         public void Pass(Vector2 target, float lateralSpeed, bool isLob)
         {
-            if (carrier == null || !CarrierMayRelease()) return;
+            if (carrier == null) return;
+            if (!CarrierMayRelease()) { Drop(); return; }   // pressing pass while ineligible drops the ball
 
             Vector2 start = transform.position;
             Vector2 toTarget = target - start;

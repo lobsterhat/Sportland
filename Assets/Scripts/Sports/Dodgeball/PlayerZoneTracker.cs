@@ -22,8 +22,8 @@ namespace Sportland.Sports.Dodgeball
     {
         // --- Tunables ---------------------------------------------------------
         [Header("Rule timings")]
-        [Tooltip("Return window (seconds): how long a player may be out of their area before the timer fires (OnReturnTimerExpired) and, if they're holding the ball there, they drop it. Long enough to cross, grab a loose ball, and carry it back.")]
-        [SerializeField] private float returnGraceSeconds = 3f;
+        [Tooltip("Return window (seconds): how long a player may be out of their area holding the ball before they're forced to drop it AND their team takes a -1 point penalty.")]
+        [SerializeField] private float returnGraceSeconds = 2f;
         [SerializeField] private int   crossingsForWarning = 3;
         [SerializeField] private float crossingWindowSeconds = 30f;
 
@@ -79,6 +79,9 @@ namespace Sportland.Sports.Dodgeball
         public System.Action<PlayerZoneTracker> OnTurnoverFromOutOfZoneWithBall;
         public System.Action<PlayerZoneTracker> OnWarningIssued;
         public System.Action<PlayerZoneTracker> OnPenaltyTriggered;   // post-warning offense
+
+        /// <summary>Static signal: a carrier was forced to drop the ball (return window expired). The match subscribes to apply the -1 point penalty.</summary>
+        public static event System.Action<PlayerZoneTracker> OnAnyForcedDrop;
 
         private void Awake()
         {
@@ -194,7 +197,8 @@ namespace Sportland.Sports.Dodgeball
         {
             var ball = HeldBall;
             OnTurnoverFromOutOfZoneWithBall?.Invoke(this);   // hook for HUD / audio
-            Debug.Log($"[Dodgeball] {Spawn.id} didn't return the ball to their area in time — dropped it.");
+            OnAnyForcedDrop?.Invoke(this);                   // penalty signal (the match deducts -1)
+            Debug.Log($"[Dodgeball] {Spawn.id} didn't return the ball to their area in time — dropped it (-1 penalty).");
             if (ball != null) ball.Drop();
         }
 

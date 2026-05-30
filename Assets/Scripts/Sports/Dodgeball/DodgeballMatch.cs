@@ -37,7 +37,7 @@ namespace Sportland.Sports.Dodgeball
         // --- Play-by-play log (assembled here; shown by DodgeballPlayByPlay) ---
         private bool playOpen;
         private PlayerZoneTracker playThrower, playTarget, playVictim, playCatcher, playElim, playDeflector;
-        private bool playIsThrow, playCatchWasDive, playPassCompleted;
+        private bool playIsThrow, playCatchWasDive, playPassCompleted, playViolationTouch;
         private Ball.DodgeKind playDodge;
         private Team? playScoreTeam;
         private int playScorePoints;
@@ -70,7 +70,9 @@ namespace Sportland.Sports.Dodgeball
                 ball.OnReleased -= OnBallReleased;
                 ball.OnBecameLoose -= OnBallBecameLoose;
                 ball.OnAttached -= OnBallAttached;
+                ball.OnViolationTouch -= OnBallViolationTouch;
             }
+            PlayerZoneTracker.OnAnyForcedDrop -= OnPlayerForcedDrop;
         }
 
         private void Update()
@@ -93,6 +95,8 @@ namespace Sportland.Sports.Dodgeball
             ball.OnReleased += OnBallReleased;
             ball.OnBecameLoose += OnBallBecameLoose;
             ball.OnAttached += OnBallAttached;
+            ball.OnViolationTouch += OnBallViolationTouch;
+            PlayerZoneTracker.OnAnyForcedDrop += OnPlayerForcedDrop;
             subscribed = true;
         }
 
@@ -216,6 +220,7 @@ namespace Sportland.Sports.Dodgeball
             playVictim = playCatcher = playElim = playDeflector = null;
             playCatchWasDive = false;
             playPassCompleted = false;
+            playViolationTouch = false;
             playDodge = Ball.DodgeKind.None;
             playScoreTeam = null;
             playScorePoints = 0;
@@ -241,6 +246,38 @@ namespace Sportland.Sports.Dodgeball
             FlushPlay();
         }
 
+        // A player touched the ball while in the opposing team's half — +1 to
+        // the opposing team (whether it was a "catch" or a loose-ball pickup).
+        // Folds into the current play if there is one; otherwise logs standalone.
+        private void OnBallViolationTouch(PlayerZoneTracker player)
+        {
+            if (matchOver || player == null) return;
+            var oppTeam = player.Spawn.team == Team.A ? Team.B : Team.A;
+            AddScore(oppTeam, 1);
+
+            if (playOpen)
+            {
+                RecordScore(oppTeam, 1);
+                playCatcher = player;
+                playViolationTouch = true;
+                FlushPlay();
+            }
+            else
+            {
+                DodgeballPlayByPlay.Log($"{Label(player)} touched ball on opposing side - +1 {TeamLetter(oppTeam)} team");
+            }
+        }
+
+        // A carrier was forced to drop the ball (return window expired) — -1 to
+        // their team. Their team takes the deduction; play stays open for the
+        // newly loose ball.
+        private void OnPlayerForcedDrop(PlayerZoneTracker player)
+        {
+            if (matchOver || player == null) return;
+            AddScore(player.Spawn.team, -1);
+            DodgeballPlayByPlay.Log($"{Label(player)} didn't return in time, dropped ball - -1 {TeamLetter(player.Spawn.team)} team");
+        }
+
         private void RecordScore(Team team, int points)
         {
             if (!playOpen) return;
@@ -262,12 +299,13 @@ namespace Sportland.Sports.Dodgeball
             if (playCatcher != null)
             {
                 string diveTag = playCatchWasDive ? " (dive)" : "";
+                string viol = playViolationTouch ? " (violation)" : "";
                 if (playDeflector != null && playDeflector != playTarget)
-                    line += $" and deflects off of {Label(playDeflector)} and is caught{diveTag} by {Label(playCatcher)}";
+                    line += $" and deflects off of {Label(playDeflector)} and is caught{diveTag}{viol} by {Label(playCatcher)}";
                 else if (playDeflector != null)
-                    line += $" and deflects and is caught{diveTag} by {Label(playCatcher)}";
+                    line += $" and deflects and is caught{diveTag}{viol} by {Label(playCatcher)}";
                 else
-                    line += $" and is caught{diveTag} by {Label(playCatcher)}";
+                    line += $" and is caught{diveTag}{viol} by {Label(playCatcher)}";
             }
             else if (playVictim != null)
                 line += playVictim == playTarget ? " and hits" : $" and hits {Label(playVictim)}";
