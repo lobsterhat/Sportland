@@ -26,6 +26,8 @@ namespace Sportland.Sports.Dodgeball
 
         [Header("Tool")]
         [SerializeField] private bool showTool = true;
+        [Tooltip("Master enable. When off, the marker is hidden, firing is disabled (manual and auto), and the panel collapses to just its title + this checkbox.")]
+        [SerializeField] private bool cannonEnabled = true;
         [SerializeField] private float minSpeed = 4f;
         [SerializeField] private float maxSpeed = 50f;
         [Tooltip("Right stick nudges the cannon position at this speed (units/sec).")]
@@ -48,6 +50,12 @@ namespace Sportland.Sports.Dodgeball
 
         private void Update()
         {
+            if (!cannonEnabled)
+            {
+                if (marker != null) marker.gameObject.SetActive(false);
+                return;
+            }
+
             HandlePositionStick();
             UpdateMarker();
 
@@ -166,9 +174,16 @@ namespace Sportland.Sports.Dodgeball
 
             const float w = 250f;
             float x = Screen.width - w - 12f;
-            GUILayout.BeginArea(new Rect(x, 12f, w, 270f), GUI.skin.box);
+            float h = cannonEnabled ? 270f : 40f;   // collapse to title + checkbox when off
+            GUILayout.BeginArea(new Rect(x, 12f, w, h), GUI.skin.box);
 
+            GUILayout.BeginHorizontal();
             GUILayout.Label("== CANNON ==");
+            GUILayout.FlexibleSpace();
+            cannonEnabled = GUILayout.Toggle(cannonEnabled, "");
+            GUILayout.EndHorizontal();
+
+            if (!cannonEnabled) { GUILayout.EndArea(); return; }
 
             GUILayout.Label($"Speed: {firePower:F1} u/s ({DodgeballUnits.ToMph(firePower):F0} mph)");
             firePower = GUILayout.HorizontalSlider(firePower, minSpeed, maxSpeed);
