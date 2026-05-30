@@ -56,6 +56,14 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float accuracyErrorPerUnit = 0.15f;
         [Tooltip("Base lateral speed (u/s) of an outfielder's lob back to an infielder; scales up with distance.")]
         [SerializeField] private float passSpeed = 12f;
+        [Tooltip("Speed multiplier on passSpeed for a hard chest pass when the lane is clear — fast & flat, harder to set up against, easier to intercept.")]
+        [SerializeField] private float hardPassSpeedMul = 1.6f;
+        [Tooltip("Chance (0..1) of choosing a hard chest pass when the lane is clear; otherwise lob.")]
+        [SerializeField, Range(0f, 1f)] private float hardPassChance = 0.4f;
+        [Tooltip("Perpendicular distance (u) within which an opponent counts as 'in the lane' (for the hard-pass decision and for defenders moving to intercept).")]
+        [SerializeField] private float laneClearRadius = 1.5f;
+        [Tooltip("Ball Height (u) above which an intercepting defender jumps for extra reach (PickupHeightFor scales with the jump).")]
+        [SerializeField] private float interceptJumpHeight = 1.4f;
 
         [Header("Loose-ball retrieval")]
         [Tooltip("Dive for a bouncing (deflected) ball when its predicted landing is within this distance — a lunging catch with arms extended. The dive may cross the zone line (legal while airborne).")]
@@ -109,6 +117,21 @@ namespace Sportland.Sports.Dodgeball
                 if (BallIsLoose()) ChaseLooseBall();
                 else Idle();
                 return;
+            }
+
+            // An opposing pass is in flight: the closest same-team infielder
+            // steps to the lane to intercept; the others stay set, ready for
+            // the next throw.
+            if (ball.CurrentState == Ball.State.Passing)
+            {
+                var passer = ball.RecentThrower;
+                if (passer != null && passer.Spawn.team != tracker.Spawn.team)
+                {
+                    EndThreat();
+                    if (IsClosestInfielderToPassLine()) InterceptPass();
+                    else Prepare(passer);
+                    return;
+                }
             }
 
             if (IsIncomingThreat(out Vector2 ballDir))
@@ -434,10 +457,104 @@ namespace Sportland.Sports.Dodgeball
             if (holdStartTime < 0f) holdStartTime = Time.time;
             if (Time.time - holdStartTime >= windupTime)
             {
+                // Lane clear? Sometimes whip a hard chest pass — fast and flat —
+                // to catch the defense unaware. Otherwise lob over for safety.
+                bool laneClear = LaneIsClear(target.transform.position);
+                bool hard = laneClear && Random.value < hardPassChance;
+                float speed = hard ? passSpeed * hardPassSpeedMul : passSpeed;
                 ball.IntendedTarget = target;
-                ball.Pass(target.transform.position, passSpeed, isLob: true);
+                ball.Pass(target.transform.position, speed, isLob: !hard);
                 holdStartTime = -1f;
             }
+        }
+
+        // ── Pass interception (defenders) ──
+
+        // Step onto the passer→receiver line — clamped to my zone — and arm a
+        // catch. Jump for high lobs (PickupHeightFor extends with jump height).
+        private void InterceptPass()
+        {
+            movement.IsRunning = true;
+            movement.SetStance(true);
+            Vector2 me = transform.position;
+            Vector2 ballPos = ball.transform.position;
+            var ballTarget = ball.IntendedTarget;
+            Vector2 targetPos = ballTarget != null ? (Vector2)ballTarget.transform.position : ballPos;
+
+            Vector2 seg = targetPos - ballPos;
+            float segLen = seg.magnitude;
+            if (segLen < 0.01f) { Idle(); return; }
+            Vector2 dir = seg / segLen;
+            float along = Mathf.Clamp(Vector2.Dot(me - ballPos, dir), 0f, segLen);
+            Vector2 onLine = ballPos + dir * along;
+
+            movement.SetFacing(ballPos - me);
+            MoveToward(ClampToZone(onLine));
+
+            // Jump for a high lob — the catch reach rises with the jump.
+            if (ball.Height > interceptJumpHeight && Vector2.Distance(me, ballPos) < laneClearRadius)
+                movement.TryJump();
+
+            // Arm the catch as the ball nears (skill catch on opponent's pass).
+            if (Vector2.Distance(me, ballPos) <= armWithinDistance)
+                tracker.ArmCatch();
+        }
+
+        // True if I'm the same-team infielder closest to the current pass
+        // segment — only the nearest one drops back to intercept.
+        private bool IsClosestInfielderToPassLine()
+        {
+            var ballTarget = ball.IntendedTarget;
+            if (ballTarget == null) return false;
+            Vector2 ballPos = ball.transform.position;
+            Vector2 targetPos = ballTarget.transform.position;
+            Vector2 seg = targetPos - ballPos;
+            float segLen = seg.magnitude;
+            if (segLen < 0.01f) return false;
+            Vector2 dir = seg / segLen;
+
+            float myDist = DistanceToSegment(transform.position, ballPos, dir, segLen);
+            var team = tracker.Spawn.team;
+            var all = PlayerZoneTracker.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var t = all[i];
+                if (t == null || t == tracker) continue;
+                if (t.Spawn.team != team || t.Spawn.role != PlayerRole.Infielder) continue;
+                if (DistanceToSegment(t.transform.position, ballPos, dir, segLen) < myDist) return false;
+            }
+            return true;
+        }
+
+        // No opponent stands within laneClearRadius of the passer→target segment
+        // (and between the two, not before / past the ends).
+        private bool LaneIsClear(Vector2 target)
+        {
+            Vector2 ballPos = transform.position;
+            Vector2 seg = target - ballPos;
+            float segLen = seg.magnitude;
+            if (segLen < 0.01f) return true;
+            Vector2 dir = seg / segLen;
+            var team = tracker.Spawn.team;
+            var all = PlayerZoneTracker.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var t = all[i];
+                if (t == null || t.Spawn.team == team) continue;
+                Vector2 toT = (Vector2)t.transform.position - ballPos;
+                float along = Vector2.Dot(toT, dir);
+                if (along <= 0.5f || along >= segLen - 0.5f) continue;
+                if (Vector2.Distance(ballPos + dir * along, t.transform.position) <= laneClearRadius)
+                    return false;
+            }
+            return true;
+        }
+
+        private static float DistanceToSegment(Vector2 p, Vector2 a, Vector2 dir, float len)
+        {
+            Vector2 ap = p - a;
+            float along = Mathf.Clamp(Vector2.Dot(ap, dir), 0f, len);
+            return Vector2.Distance(a + dir * along, p);
         }
 
         private PlayerZoneTracker NearestTeammateInfielder()

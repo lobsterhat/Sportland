@@ -528,8 +528,8 @@ namespace Sportland.Sports.Dodgeball
         // take here just leaves the ball in play (no carom).
         private void TryPickup()
         {
-            if (Height > pickupMaxHeight) return;
-
+            // No top height guard: a jumping defender extends their catch reach,
+            // so the per-player check inside TryTakeBall is what decides.
             var trackers = PlayerZoneTracker.All;
             Vector2 ballPos = transform.position;
             for (int i = 0; i < trackers.Count; i++)
@@ -589,7 +589,7 @@ namespace Sportland.Sports.Dodgeball
                 // crossing into the opponent's area to grab it and carry it back.
                 // (Catching a LIVE throw out of zone is still illegal — gated by
                 // CanCatchBall in the live paths below — except a diving catch.)
-                if (Height <= pickupMaxHeight) { Attach(t); return true; }
+                if (Height <= PickupHeightFor(t)) { Attach(t); return true; }
                 return false;
             }
 
@@ -599,7 +599,7 @@ namespace Sportland.Sports.Dodgeball
             bool deliberate = human || (caromOnMiss && HasAI(t));
 
             // A catch needs the ball within reach height.
-            if (deliberate && t.CanCatchBall() && t.IsCatchArmed(catchArmWindow) && Height <= pickupMaxHeight)
+            if (deliberate && t.CanCatchBall() && t.IsCatchArmed(catchArmWindow) && Height <= PickupHeightFor(t))
             {
                 RecordArrival();
                 var f = BuildCatchFactors(t, applyLuck: true);
@@ -620,7 +620,7 @@ namespace Sportland.Sports.Dodgeball
             }
 
             // Pass / loose ball: humans must arm (pass-by), AI/uncontrolled auto-catch.
-            if (!human && t.CanCatchBall() && Height <= pickupMaxHeight) { RecordArrival(); Attach(t); return true; }
+            if (!human && t.CanCatchBall() && Height <= PickupHeightFor(t)) { RecordArrival(); Attach(t); return true; }
             return false;
         }
 
@@ -631,6 +631,14 @@ namespace Sportland.Sports.Dodgeball
             var m = t.GetComponent<PlayerMovement>();
             if (m == null) return Height <= pickupMaxHeight;
             return Height >= m.BodyBottom && Height <= m.BodyTop;
+        }
+
+        // A jumping player extends their vertical catch reach by their current
+        // jump height — lets a defender leap to intercept a slightly overhead lob.
+        private float PickupHeightFor(PlayerZoneTracker t)
+        {
+            var m = t.GetComponent<PlayerMovement>();
+            return pickupMaxHeight + (m != null ? m.CurrentJumpHeight : 0f);
         }
 
         // Catch/pickup reach for a player — the larger catch radius for a
