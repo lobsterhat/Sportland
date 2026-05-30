@@ -21,9 +21,10 @@ namespace Sportland.Sports.Dodgeball
     public class PlayerZoneTracker : MonoBehaviour
     {
         // --- Tunables ---------------------------------------------------------
+        /// <summary>Return window (seconds): how long a carrier may be out of their area before they're forced to drop the ball AND their team takes a -1 point penalty. Static so the runtime match-controls slider tunes it for all players at once.</summary>
+        public static float ReturnGraceSeconds = 2f;
+
         [Header("Rule timings")]
-        [Tooltip("Return window (seconds): how long a player may be out of their area holding the ball before they're forced to drop it AND their team takes a -1 point penalty.")]
-        [SerializeField] private float returnGraceSeconds = 2f;
         [SerializeField] private int   crossingsForWarning = 3;
         [SerializeField] private float crossingWindowSeconds = 30f;
 
@@ -173,7 +174,7 @@ namespace Sportland.Sports.Dodgeball
         {
             if (IsInZone || outOfZoneSince < 0f || returnExpiryFired) return;
 
-            if (Time.time - outOfZoneSince >= returnGraceSeconds)
+            if (Time.time - outOfZoneSince >= ReturnGraceSeconds)
             {
                 returnExpiryFired = true;
                 OnReturnTimerExpired?.Invoke(this);
@@ -189,7 +190,7 @@ namespace Sportland.Sports.Dodgeball
         private void EnforceCarrierInZone()
         {
             if (HasBall && !IsInZone && movement.IsGrounded
-                && outOfZoneSince >= 0f && Time.time - outOfZoneSince >= returnGraceSeconds)
+                && outOfZoneSince >= 0f && Time.time - outOfZoneSince >= ReturnGraceSeconds)
                 DropHeldBall();
         }
 
@@ -221,6 +222,6 @@ namespace Sportland.Sports.Dodgeball
         public int CurrentCrossingCount => crossingTimestamps.Count;
 
         public float SecondsUntilReturnExpiry =>
-            IsInZone ? 0f : Mathf.Max(0f, returnGraceSeconds - (Time.time - outOfZoneSince));
+            IsInZone ? 0f : Mathf.Max(0f, ReturnGraceSeconds - (Time.time - outOfZoneSince));
     }
 }

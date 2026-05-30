@@ -25,6 +25,11 @@ namespace Sportland.Sports.Dodgeball
         private bool matchOver;
         private Team? winner;
 
+        /// <summary>Live time remaining (seconds). Settable so the match-controls slider can extend/shorten the current period.</summary>
+        public float TimeRemaining { get => timeRemaining; set => timeRemaining = Mathf.Max(0f, value); }
+        /// <summary>True if the active mode runs a clock.</summary>
+        public bool IsTimed => mode != null && mode.isTimed;
+
         // Mode 2: hits taken per player. Mode 4: players benched (recallable).
         // Mode 3: current energy per player (lazily seeded from maxEnergy).
         private readonly Dictionary<PlayerZoneTracker, int> hitCounts = new Dictionary<PlayerZoneTracker, int>();

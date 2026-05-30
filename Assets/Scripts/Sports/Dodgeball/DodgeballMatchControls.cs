@@ -29,7 +29,10 @@ namespace Sportland.Sports.Dodgeball
             if (court == null) return;
             GUI.depth = -1;   // open dropdown draws on top of the play-by-play below it
 
-            float h = dropdownOpen ? 70f + presetNames.Length * 24f : 70f;
+            var match = court.GetComponent<DodgeballMatch>();
+            bool timed = match != null && match.IsTimed;
+
+            float h = 110f + (timed ? 44f : 0f) + (dropdownOpen ? presetNames.Length * 24f : 0f);
             float x = Screen.width - panelWidth - 12f;
             GUILayout.BeginArea(new Rect(x, topOffset, panelWidth, h), GUI.skin.box);
 
@@ -53,6 +56,16 @@ namespace Sportland.Sports.Dodgeball
                     }
                 }
             }
+
+            if (timed)
+            {
+                int total = Mathf.CeilToInt(match.TimeRemaining);
+                GUILayout.Label($"Time: {total / 60}:{(total % 60):00}");
+                match.TimeRemaining = GUILayout.HorizontalSlider(match.TimeRemaining, 0f, 600f);
+            }
+
+            GUILayout.Label($"Penalty: {PlayerZoneTracker.ReturnGraceSeconds:F1}s");
+            PlayerZoneTracker.ReturnGraceSeconds = GUILayout.HorizontalSlider(PlayerZoneTracker.ReturnGraceSeconds, 0.5f, 10f);
 
             GUILayout.EndArea();
         }

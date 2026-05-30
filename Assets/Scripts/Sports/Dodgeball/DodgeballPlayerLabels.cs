@@ -36,16 +36,24 @@ namespace Sportland.Sports.Dodgeball
 
                 // WorldToScreenPoint's origin is bottom-left; GUI's is top-left.
                 var rect = new Rect(screen.x - 24f, Screen.height - screen.y - 12f, 48f, 24f);
-                DrawShadowed(rect, $"{(t.Spawn.team == Team.A ? "A" : "B")}{t.Number}");
+                DrawShadowed(rect, $"{(t.Spawn.team == Team.A ? "A" : "B")}{t.Number}", Color.white);
+
+                // Penalty countdown: a carrier who's out of their area is on the
+                // clock. Show the remaining seconds in red so it reads as urgent.
+                if (t.HasBall && !t.IsInZone)
+                {
+                    var cRect = new Rect(rect.x, rect.y + rect.height + 2f, rect.width, 22f);
+                    DrawShadowed(cRect, $"{t.SecondsUntilReturnExpiry:F1}", new Color(1f, 0.35f, 0.35f));
+                }
             }
         }
 
-        // White text with a dark offset copy behind it, so it reads over any sprite.
-        private void DrawShadowed(Rect rect, string text)
+        // Text with a dark offset copy behind it, so it reads over any sprite.
+        private void DrawShadowed(Rect rect, string text, Color color)
         {
             style.normal.textColor = new Color(0f, 0f, 0f, 0.85f);
             GUI.Label(new Rect(rect.x + 1f, rect.y + 1f, rect.width, rect.height), text, style);
-            style.normal.textColor = Color.white;
+            style.normal.textColor = color;
             GUI.Label(rect, text, style);
         }
 
