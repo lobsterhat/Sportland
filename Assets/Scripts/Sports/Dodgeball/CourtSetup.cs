@@ -73,6 +73,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private bool showPlayerLabels = true;
         [Tooltip("Show the play-by-play log panel (top-right, under the cannon).")]
         [SerializeField] private bool showPlayByPlay = true;
+        [Tooltip("Show the Match controls panel (mode dropdown + Reset button) top-right.")]
+        [SerializeField] private bool showMatchControls = true;
 
         [Header("Match")]
         [Tooltip("Scoring rules asset. Leave null to use Start Mode below (built in code).")]
@@ -91,6 +93,9 @@ namespace Sportland.Sports.Dodgeball
         private Ball ball;
         private GameMode.Preset currentPreset;
 
+        /// <summary>The mode the match is currently running in (read by the controls panel).</summary>
+        public GameMode.Preset CurrentPreset => currentPreset;
+
         private void Awake()
         {
             BuildCourt();
@@ -100,6 +105,7 @@ namespace Sportland.Sports.Dodgeball
             if (spawnDebugCannon) gameObject.AddComponent<DodgeballCannon>();
             if (showPlayerLabels) gameObject.AddComponent<DodgeballPlayerLabels>();
             if (showPlayByPlay) gameObject.AddComponent<DodgeballPlayByPlay>();
+            if (showMatchControls) gameObject.AddComponent<DodgeballMatchControls>();
             if (runMatch)
             {
                 match = gameObject.AddComponent<DodgeballMatch>();
@@ -133,12 +139,15 @@ namespace Sportland.Sports.Dodgeball
         }
 
         // Rebuild the chosen mode and reset to a fresh match in it.
-        private void SwitchMode(GameMode.Preset preset)
+        public void SwitchMode(GameMode.Preset preset)
         {
             currentPreset = preset;
             RestartInMode(GameMode.Create(preset));
             Debug.Log($"[Dodgeball] Switched to mode: {preset}");
         }
+
+        /// <summary>Restart the current mode in place (Reset button).</summary>
+        public void RestartMatch() => SwitchMode(currentPreset);
 
         // Revive + reposition every spawned player (incl. any eliminated under a
         // previous mode), reset the ball to a loose ball at center, and reconfigure
