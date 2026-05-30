@@ -20,12 +20,21 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private Color teamBColor = new Color(1.00f, 0.55f, 0.55f, 1f);
         [SerializeField] private Color outOfZoneTint = new Color(1f, 0.85f, 0.2f, 1f);
 
-        [Header("Facing arrow")]
-        [SerializeField] private Color arrowColor = new Color(1f, 0.95f, 0.3f, 0.95f);
-        [Tooltip("How far from the player center the pointer orbits.")]
-        [SerializeField] private float arrowDistance = 0.9f;
-        [SerializeField] private float arrowSize = 0.35f;
-        [SerializeField] private int arrowSortingOrder = 26;
+        [Header("Movement arrow (yellow — controlled player, hides when stationary)")]
+        [SerializeField] private Color movementArrowColor = new Color(1f, 0.95f, 0.3f, 0.95f);
+        [Tooltip("How far from the player center the yellow movement pointer orbits.")]
+        [SerializeField] private float movementArrowDistance = 0.9f;
+        [SerializeField] private float movementArrowSize = 0.35f;
+        [SerializeField] private int movementArrowSortingOrder = 26;
+        [Tooltip("Hide the yellow movement arrow when below this speed (u/s).")]
+        [SerializeField] private float movementArrowMinSpeed = 0.4f;
+
+        [Header("Facing arrow (red — every player, always visible)")]
+        [SerializeField] private Color facingArrowColor = new Color(1f, 0.35f, 0.35f, 0.95f);
+        [Tooltip("How far from the player center the red facing pointer orbits.")]
+        [SerializeField] private float facingArrowDistance = 0.6f;
+        [SerializeField] private float facingArrowSize = 0.28f;
+        [SerializeField] private int facingArrowSortingOrder = 27;
 
         [Header("Controlled-player ring")]
         [SerializeField] private Color ringColor = new Color(1f, 0.9f, 0.15f, 0.95f);
@@ -41,7 +50,8 @@ namespace Sportland.Sports.Dodgeball
         private PlayerZoneTracker tracker;
         private Color baseColor;
         private PlayerMovement movement;
-        private Transform arrowTransform;
+        private Transform movementArrowTransform;
+        private Transform facingArrowTransform;
         private Transform ringTransform;
 
         public void Configure(Team team, PlayerRole role, PlayerZoneTracker zoneTracker)
@@ -61,6 +71,7 @@ namespace Sportland.Sports.Dodgeball
             }
 
             movement = GetComponentInParent<PlayerMovement>();
+            BuildMovementArrow();
             BuildFacingArrow();
             BuildControlRing();
         }
@@ -68,6 +79,7 @@ namespace Sportland.Sports.Dodgeball
         private void Update()
         {
             UpdateControlIndicators();
+            UpdateMovementArrow();
             UpdateFacingArrow();
 
             if (tracker == null) return;
@@ -146,51 +158,90 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
-        private void BuildFacingArrow()
+        private void BuildMovementArrow()
         {
-            if (arrowTransform != null) return;
+            if (movementArrowTransform != null) return;
 
             // Parent to the player root (not this Visual child) so the jump bob
             // and duck squash don't distort the pointer.
             Transform parent = transform.parent != null ? transform.parent : transform;
-            var go = new GameObject("FacingArrow");
+            movementArrowTransform = BuildArrow(parent, "MovementArrow",
+                movementArrowColor, movementArrowSize, movementArrowSortingOrder);
+            movementArrowTransform.gameObject.SetActive(false);   // shown only while controlled + moving
+        }
+
+        private void BuildFacingArrow()
+        {
+            if (facingArrowTransform != null) return;
+            Transform parent = transform.parent != null ? transform.parent : transform;
+            facingArrowTransform = BuildArrow(parent, "FacingArrow",
+                facingArrowColor, facingArrowSize, facingArrowSortingOrder);
+            // The red facing arrow is always visible (every player).
+        }
+
+        private static Transform BuildArrow(Transform parent, string name, Color color, float size, int sortingOrder)
+        {
+            var go = new GameObject(name);
             go.transform.SetParent(parent, false);
 
             var mf = go.AddComponent<MeshFilter>();
             var mr = go.AddComponent<MeshRenderer>();
-            mr.sharedMaterial = CreateMat(arrowColor);
-            mr.sortingOrder = arrowSortingOrder;
+            mr.sharedMaterial = CreateMat(color);
+            mr.sortingOrder = sortingOrder;
             mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
             mr.receiveShadows = false;
 
-            float s = arrowSize;
+            float s = size;
             var verts = new Vector3[]
             {
-                new Vector3( s * 0.6f,  0f,       0f),   // tip (+X); rotated to Facing each frame
+                new Vector3( s * 0.6f,  0f,       0f),   // tip (+X); rotated each frame
                 new Vector3(-s * 0.4f,  s * 0.5f, 0f),
                 new Vector3(-s * 0.4f, -s * 0.5f, 0f),
             };
             var tris = new int[] { 0, 1, 2 };
-            var mesh = new Mesh { name = "FacingArrow", vertices = verts, triangles = tris };
+            var mesh = new Mesh { name = name, vertices = verts, triangles = tris };
             mesh.RecalculateNormals();
             mf.mesh = mesh;
 
-            go.SetActive(false);   // shown only while controlled (UpdateControlIndicators)
-            arrowTransform = go.transform;
+            return go.transform;
         }
 
-        // Orbit the pointer around the player in the current Facing direction.
+        // Orbit the yellow movement arrow in the direction the player is actually
+        // moving (rb velocity), only for the controlled player, and hide it when
+        // they're essentially stationary.
+        private void UpdateMovementArrow()
+        {
+            if (movementArrowTransform == null) return;
+            if (movement == null) movement = GetComponentInParent<PlayerMovement>();
+            if (movement == null) return;
+
+            bool controlled = movement.GetComponent<DodgeballPlayerInput>() != null;
+            Vector2 v = movement.Velocity;
+            bool show = controlled && v.magnitude >= movementArrowMinSpeed;
+            if (movementArrowTransform.gameObject.activeSelf != show)
+                movementArrowTransform.gameObject.SetActive(show);
+            if (!show) return;
+
+            Vector2 n = v.normalized;
+            float ang = Mathf.Atan2(n.y, n.x) * Mathf.Rad2Deg;
+            movementArrowTransform.localPosition = new Vector3(n.x * movementArrowDistance, n.y * movementArrowDistance, 0f);
+            movementArrowTransform.localRotation = Quaternion.Euler(0f, 0f, ang);
+        }
+
+        // Orbit the red facing arrow in the player's Facing direction. Always on
+        // (every player), so you can see where each player is looking — useful for
+        // reading defensive stance / set-and-watch-the-ball behaviour.
         private void UpdateFacingArrow()
         {
-            if (arrowTransform == null || !arrowTransform.gameObject.activeSelf) return;
+            if (facingArrowTransform == null) return;
             if (movement == null) movement = GetComponentInParent<PlayerMovement>();
             if (movement == null) return;
 
             Vector2 f = movement.Facing;
             if (f.sqrMagnitude < 0.0001f) return;
             float ang = Mathf.Atan2(f.y, f.x) * Mathf.Rad2Deg;
-            arrowTransform.localPosition = new Vector3(f.x * arrowDistance, f.y * arrowDistance, 0f);
-            arrowTransform.localRotation = Quaternion.Euler(0f, 0f, ang);
+            facingArrowTransform.localPosition = new Vector3(f.x * facingArrowDistance, f.y * facingArrowDistance, 0f);
+            facingArrowTransform.localRotation = Quaternion.Euler(0f, 0f, ang);
         }
 
         // A flat yellow ring at the player's feet marking the human-controlled
@@ -228,16 +279,16 @@ namespace Sportland.Sports.Dodgeball
             ringTransform = go.transform;
         }
 
-        // The ring + facing arrow mark the human-controlled player, so show them
-        // only on whoever currently holds a DodgeballPlayerInput.
+        // The ring marks the human-controlled player; show it only on whoever
+        // currently holds a DodgeballPlayerInput. (The yellow movement arrow has
+        // its own controlled+moving gating in UpdateMovementArrow; the red facing
+        // arrow is always on.)
         private void UpdateControlIndicators()
         {
             if (movement == null) movement = GetComponentInParent<PlayerMovement>();
             bool controlled = movement != null && movement.GetComponent<DodgeballPlayerInput>() != null;
             if (ringTransform != null && ringTransform.gameObject.activeSelf != controlled)
                 ringTransform.gameObject.SetActive(controlled);
-            if (arrowTransform != null && arrowTransform.gameObject.activeSelf != controlled)
-                arrowTransform.gameObject.SetActive(controlled);
         }
 
         private static Material CreateMat(Color c)

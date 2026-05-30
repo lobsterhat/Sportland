@@ -129,6 +129,9 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Unit vector of the last non-zero movement direction (the way the player faces).</summary>
         public Vector2 Facing { get; private set; } = Vector2.right;
 
+        /// <summary>Current lateral velocity (Rigidbody2D). Used by the visual to point the yellow movement arrow.</summary>
+        public Vector2 Velocity => rb != null ? rb.linearVelocity : Vector2.zero;
+
         /// <summary>Orient the player without moving (e.g. AI facing the ball while set).</summary>
         public void SetFacing(Vector2 dir)
         {
