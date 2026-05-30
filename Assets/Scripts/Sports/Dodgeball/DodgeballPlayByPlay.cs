@@ -21,7 +21,7 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float panelWidth = 250f;
         [SerializeField] private float panelHeight = 240f;
         [Tooltip("Top edge (px). Sits under the cannon panel and the (taller) match controls panel.")]
-        [SerializeField] private float topOffset = 460f;
+        [SerializeField] private float topOffset = 490f;
 
         private static readonly List<string> lines = new List<string>();
         private static string cached = "";

@@ -63,6 +63,8 @@ namespace Sportland.Sports.Dodgeball
         // Spawn ID of the human-driven character. A_In_2 is Team A's center
         // infielder at (-4.5, 0).
         [SerializeField] private string playerControlledId = "A_In_2";
+        [Tooltip("Hand every player to the CPU brain (no human input). Pure AI-vs-AI for observation; toggleable live from the Match controls panel.")]
+        [SerializeField] private bool allAIControlled = false;
 
         [Header("Diagnostics")]
         [Tooltip("Spawn an on-screen readout of player/ball state for tuning.")]
@@ -95,6 +97,43 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>The mode the match is currently running in (read by the controls panel).</summary>
         public GameMode.Preset CurrentPreset => currentPreset;
+
+        /// <summary>True if all players are CPU-controlled (no human input).</summary>
+        public bool AllAIControlled => allAIControlled;
+
+        /// <summary>Toggle pure AI-vs-AI play live. On: remove the human input wherever it currently lives. Off: re-attach it to the spawn-time controlled player (or any active player if that one's eliminated).</summary>
+        public void SetAllAI(bool value)
+        {
+            allAIControlled = value;
+            if (value)
+            {
+                if (DodgeballPlayerInput.Current != null) Destroy(DodgeballPlayerInput.Current);
+            }
+            else if (DodgeballPlayerInput.Current == null)
+            {
+                var go = FindActiveSpawnedById(playerControlledId) ?? FirstActiveSpawnedPlayer();
+                if (go != null) go.AddComponent<DodgeballPlayerInput>();
+            }
+        }
+
+        private GameObject FindActiveSpawnedById(string id)
+        {
+            for (int i = 0; i < spawnedPlayers.Count; i++)
+            {
+                var go = spawnedPlayers[i];
+                if (go == null || !go.activeSelf) continue;
+                var tr = go.GetComponent<PlayerZoneTracker>();
+                if (tr != null && tr.Spawn.id == id) return go;
+            }
+            return null;
+        }
+
+        private GameObject FirstActiveSpawnedPlayer()
+        {
+            for (int i = 0; i < spawnedPlayers.Count; i++)
+                if (spawnedPlayers[i] != null && spawnedPlayers[i].activeSelf) return spawnedPlayers[i];
+            return null;
+        }
 
         private void Awake()
         {
@@ -238,7 +277,7 @@ namespace Sportland.Sports.Dodgeball
             // Every player gets a CPU brain; the human input component
             // (added below) disables it on the controlled player while present.
             go.AddComponent<DodgeballAI>();
-            if (spawn.id == playerControlledId)
+            if (!allAIControlled && spawn.id == playerControlledId)
             {
                 go.AddComponent<DodgeballPlayerInput>();
             }
