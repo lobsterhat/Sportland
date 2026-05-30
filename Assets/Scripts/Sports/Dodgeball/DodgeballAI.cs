@@ -58,9 +58,7 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float passSpeed = 12f;
         [Tooltip("Speed multiplier on passSpeed for a hard chest pass when the lane is clear — fast & flat, harder to set up against, easier to intercept.")]
         [SerializeField] private float hardPassSpeedMul = 1.6f;
-        [Tooltip("Chance (0..1) of choosing a hard chest pass when the lane is clear; otherwise lob.")]
-        [SerializeField, Range(0f, 1f)] private float hardPassChance = 0.4f;
-        [Tooltip("Perpendicular distance (u) within which an opponent counts as 'in the lane' (for the hard-pass decision and for defenders moving to intercept).")]
+        [Tooltip("Perpendicular distance (u) within which an opponent counts as 'in the lane' — flips the pass from hard chest to lob, and tells defenders where to step in.")]
         [SerializeField] private float laneClearRadius = 1.5f;
         [Tooltip("Ball Height (u) above which an intercepting defender jumps for extra reach (PickupHeightFor scales with the jump).")]
         [SerializeField] private float interceptJumpHeight = 1.4f;
@@ -457,13 +455,12 @@ namespace Sportland.Sports.Dodgeball
             if (holdStartTime < 0f) holdStartTime = Time.time;
             if (Time.time - holdStartTime >= windupTime)
             {
-                // Lane clear? Sometimes whip a hard chest pass — fast and flat —
-                // to catch the defense unaware. Otherwise lob over for safety.
+                // Lane clear → hard chest pass (fast & flat, catches defense
+                // unaware); opponent in the lane → lob over them.
                 bool laneClear = LaneIsClear(target.transform.position);
-                bool hard = laneClear && Random.value < hardPassChance;
-                float speed = hard ? passSpeed * hardPassSpeedMul : passSpeed;
+                float speed = laneClear ? passSpeed * hardPassSpeedMul : passSpeed;
                 ball.IntendedTarget = target;
-                ball.Pass(target.transform.position, speed, isLob: !hard);
+                ball.Pass(target.transform.position, speed, isLob: !laneClear);
                 holdStartTime = -1f;
             }
         }
