@@ -3,22 +3,22 @@ using UnityEngine;
 namespace Sportland.Sports.Dodgeball
 {
     /// <summary>
-    /// CPU brain for a non-human dodgeball player. First slice: defensive
-    /// reactions when the opposing team has the ball.
+    /// CPU brain for a non-human dodgeball player.
     ///
-    ///   Idle     — no threat / our team has the ball: drift back to the
-    ///              spawn home so the team holds formation.
-    ///   Prepare  — an opponent is holding the ball: square up and face them.
-    ///   React    — an opponent's throw is in flight and heading at me. A
-    ///              one-time decision (weighted by the catching rating, and
-    ///              only if I can legally catch here) commits to either:
-    ///                Catch — slide onto the ball's line and arm a catch, or
-    ///                Evade — sidestep out of the ball's path.
+    /// Per-frame behavior chain (priority order; first node to claim the frame wins):
+    ///   TryActWithBall                — I have the ball → offense (throw / pass / carry home)
+    ///   TryAnticipateOutfielderCatch  — outfielder reading a throw landing in my strip
+    ///   TryReactToOpposingPass        — closest infielder intercepts; others set against the passer
+    ///   TryReactToIncomingThrow       — emergency: catch / duck / jump / sidestep
+    ///   TryPrepareForCarrier          — opposing carrier exists → face & hold zone depth
+    ///   TryChaseLooseBall             — loose ball + I'm closest in my retrieval zone
+    ///   Idle                          — fallback: drift home so formation holds
     ///
-    /// Movement targets are clamped to the assigned zone so the AI stays legal
-    /// and in formation. Drives the same PlayerMovement / catch-arm API the
-    /// human uses; the Ball resolves an armed AI catch with the same skill
-    /// check as a human.
+    /// Role gates (infielder vs outfielder) live inside each node so a single chain
+    /// serves every player. Movement targets are clamped to the assigned zone so the
+    /// AI stays legal and in formation. The AI drives the same PlayerMovement /
+    /// catch-arm API the human uses; the Ball resolves an armed AI catch with the
+    /// same skill check as a human.
     /// </summary>
     [RequireComponent(typeof(PlayerMovement))]
     [RequireComponent(typeof(PlayerZoneTracker))]
@@ -90,79 +90,121 @@ namespace Sportland.Sports.Dodgeball
             attr = GetComponent<DodgeballAttributes>();
         }
 
+        // Per-frame priority chain. First Try* to claim the frame wins; later
+        // nodes don't run. TryReactToIncomingThrow owns the threat state machine;
+        // every other reachable node calls EndThreat() on entry so stale state
+        // doesn't survive between frames. Adding a behavior = insert one node
+        // into the ordered list.
         private void Update()
         {
             if (ball == null) ball = FindFirstObjectByType<Ball>();
             if (ball == null) { EndThreat(); Idle(); return; }
 
-            // Holding the ball: go on offense — wind up and throw at an opponent.
-            if (tracker.HasBall) { EndThreat(); Offense(); return; }
-            holdStartTime = -1f;   // not holding — reset any wind-up
-
-            // Outfielders don't defend (can't be eliminated). They read an
-            // incoming throw and get under its predicted landing — staying in
-            // their strip — to take it out of the air or off the hop; failing
-            // that they fetch a loose ball already in their strip, else hold.
-            // Once they grab one, Offense lobs it back to an infielder.
-            if (tracker.Spawn.role != PlayerRole.Infielder)
-            {
-                EndThreat();
-                if (ball.CurrentState == Ball.State.Thrown)
-                {
-                    Vector2 land = ball.PredictGroundPoint();
-                    if (tracker.AssignedZone.Contains(land)) { AnticipateCatch(land); return; }
-                }
-                if (BallIsLoose()) ChaseLooseBall();
-                else Idle();
-                return;
-            }
-
-            // An opposing pass is in flight: the closest same-team infielder
-            // steps to the lane to intercept; the others stay set, ready for
-            // the next throw.
-            if (ball.CurrentState == Ball.State.Passing)
-            {
-                var passer = ball.RecentThrower;
-                if (passer != null && passer.Spawn.team != tracker.Spawn.team)
-                {
-                    EndThreat();
-                    if (IsClosestInfielderToPassLine()) InterceptPass();
-                    else Prepare(passer);
-                    return;
-                }
-            }
-
-            if (IsIncomingThreat(out Vector2 ballDir))
-            {
-                movement.SetStance(true);   // reacting to a live throw — fully set
-                Vector2 ballPos = ball.transform.position;
-                float distToBall = Vector2.Distance(transform.position, ballPos);
-                float predictedHeight = ball.PredictHeightAfter(distToBall);
-
-                if (!threatActive)
-                {
-                    threatActive = true;
-                    armedThisThreat = false;
-                    jumpedThisThreat = false;
-                    reaction = Decide(predictedHeight);
-                }
-
-                switch (reaction)
-                {
-                    case Reaction.Catch:    DoCatch(ballDir); break;
-                    case Reaction.Duck:     DoDuck(ballPos); break;
-                    case Reaction.Jump:     DoJump(ballPos, distToBall); break;
-                    default:                DoSidestep(ballDir); break;
-                }
-                return;
-            }
-
+            if (TryActWithBall())               return;
+            holdStartTime = -1f;                // not holding — reset wind-up
+            if (TryAnticipateOutfielderCatch()) return;
+            if (TryReactToOpposingPass())       return;
+            if (TryReactToIncomingThrow())      return;
             EndThreat();
+            if (TryPrepareForCarrier())         return;
+            if (TryChaseLooseBall())            return;
+            Idle();
+        }
 
+        // ── Behavior chain nodes ──
+        // Each Try* returns true iff it handled the frame. Role gates live
+        // inside the node, so one chain serves both infielders and outfielders.
+
+        // I'm holding the ball → wind up and throw, or carry home first.
+        private bool TryActWithBall()
+        {
+            if (!tracker.HasBall) return false;
+            EndThreat();
+            Offense();
+            return true;
+        }
+
+        // Outfielders only: an opposing throw is in flight and lands in my
+        // strip. Get under it to take it out of the air or off the hop.
+        // If it's not landing in my strip we fall through to ChaseLooseBall / Idle.
+        private bool TryAnticipateOutfielderCatch()
+        {
+            if (tracker.Spawn.role == PlayerRole.Infielder) return false;
+            EndThreat();
+            if (ball.CurrentState != Ball.State.Thrown) return false;
+            Vector2 land = ball.PredictGroundPoint();
+            if (!tracker.AssignedZone.Contains(land)) return false;
+            AnticipateCatch(land);
+            return true;
+        }
+
+        // Infielders only: an opposing pass is in flight. The closest same-team
+        // infielder steps to the lane; the others stay set facing the passer,
+        // ready for the next throw.
+        private bool TryReactToOpposingPass()
+        {
+            if (tracker.Spawn.role != PlayerRole.Infielder) return false;
+            if (ball.CurrentState != Ball.State.Passing) return false;
+            var passer = ball.RecentThrower;
+            if (passer == null || passer.Spawn.team == tracker.Spawn.team) return false;
+            EndThreat();
+            if (IsClosestInfielderToPassLine()) InterceptPass();
+            else Prepare(passer);
+            return true;
+        }
+
+        // Infielders only: a live throw's line passes through me. Commit once
+        // per threat to Catch/Duck/Jump/Sidestep and execute it each frame
+        // until the threat clears.
+        private bool TryReactToIncomingThrow()
+        {
+            if (tracker.Spawn.role != PlayerRole.Infielder) return false;
+            if (!IsIncomingThreat(out Vector2 ballDir)) return false;
+
+            movement.SetStance(true);   // reacting to a live throw — fully set
+            Vector2 ballPos = ball.transform.position;
+            float distToBall = Vector2.Distance(transform.position, ballPos);
+            float predictedHeight = ball.PredictHeightAfter(distToBall);
+
+            if (!threatActive)
+            {
+                threatActive = true;
+                armedThisThreat = false;
+                jumpedThisThreat = false;
+                reaction = Decide(predictedHeight);
+            }
+
+            switch (reaction)
+            {
+                case Reaction.Catch:    DoCatch(ballDir);            break;
+                case Reaction.Duck:     DoDuck(ballPos);             break;
+                case Reaction.Jump:     DoJump(ballPos, distToBall); break;
+                default:                DoSidestep(ballDir);         break;
+            }
+            return true;
+        }
+
+        // Infielders only: an opposing carrier exists — back off along the
+        // zone-depth axis so any throw has further to travel.
+        private bool TryPrepareForCarrier()
+        {
+            if (tracker.Spawn.role != PlayerRole.Infielder) return false;
             var carrier = ball.Carrier;
-            if (carrier != null && carrier.Spawn.team != tracker.Spawn.team) Prepare(carrier);
-            else if (carrier == null && BallIsLoose() && IsClosestTeammateToBall()) ChaseLooseBall();
-            else Idle();
+            if (carrier == null || carrier.Spawn.team == tracker.Spawn.team) return false;
+            Prepare(carrier);
+            return true;
+        }
+
+        // Both roles: ball is loose in my retrieval zone. Infielders gate on
+        // "closest teammate" so only the nearest one commits; outfielders chase
+        // unconditionally when the ball is in their strip.
+        private bool TryChaseLooseBall()
+        {
+            if (!BallIsLoose()) return false;
+            bool isInfielder = tracker.Spawn.role == PlayerRole.Infielder;
+            if (isInfielder && !IsClosestTeammateToBall()) return false;
+            ChaseLooseBall();
+            return true;
         }
 
         private void EndThreat()
