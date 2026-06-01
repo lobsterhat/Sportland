@@ -83,6 +83,14 @@ namespace Sportland.Sports.Dodgeball
         private float holdStartTime = -1f;       // when we picked up the ball (wind-up clock)
         private PlayerZoneTracker throwTarget;
 
+        /// <summary>
+        /// Short label of the chain node driving this AI this frame ("Offense",
+        /// "Intercept", "Chase", "Idle", etc.). Empty until the first frame runs.
+        /// Read-only — set by the Try* nodes and the Idle path. Surfaced by
+        /// <see cref="DodgeballPlayerLabels"/> as a debug overlay under the jersey.
+        /// </summary>
+        public string CurrentDecision { get; private set; } = "";
+
         private void Awake()
         {
             movement = GetComponent<PlayerMovement>();
@@ -98,7 +106,7 @@ namespace Sportland.Sports.Dodgeball
         private void Update()
         {
             if (ball == null) ball = FindFirstObjectByType<Ball>();
-            if (ball == null) { EndThreat(); Idle(); return; }
+            if (ball == null) { EndThreat(); CurrentDecision = "Idle"; Idle(); return; }
 
             if (TryActWithBall())               return;
             holdStartTime = -1f;                // not holding — reset wind-up
@@ -108,18 +116,22 @@ namespace Sportland.Sports.Dodgeball
             EndThreat();
             if (TryPrepareForCarrier())         return;
             if (TryChaseLooseBall())            return;
+            CurrentDecision = "Idle";
             Idle();
         }
 
         // ── Behavior chain nodes ──
         // Each Try* returns true iff it handled the frame. Role gates live
         // inside the node, so one chain serves both infielders and outfielders.
+        // Each claiming node also stamps CurrentDecision so the debug overlay
+        // (DodgeballPlayerLabels) can show who's deciding what in real time.
 
         // I'm holding the ball → wind up and throw, or carry home first.
         private bool TryActWithBall()
         {
             if (!tracker.HasBall) return false;
             EndThreat();
+            CurrentDecision = "Offense";
             Offense();
             return true;
         }
@@ -134,6 +146,7 @@ namespace Sportland.Sports.Dodgeball
             if (ball.CurrentState != Ball.State.Thrown) return false;
             Vector2 land = ball.PredictGroundPoint();
             if (!tracker.AssignedZone.Contains(land)) return false;
+            CurrentDecision = "Anticipate";
             AnticipateCatch(land);
             return true;
         }
@@ -148,8 +161,8 @@ namespace Sportland.Sports.Dodgeball
             var passer = ball.RecentThrower;
             if (passer == null || passer.Spawn.team == tracker.Spawn.team) return false;
             EndThreat();
-            if (IsClosestInfielderToPassLine()) InterceptPass();
-            else Prepare(passer);
+            if (IsClosestInfielderToPassLine()) { CurrentDecision = "Intercept";   InterceptPass(); }
+            else                                { CurrentDecision = "Prep (pass)"; Prepare(passer); }
             return true;
         }
 
@@ -176,10 +189,10 @@ namespace Sportland.Sports.Dodgeball
 
             switch (reaction)
             {
-                case Reaction.Catch:    DoCatch(ballDir);            break;
-                case Reaction.Duck:     DoDuck(ballPos);             break;
-                case Reaction.Jump:     DoJump(ballPos, distToBall); break;
-                default:                DoSidestep(ballDir);         break;
+                case Reaction.Catch:    CurrentDecision = "Catch!"; DoCatch(ballDir);            break;
+                case Reaction.Duck:     CurrentDecision = "Duck";   DoDuck(ballPos);             break;
+                case Reaction.Jump:     CurrentDecision = "Jump";   DoJump(ballPos, distToBall); break;
+                default:                CurrentDecision = "Dodge";  DoSidestep(ballDir);         break;
             }
             return true;
         }
@@ -191,6 +204,7 @@ namespace Sportland.Sports.Dodgeball
             if (tracker.Spawn.role != PlayerRole.Infielder) return false;
             var carrier = ball.Carrier;
             if (carrier == null || carrier.Spawn.team == tracker.Spawn.team) return false;
+            CurrentDecision = "Prepare";
             Prepare(carrier);
             return true;
         }
@@ -203,6 +217,7 @@ namespace Sportland.Sports.Dodgeball
             if (!BallIsLoose()) return false;
             bool isInfielder = tracker.Spawn.role == PlayerRole.Infielder;
             if (isInfielder && !IsClosestTeammateToBall()) return false;
+            CurrentDecision = "Chase";
             ChaseLooseBall();
             return true;
         }

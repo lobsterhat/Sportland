@@ -32,7 +32,9 @@ namespace Sportland.Sports.Dodgeball
             var match = court.GetComponent<DodgeballMatch>();
             bool timed = match != null && match.IsTimed;
 
-            float h = 134f + (timed ? 44f : 0f) + (dropdownOpen ? presetNames.Length * 24f : 0f);
+            var labels = court.GetComponent<DodgeballPlayerLabels>();
+
+            float h = 134f + 24f + (timed ? 44f : 0f) + (dropdownOpen ? presetNames.Length * 24f : 0f);
             float x = Screen.width - panelWidth - 12f;
             GUILayout.BeginArea(new Rect(x, topOffset, panelWidth, h), GUI.skin.box);
 
@@ -48,6 +50,13 @@ namespace Sportland.Sports.Dodgeball
             bool prevAllAI = court.AllAIControlled;
             bool newAllAI = GUILayout.Toggle(prevAllAI, " All AI (no human input)");
             if (newAllAI != prevAllAI) court.SetAllAI(newAllAI);
+
+            if (labels != null)
+            {
+                bool prevDecisions = labels.ShowAIDecisions;
+                bool newDecisions = GUILayout.Toggle(prevDecisions, " Show AI decisions");
+                if (newDecisions != prevDecisions) labels.ShowAIDecisions = newDecisions;
+            }
 
             if (dropdownOpen)
             {
