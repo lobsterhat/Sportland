@@ -68,6 +68,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float diveRange = 3f;
         [Tooltip("Speed when ambling toward a loose ball, as a fraction of walk speed — there's no urgency, so it shouldn't sprint. 1 = full walk.")]
         [SerializeField, Range(0.2f, 1f)] private float looseChaseSpeed = 0.6f;
+        [Tooltip("Cross-retrieval distance cap (u). Don't chase a loose ball outside my own zone if it's farther than this — keeps the whole infield from sprinting after a deep-corner ball.")]
+        [SerializeField] private float crossRetrieveMaxDist = 8f;
 
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
@@ -209,16 +211,38 @@ namespace Sportland.Sports.Dodgeball
             return true;
         }
 
-        // Both roles: ball is loose in my retrieval zone. Infielders gate on
-        // "closest teammate" so only the nearest one commits; outfielders chase
-        // unconditionally when the ball is in their strip.
+        // Loose ball retrieval. Two sub-cases, top-to-bottom:
+        //  1. Ball in my own zone (infielder's half, outfielder's strip) → chase
+        //     as before. Infielders gate on "closest teammate infielder";
+        //     outfielders chase unconditionally inside their strip.
+        //  2. Ball outside my zone → cross-retrieve. Conservative + capped:
+        //     only commit if I'm the closest teammate (any role), no opposing
+        //     player is closer, and the ball is within crossRetrieveMaxDist.
+        //     The "Cross" decision label flags this in the debug overlay.
         private bool TryChaseLooseBall()
         {
-            if (!BallIsLoose()) return false;
+            if (!BallSettled()) return false;
+
+            Vector2 ballPos = ball.transform.position;
+            bool ballInOwnZone = tracker.AssignedZone.Contains(ballPos);
             bool isInfielder = tracker.Spawn.role == PlayerRole.Infielder;
-            if (isInfielder && !IsClosestTeammateToBall()) return false;
-            CurrentDecision = "Chase";
-            ChaseLooseBall();
+
+            if (ballInOwnZone)
+            {
+                if (isInfielder && !IsClosestTeammateToBall()) return false;
+                CurrentDecision = "Chase";
+                ChaseLooseBall();
+                return true;
+            }
+
+            // Cross-retrieval gate.
+            float distToBall = Vector2.Distance(transform.position, ballPos);
+            if (distToBall > crossRetrieveMaxDist) return false;
+            if (!IsClosestTeammateAnyRoleToBall()) return false;
+            if (AnyOpposingPlayerCloserToBall()) return false;
+
+            CurrentDecision = "Cross";
+            ChaseLooseBall(clamp: false);
             return true;
         }
 
@@ -460,7 +484,44 @@ namespace Sportland.Sports.Dodgeball
             return true;
         }
 
-        private void ChaseLooseBall()
+        // Like IsClosestTeammateToBall but counts ALL teammates (any role).
+        // Used by cross-retrieval, where outfielders may also commit so an
+        // infielder shouldn't bother if a teammate outfielder is already closer.
+        private bool IsClosestTeammateAnyRoleToBall()
+        {
+            Vector2 ballPos = ball.transform.position;
+            float myDistSq = ((Vector2)transform.position - ballPos).sqrMagnitude;
+            var team = tracker.Spawn.team;
+            var trackers = PlayerZoneTracker.All;
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null || t == tracker || t.Spawn.team != team) continue;
+                if (((Vector2)t.transform.position - ballPos).sqrMagnitude < myDistSq) return false;
+            }
+            return true;
+        }
+
+        // True if any opposing-team player is closer to the ball than I am.
+        // Used by cross-retrieval to back off when we'd lose the race anyway.
+        private bool AnyOpposingPlayerCloserToBall()
+        {
+            Vector2 ballPos = ball.transform.position;
+            float myDistSq = ((Vector2)transform.position - ballPos).sqrMagnitude;
+            var team = tracker.Spawn.team;
+            var trackers = PlayerZoneTracker.All;
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null || t.Spawn.team == team) continue;
+                if (((Vector2)t.transform.position - ballPos).sqrMagnitude < myDistSq) return true;
+            }
+            return false;
+        }
+
+        // clamp=true for in-zone chases (keeps the AI legal); clamp=false for
+        // cross-retrieval, which is explicitly allowed across the zone line.
+        private void ChaseLooseBall(bool clamp = true)
         {
             movement.IsRunning = false;   // amble after a loose ball — no need to sprint
             movement.SetStance(false);
@@ -483,7 +544,7 @@ namespace Sportland.Sports.Dodgeball
                 }
             }
 
-            MoveToward(ClampToZone(ballPos), looseChaseSpeed);
+            MoveToward(clamp ? ClampToZone(ballPos) : ballPos, looseChaseSpeed);
         }
 
         // Read the throw's predicted landing and get under it (clamped to our
