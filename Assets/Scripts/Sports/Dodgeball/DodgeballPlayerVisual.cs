@@ -36,6 +36,14 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float facingArrowSize = 0.28f;
         [SerializeField] private int facingArrowSortingOrder = 27;
 
+        [Header("Sprite facing flip")]
+        [Tooltip("Mirror the SpriteRenderer horizontally based on Facing.x so the player looks the way they're facing. Only affects sprite visuals (not the procedural fallback).")]
+        [SerializeField] private bool flipSpriteByFacing = true;
+        [Tooltip("True if the sprite art is drawn facing right by default (+X). False if the source sprite faces left — flips the polarity of the mirror.")]
+        [SerializeField] private bool spriteFacesRightAtDefault = true;
+        [Tooltip("Deadband on Facing.x. While |Facing.x| is below this, the sprite keeps its current flip so straight up/down looking doesn't jitter.")]
+        [SerializeField] private float flipDeadband = 0.1f;
+
         [Header("Controlled-player ring")]
         [SerializeField] private Color ringColor = new Color(1f, 0.9f, 0.15f, 0.95f);
         [Tooltip("Ground-ring half-extents (x wide, y flat) so it reads as lying on the floor.")]
@@ -81,6 +89,7 @@ namespace Sportland.Sports.Dodgeball
             UpdateControlIndicators();
             UpdateMovementArrow();
             UpdateFacingArrow();
+            UpdateSpriteFacing();
 
             if (tracker == null) return;
             Color target = tracker.IsInZone ? baseColor : outOfZoneTint;
@@ -242,6 +251,24 @@ namespace Sportland.Sports.Dodgeball
             float ang = Mathf.Atan2(f.y, f.x) * Mathf.Rad2Deg;
             facingArrowTransform.localPosition = new Vector3(f.x * facingArrowDistance, f.y * facingArrowDistance, 0f);
             facingArrowTransform.localRotation = Quaternion.Euler(0f, 0f, ang);
+        }
+
+        // Mirror the sprite horizontally to match the player's Facing direction.
+        // Sprite-only (the procedural fallback is symmetric, so flipping it does
+        // nothing useful). A small deadband around Facing.x = 0 keeps the sprite
+        // from flickering when the player is looking straight up or down.
+        private void UpdateSpriteFacing()
+        {
+            if (!flipSpriteByFacing || spriteRenderer == null) return;
+            if (movement == null) movement = GetComponentInParent<PlayerMovement>();
+            if (movement == null) return;
+
+            float fx = movement.Facing.x;
+            if (Mathf.Abs(fx) < flipDeadband) return;   // straight up/down — keep current flip
+
+            bool wantFacingLeft = fx < 0f;
+            bool flip = spriteFacesRightAtDefault ? wantFacingLeft : !wantFacingLeft;
+            if (spriteRenderer.flipX != flip) spriteRenderer.flipX = flip;
         }
 
         // A flat yellow ring at the player's feet marking the human-controlled
