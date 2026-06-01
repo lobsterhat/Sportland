@@ -34,7 +34,7 @@ namespace Sportland.Sports.Dodgeball
 
             var labels = court.GetComponent<DodgeballPlayerLabels>();
 
-            float h = 134f + 24f + (timed ? 44f : 0f) + (dropdownOpen ? presetNames.Length * 24f : 0f);
+            float h = 134f + 48f + (timed ? 44f : 0f) + (dropdownOpen ? presetNames.Length * 24f : 0f);
             float x = Screen.width - panelWidth - 12f;
             GUILayout.BeginArea(new Rect(x, topOffset, panelWidth, h), GUI.skin.box);
 
@@ -56,6 +56,13 @@ namespace Sportland.Sports.Dodgeball
                 bool prevDecisions = labels.ShowAIDecisions;
                 bool newDecisions = GUILayout.Toggle(prevDecisions, " Show AI decisions");
                 if (newDecisions != prevDecisions) labels.ShowAIDecisions = newDecisions;
+            }
+
+            if (match != null)
+            {
+                bool prevFace = match.PlayersFaceBallWhenEmpty;
+                bool newFace = GUILayout.Toggle(prevFace, " Face ball (when empty-handed)");
+                if (newFace != prevFace) match.PlayersFaceBallWhenEmpty = newFace;
             }
 
             if (dropdownOpen)

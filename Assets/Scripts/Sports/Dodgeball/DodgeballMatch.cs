@@ -16,6 +16,12 @@ namespace Sportland.Sports.Dodgeball
     {
         [SerializeField] private GameMode mode;
 
+        [Tooltip("Debug toggle: when enabled, every non-carrier auto-faces the ball each frame. Overrides whatever the AI or input chose for facing. Useful for visual clarity / debugging.")]
+        [SerializeField] private bool playersFaceBallWhenEmpty;
+
+        /// <summary>Live toggle: when true, non-carriers auto-face the ball every frame (via LateUpdate override).</summary>
+        public bool PlayersFaceBallWhenEmpty { get => playersFaceBallWhenEmpty; set => playersFaceBallWhenEmpty = value; }
+
         private Ball ball;
         private bool subscribed;
 
@@ -88,6 +94,25 @@ namespace Sportland.Sports.Dodgeball
 
             timeRemaining -= Time.deltaTime;
             if (timeRemaining <= 0f) { timeRemaining = 0f; EndMatch(); }
+        }
+
+        // Optional debug override: each frame after gameplay-side Updates,
+        // re-point every non-carrier's facing at the ball. Runs in LateUpdate
+        // so it wins regardless of script execution order. Whoever's holding
+        // the ball is left alone (their facing belongs to their offense logic
+        // / aim input).
+        private void LateUpdate()
+        {
+            if (!playersFaceBallWhenEmpty || ball == null) return;
+            Vector2 ballPos = ball.transform.position;
+            var all = PlayerZoneTracker.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var t = all[i];
+                if (t == null || t.HasBall) continue;
+                var mv = t.GetComponent<PlayerMovement>();
+                if (mv != null) mv.SetFacing(ballPos - (Vector2)t.transform.position);
+            }
         }
 
         // The ball may not exist at Awake; subscribe once it's found.
