@@ -997,13 +997,15 @@ namespace Sportland.Sports.Dodgeball
         }
 
         /// <summary>
-        /// The carrier loses the ball where they stand — it falls straight to a
-        /// loose ball (no throw). Used when a player is caught grounded outside
-        /// their area still holding it. recentThrower is cleared (a dropped ball
-        /// is no one's throw), so anyone may retrieve it — though the dropper
-        /// can't until they're back in their area (CanCatchBall).
+        /// The carrier loses the ball. recentThrower is cleared so a pickup
+        /// off it isn't scored as a catch (groundedSinceRelease=true). The
+        /// optional initialVelocity transfers the carrier's momentum to the
+        /// ball — used by the opp-infield rule so the release looks like a
+        /// release (ball slides away with the player's motion) rather than
+        /// freezing in place. Default (zero) preserves the old "drops where
+        /// they stand" behavior for voluntary ineligible-release drops.
         /// </summary>
-        public void Drop()
+        public void Drop(Vector2 initialVelocity = default)
         {
             if (carrier == null) return;
             carrier.HeldBall = null;
@@ -1011,7 +1013,7 @@ namespace Sportland.Sports.Dodgeball
             carrierMovement = null;
             recentThrower = null;
             throwerCooldownRemaining = 0f;
-            rb.linearVelocity = Vector2.zero;
+            rb.linearVelocity = initialVelocity;
             heightVelocity = 0f;
             groundedSinceRelease = true;   // dead ball — a pickup off it isn't a catch
             EnterLoose();                  // wakes physics; falls to the floor and rolls
