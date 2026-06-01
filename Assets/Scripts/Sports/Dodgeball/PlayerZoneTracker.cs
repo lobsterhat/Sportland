@@ -46,8 +46,10 @@ namespace Sportland.Sports.Dodgeball
         public Team OpposingTeam => Spawn.team == Team.A ? Team.B : Team.A;
         /// <summary>The opposing team's infield zone (front-court half) — the area an outfielder may not enter while carrying.</summary>
         public PlayZone OpposingInfield => ZoneFactory.InfieldFor(OpposingTeam);
-        /// <summary>True when this player is physically inside the opposing team's infield (does not gate on grounded — check movement.IsGrounded for the rules-relevant version).</summary>
+        /// <summary>True when this player is physically inside the opposing team's infield (does not gate on grounded — check IsGrounded for the rules-relevant version).</summary>
         public bool IsInOpposingInfield => OpposingInfield.Contains(transform.position);
+        /// <summary>True when the player's feet are on the ground (not airborne, not diving). Convenience pass-through to PlayerMovement.</summary>
+        public bool IsGrounded => movement != null && movement.IsGrounded;
 
         // Time of the most recent Catch press (press-window reaction). The Ball
         // reads this to decide whether a catch attempt is "armed" and to score

@@ -226,6 +226,9 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>True if the most recent release was a throw (offensive) rather than a pass to a teammate. Lets a catch put the thrower out only for actual throws.</summary>
         public bool LastReleaseWasThrow { get; private set; }
 
+        /// <summary>True if the most recent release was a throw from an outfielder who was inside the opposing infield at the moment of release. The hit handler nullifies all effects (no points, no elimination, no damage, no sideline) of a "throw from inside" — passes from inside are unaffected since they don't score on contact anyway.</summary>
+        public bool LastReleaseFromOpposingInfield { get; private set; }
+
         /// <summary>The thrower's intended target at release (set by the controller), for the play-by-play log. May be null (e.g. an untargeted throw).</summary>
         public PlayerZoneTracker IntendedTarget { get; set; }
 
@@ -1024,6 +1027,7 @@ namespace Sportland.Sports.Dodgeball
             heightVelocity = 0f;
             groundedSinceRelease = true;
             LastReleaseWasThrow = false;
+            LastReleaseFromOpposingInfield = false;
             EnterLoose();
             rb.linearVelocity = Vector2.zero;
         }
@@ -1052,6 +1056,9 @@ namespace Sportland.Sports.Dodgeball
 
             recentThrower = carrier;
             throwerCooldownRemaining = throwerPickupCooldown;
+            // Phase D: neutered if an outfielder released from inside the opposing infield.
+            LastReleaseFromOpposingInfield = recentThrower.Spawn.role == PlayerRole.Outfielder
+                                          && recentThrower.IsInOpposingInfield;
             carrier.HeldBall = null;
             carrier = null;
             carrierMovement = null;
@@ -1193,6 +1200,10 @@ namespace Sportland.Sports.Dodgeball
 
             recentThrower = virtualThrower;
             throwerCooldownRemaining = throwerPickupCooldown;
+            // Phase D: neutered if an outfielder released from inside the opposing infield.
+            LastReleaseFromOpposingInfield = recentThrower != null
+                                          && recentThrower.Spawn.role == PlayerRole.Outfielder
+                                          && recentThrower.IsInOpposingInfield;
             rb.simulated = true;
             rb.linearVelocity = dir * power;
             heightVelocity = vy;
@@ -1255,6 +1266,7 @@ namespace Sportland.Sports.Dodgeball
             LastDeflector = null;
             LastTargetDodge = DodgeKind.None;
             LastReleaseWasThrow = false;
+            LastReleaseFromOpposingInfield = false;   // passes never carry the neuter flag
             state = State.Passing;
 
             rb.simulated = false;

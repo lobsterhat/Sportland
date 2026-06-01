@@ -108,36 +108,51 @@ namespace Sportland.Sports.Dodgeball
         }
 
         // A landed hit: score for the throwing team, then apply the victim
-        // outcome. Eliminations only affect infielders — the backrow is immune.
+        // outcome. Outfielders are normally immune to elimination/damage; that
+        // immunity drops while they're grounded inside the opposing infield
+        // (Phase C — the risk of venturing in for a loose ball). A throw whose
+        // release came from inside the opposing infield is wholly neutered
+        // (Phase D): no points, no elimination, no damage, no sideline — just
+        // a play-by-play entry.
         private void OnBallHit(PlayerZoneTracker victim, Ball.HitZone zone, float ballSpeed)
         {
             if (matchOver || victim == null) return;
             var attacker = ball != null ? ball.RecentThrower : null;
             if (attacker == null || attacker.Spawn.team == victim.Spawn.team) return;  // need an opponent's hit
 
-            if (mode.pointsPerHit != 0)
-            {
-                AddScore(attacker.Spawn.team, mode.pointsPerHit);
-                RecordScore(attacker.Spawn.team, mode.pointsPerHit);
-            }
+            bool neutered = ball != null && ball.LastReleaseFromOpposingInfield;
 
-            if (victim.Spawn.role == PlayerRole.Infielder)   // backrow can't be eliminated
+            if (!neutered)
             {
-                switch (mode.victimOutcome)
+                if (mode.pointsPerHit != 0)
                 {
-                    case VictimOutcome.CountToOut:   // Mode 2
-                        hitCounts.TryGetValue(victim, out int n);
-                        hitCounts[victim] = ++n;
-                        if (n >= mode.hitsToOut) TakeOut(victim, permanent: true);
-                        break;
-                    case VictimOutcome.DamageEnergy: // Mode 3
-                        if (ApplyDamage(victim, ballSpeed) <= 0f) TakeOut(victim, permanent: true);
-                        break;
-                    case VictimOutcome.Sideline:     // Mode 4
-                        TakeOut(victim, permanent: false);
-                        break;
-                    case VictimOutcome.None:         // Mode 1 — hits only score.
-                        break;
+                    AddScore(attacker.Spawn.team, mode.pointsPerHit);
+                    RecordScore(attacker.Spawn.team, mode.pointsPerHit);
+                }
+
+                bool outfielderInOppInfield = victim.Spawn.role == PlayerRole.Outfielder
+                                           && victim.IsInOpposingInfield
+                                           && victim.IsGrounded;
+                bool vulnerable = victim.Spawn.role == PlayerRole.Infielder || outfielderInOppInfield;
+
+                if (vulnerable)
+                {
+                    switch (mode.victimOutcome)
+                    {
+                        case VictimOutcome.CountToOut:   // Mode 2
+                            hitCounts.TryGetValue(victim, out int n);
+                            hitCounts[victim] = ++n;
+                            if (n >= mode.hitsToOut) TakeOut(victim, permanent: true);
+                            break;
+                        case VictimOutcome.DamageEnergy: // Mode 3
+                            if (ApplyDamage(victim, ballSpeed) <= 0f) TakeOut(victim, permanent: true);
+                            break;
+                        case VictimOutcome.Sideline:     // Mode 4
+                            TakeOut(victim, permanent: false);
+                            break;
+                        case VictimOutcome.None:         // Mode 1 — hits only score.
+                            break;
+                    }
                 }
             }
 
