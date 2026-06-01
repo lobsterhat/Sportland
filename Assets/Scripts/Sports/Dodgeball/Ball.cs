@@ -592,6 +592,12 @@ namespace Sportland.Sports.Dodgeball
                 // crossing into the opponent's area to grab it and carry it back.
                 // (Catching a LIVE throw out of zone is still illegal — gated by
                 // CanCatchBall in the live paths below — except a diving catch.)
+                //
+                // Exception: a player who was just forced to drop the ball by the
+                // opp-infield rules is locked out of pickup until they leave or
+                // jump — otherwise they'd re-grab the ball at their feet and
+                // loop drop/re-pickup once per frame.
+                if (t.PickupLockedInOppInfield) return false;
                 if (Height <= PickupHeightFor(t)) { Attach(t); return true; }
                 return false;
             }

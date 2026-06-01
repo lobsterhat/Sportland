@@ -75,15 +75,23 @@ namespace Sportland.Sports.Dodgeball
         // out of zone. Reset when the player gets back in zone.
         private bool returnExpiryFired;
 
-        // Opposing-infield state (Phase B rules — only meaningful for outfielders):
+        // Opposing-infield state (Phase B rules — applies to both roles):
         //   wasInOppInfieldGrounded — true if the player was grounded inside
         //     the opposing infield last tick. Used to detect grounded-entry
         //     transitions; airborne fly-overs (jump/dive) don't trigger.
         //   opposingInfieldEnteredAt — timestamp of the most recent grounded
-        //     entry. After 2 s, if the outfielder is still grounded inside
-        //     the opposing infield with the ball, the carrier turnover fires.
+        //     entry. After 2 s, if the carrier is still grounded inside the
+        //     opposing infield with the ball, the drop fires.
+        //   pickupLockedInOppInfield — true after the rules forced a drop
+        //     this visit. Prevents the dropper from immediately re-grabbing
+        //     the same loose ball at their feet and looping. Cleared when
+        //     they leave opp infield or get airborne (the jump-escape).
         private bool wasInOppInfieldGrounded;
         private float opposingInfieldEnteredAt = -1f;
+        private bool pickupLockedInOppInfield;
+
+        /// <summary>True if a recent opp-infield drop has locked this player out of loose-ball pickup until they leave / jump. Read by Ball.TryTakeBall to break the drop/re-grab loop.</summary>
+        public bool PickupLockedInOppInfield => pickupLockedInOppInfield;
 
         // Timestamps of recent crossings (entering out-of-zone state).
         // Pruned to the rolling window each frame.
@@ -213,43 +221,67 @@ namespace Sportland.Sports.Dodgeball
         // The clock runs from when you left your area, so re-grabbing a dropped
         // ball out there buys no extra time (no stalling).
         //
-        // Outfielders standing in the opposing infield are handled by
-        // EnforceOpposingInfieldRules instead — that path fires a turnover
-        // (no -1) on entry-with-ball or 2 s expiry-with-ball, so we skip the
-        // general -1 path here to avoid double-firing.
+        // Players standing in the opposing infield are handled by
+        // EnforceOpposingInfieldRules instead — that path fires an immediate
+        // drop on entry-with-ball (turnover for outfielders, -1 for infielders)
+        // and a drop at 2 s expiry-with-ball, so we skip the general -1 path
+        // here to avoid double-firing.
         private void EnforceCarrierInZone()
         {
-            if (Spawn.role == PlayerRole.Outfielder && IsInOpposingInfield) return;
+            if (IsInOpposingInfield) return;
 
             if (HasBall && !IsInZone && movement.IsGrounded
                 && outOfZoneSince >= 0f && Time.time - outOfZoneSince >= ReturnGraceSeconds)
                 DropHeldBall();
         }
 
-        // Outfielder-only. Grounded entry into the opposing infield while
-        // carrying the ball is an immediate turnover. Empty-handed entry starts
-        // a 2 s presence window; if they're still grounded in there with the
-        // ball when it expires, that's also a turnover. Airborne fly-overs
-        // (jump / dive) don't trigger — the rule only watches grounded state.
-        // No -1 penalty for either path — that's the difference vs the general
-        // out-of-zone rule.
+        // Grounded entry into the opposing infield while carrying the ball
+        // forces an immediate drop. Outfielder → turnover (no -1, they're
+        // allowed to go in but can't carry through). Infielder → -1 + drop
+        // (offensive play from the opposing side, the harsher penalty).
+        // Empty-handed entry starts a 2 s presence window; if the player ends
+        // up grounded in there with the ball when it expires, the same drop
+        // fires (with the same asymmetric penalty).
+        //
+        // After any drop the player is locked out of loose-ball pickup until
+        // they leave opp infield or get airborne — otherwise they'd just
+        // re-grab the ball at their feet and loop.
+        //
+        // Airborne fly-overs (jump / dive) don't trigger the rules — they
+        // also clear the pickup lockout, so a jump is a valid escape route.
         private void EnforceOpposingInfieldRules()
         {
-            if (Spawn.role != PlayerRole.Outfielder) return;
-            if (movement == null || !movement.IsGrounded) return;
+            if (movement == null) return;
 
             bool nowInOpp = IsInOpposingInfield;
+            bool grounded = movement.IsGrounded;
 
-            if (nowInOpp && !wasInOppInfieldGrounded)
+            // Airborne, or out of opp infield → release the pickup lockout
+            // (jump-escape, or returned to legal territory).
+            if (!grounded || !nowInOpp) pickupLockedInOppInfield = false;
+
+            if (!grounded) return;   // rules only watch grounded position
+
+            bool justEntered = nowInOpp && !wasInOppInfieldGrounded;
+            bool isOutfielder = Spawn.role == PlayerRole.Outfielder;
+
+            if (justEntered)
             {
                 opposingInfieldEnteredAt = Time.time;
-                if (HasBall) DropAsTurnover();
+                if (HasBall)
+                {
+                    if (isOutfielder) DropAsTurnover();
+                    else              DropHeldBall();
+                    pickupLockedInOppInfield = true;
+                }
             }
             else if (nowInOpp && HasBall
                      && opposingInfieldEnteredAt >= 0f
                      && Time.time - opposingInfieldEnteredAt >= ReturnGraceSeconds)
             {
-                DropAsTurnover();
+                if (isOutfielder) DropAsTurnover();
+                else              DropHeldBall();
+                pickupLockedInOppInfield = true;
             }
 
             wasInOppInfieldGrounded = nowInOpp;
