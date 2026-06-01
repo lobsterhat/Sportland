@@ -42,6 +42,13 @@ namespace Sportland.Sports.Dodgeball
         public bool HasBall => HeldBall != null;
         public bool HasActiveWarning { get; private set; }
 
+        /// <summary>The other team. Convenience for the opposing-infield rules.</summary>
+        public Team OpposingTeam => Spawn.team == Team.A ? Team.B : Team.A;
+        /// <summary>The opposing team's infield zone (front-court half) — the area an outfielder may not enter while carrying.</summary>
+        public PlayZone OpposingInfield => ZoneFactory.InfieldFor(OpposingTeam);
+        /// <summary>True when this player is physically inside the opposing team's infield (does not gate on grounded — check movement.IsGrounded for the rules-relevant version).</summary>
+        public bool IsInOpposingInfield => OpposingInfield.Contains(transform.position);
+
         // Time of the most recent Catch press (press-window reaction). The Ball
         // reads this to decide whether a catch attempt is "armed" and to score
         // the timing of the press relative to the ball's arrival.
@@ -66,6 +73,16 @@ namespace Sportland.Sports.Dodgeball
         // out of zone. Reset when the player gets back in zone.
         private bool returnExpiryFired;
 
+        // Opposing-infield state (Phase B rules — only meaningful for outfielders):
+        //   wasInOppInfieldGrounded — true if the player was grounded inside
+        //     the opposing infield last tick. Used to detect grounded-entry
+        //     transitions; airborne fly-overs (jump/dive) don't trigger.
+        //   opposingInfieldEnteredAt — timestamp of the most recent grounded
+        //     entry. After 2 s, if the outfielder is still grounded inside
+        //     the opposing infield with the ball, the carrier turnover fires.
+        private bool wasInOppInfieldGrounded;
+        private float opposingInfieldEnteredAt = -1f;
+
         // Timestamps of recent crossings (entering out-of-zone state).
         // Pruned to the rolling window each frame.
         private readonly Queue<float> crossingTimestamps = new Queue<float>();
@@ -84,6 +101,9 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Static signal: a carrier was forced to drop the ball (return window expired). The match subscribes to apply the -1 point penalty.</summary>
         public static event System.Action<PlayerZoneTracker> OnAnyForcedDrop;
 
+        /// <summary>Static signal: an outfielder + ball + opposing infield triggered a turnover (the ball drops loose with no point penalty). The match subscribes for play-by-play logging.</summary>
+        public static event System.Action<PlayerZoneTracker> OnAnyTurnover;
+
         private void Awake()
         {
             movement = GetComponent<PlayerMovement>();
@@ -99,6 +119,8 @@ namespace Sportland.Sports.Dodgeball
             IsInZone = AssignedZone.Contains(transform.position);
             outOfZoneSince = IsInZone ? -1f : Time.time;
             returnExpiryFired = false;
+            wasInOppInfieldGrounded = IsInOpposingInfield && movement != null && movement.IsGrounded;
+            opposingInfieldEnteredAt = wasInOppInfieldGrounded ? Time.time : -1f;
         }
 
         private void Update()
@@ -106,7 +128,8 @@ namespace Sportland.Sports.Dodgeball
             UpdateZoneState();
             PruneOldCrossings();
             CheckReturnTimer();
-            EnforceCarrierInZone();
+            EnforceOpposingInfieldRules();   // outfielder-in-opposing-infield turnover takes precedence
+            EnforceCarrierInZone();          // general carrier-out-of-zone -1 path
         }
 
         private void UpdateZoneState()
@@ -187,11 +210,47 @@ namespace Sportland.Sports.Dodgeball
         // but only once grounded, so the jump/dive exception holds until you land.
         // The clock runs from when you left your area, so re-grabbing a dropped
         // ball out there buys no extra time (no stalling).
+        //
+        // Outfielders standing in the opposing infield are handled by
+        // EnforceOpposingInfieldRules instead — that path fires a turnover
+        // (no -1) on entry-with-ball or 2 s expiry-with-ball, so we skip the
+        // general -1 path here to avoid double-firing.
         private void EnforceCarrierInZone()
         {
+            if (Spawn.role == PlayerRole.Outfielder && IsInOpposingInfield) return;
+
             if (HasBall && !IsInZone && movement.IsGrounded
                 && outOfZoneSince >= 0f && Time.time - outOfZoneSince >= ReturnGraceSeconds)
                 DropHeldBall();
+        }
+
+        // Outfielder-only. Grounded entry into the opposing infield while
+        // carrying the ball is an immediate turnover. Empty-handed entry starts
+        // a 2 s presence window; if they're still grounded in there with the
+        // ball when it expires, that's also a turnover. Airborne fly-overs
+        // (jump / dive) don't trigger — the rule only watches grounded state.
+        // No -1 penalty for either path — that's the difference vs the general
+        // out-of-zone rule.
+        private void EnforceOpposingInfieldRules()
+        {
+            if (Spawn.role != PlayerRole.Outfielder) return;
+            if (movement == null || !movement.IsGrounded) return;
+
+            bool nowInOpp = IsInOpposingInfield;
+
+            if (nowInOpp && !wasInOppInfieldGrounded)
+            {
+                opposingInfieldEnteredAt = Time.time;
+                if (HasBall) DropAsTurnover();
+            }
+            else if (nowInOpp && HasBall
+                     && opposingInfieldEnteredAt >= 0f
+                     && Time.time - opposingInfieldEnteredAt >= ReturnGraceSeconds)
+            {
+                DropAsTurnover();
+            }
+
+            wasInOppInfieldGrounded = nowInOpp;
         }
 
         private void DropHeldBall()
@@ -200,6 +259,17 @@ namespace Sportland.Sports.Dodgeball
             OnTurnoverFromOutOfZoneWithBall?.Invoke(this);   // hook for HUD / audio
             OnAnyForcedDrop?.Invoke(this);                   // penalty signal (the match deducts -1)
             Debug.Log($"[Dodgeball] {Spawn.id} didn't return the ball to their area in time — dropped it (-1 penalty).");
+            if (ball != null) ball.Drop();
+        }
+
+        // The opposing-infield drop path: ball becomes loose with NO point
+        // penalty — possession swing only. Distinct event from OnAnyForcedDrop
+        // so the match scorer can log it without applying -1.
+        private void DropAsTurnover()
+        {
+            var ball = HeldBall;
+            OnAnyTurnover?.Invoke(this);
+            Debug.Log($"[Dodgeball] {Spawn.id} turnover — outfielder caught with the ball in the opposing infield.");
             if (ball != null) ball.Drop();
         }
 

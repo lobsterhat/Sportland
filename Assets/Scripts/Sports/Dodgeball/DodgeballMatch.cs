@@ -78,6 +78,7 @@ namespace Sportland.Sports.Dodgeball
                 ball.OnViolationTouch -= OnBallViolationTouch;
             }
             PlayerZoneTracker.OnAnyForcedDrop -= OnPlayerForcedDrop;
+            PlayerZoneTracker.OnAnyTurnover   -= OnPlayerTurnover;
         }
 
         private void Update()
@@ -102,6 +103,7 @@ namespace Sportland.Sports.Dodgeball
             ball.OnAttached += OnBallAttached;
             ball.OnViolationTouch += OnBallViolationTouch;
             PlayerZoneTracker.OnAnyForcedDrop += OnPlayerForcedDrop;
+            PlayerZoneTracker.OnAnyTurnover   += OnPlayerTurnover;
             subscribed = true;
         }
 
@@ -281,6 +283,15 @@ namespace Sportland.Sports.Dodgeball
             if (matchOver || player == null) return;
             AddScore(player.Spawn.team, -1);
             DodgeballPlayByPlay.Log($"{Label(player)} didn't return in time, dropped ball - -1 {TeamLetter(player.Spawn.team)} team");
+        }
+
+        // An outfielder + ball + opposing infield triggered the turnover rule
+        // (entry-with-ball, or 2 s expiry with the ball). Ball is now loose; no
+        // points change hands. Just record the play.
+        private void OnPlayerTurnover(PlayerZoneTracker player)
+        {
+            if (matchOver || player == null) return;
+            DodgeballPlayByPlay.Log($"{Label(player)} crossed opposing infield with the ball - turnover");
         }
 
         private void RecordScore(Team team, int points)
