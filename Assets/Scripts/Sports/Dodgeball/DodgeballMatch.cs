@@ -30,7 +30,11 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Point penalty applied to the offending team when either clock expires.")]
         [SerializeField] private int clockExpiryPenalty = 1;
 
-        // Live shot clock state: which carrier is on the clock, and when it fires.
+        // Live shot clock state — keyed off the OFFENSIVE TEAM, not a single
+        // carrier. Continues through teammate passes / pickups; the carrier
+        // reference is just a UI hint for which jersey to render the countdown
+        // under (null when the ball's in flight or loose with no holder).
+        private Team? shotClockTeam;
         private PlayerZoneTracker shotClockCarrier;
         private float shotClockExpiresAt = -1f;
         // Live delay-of-game state: when the loose-ball alarm fires (-1 = not running).
@@ -40,14 +44,16 @@ namespace Sportland.Sports.Dodgeball
         public float ShotClockSeconds { get => shotClockSeconds; set => shotClockSeconds = Mathf.Max(1f, value); }
         /// <summary>Tunable delay-of-game period (s).</summary>
         public float DelayClockSeconds { get => delayClockSeconds; set => delayClockSeconds = Mathf.Max(1f, value); }
-        /// <summary>The carrier currently on the shot clock (null when no clock is running).</summary>
+        /// <summary>The offensive team currently on the shot clock (null when no clock).</summary>
+        public Team? ShotClockTeam => shotClockTeam;
+        /// <summary>The carrier currently visible on the clocked team (null mid-flight / when ball is loose).</summary>
         public PlayerZoneTracker ShotClockCarrier => shotClockCarrier;
         /// <summary>Seconds remaining on the shot clock; 0 when not running.</summary>
         public float ShotClockRemaining => shotClockExpiresAt < 0f ? 0f : Mathf.Max(0f, shotClockExpiresAt - Time.time);
         /// <summary>Seconds remaining on the delay-of-game clock; 0 when not running.</summary>
         public float DelayClockRemaining => delayClockExpiresAt < 0f ? 0f : Mathf.Max(0f, delayClockExpiresAt - Time.time);
-        /// <summary>True if a carrier shot clock is currently running.</summary>
-        public bool ShotClockRunning => shotClockExpiresAt >= 0f && shotClockCarrier != null;
+        /// <summary>True if any team's shot clock is currently running.</summary>
+        public bool ShotClockRunning => shotClockTeam.HasValue && shotClockExpiresAt >= 0f;
         /// <summary>True if the loose-ball delay clock is currently running.</summary>
         public bool DelayClockRunning => delayClockExpiresAt >= 0f && ball != null && ball.CurrentState == Ball.State.Loose;
 
@@ -143,15 +149,28 @@ namespace Sportland.Sports.Dodgeball
                 FireDelayClockExpiry();
         }
 
+        // Begin a fresh shot clock for a team. Called when possession swings
+        // from no-clock / from the other team to this carrier's team. Same-
+        // team possession continuation goes through UpdateShotClockCarrier
+        // instead (no reset).
         private void StartShotClock(PlayerZoneTracker carrier)
         {
             if (carrier == null) { StopShotClock(); return; }
+            shotClockTeam = carrier.Spawn.team;
             shotClockCarrier = carrier;
             shotClockExpiresAt = Time.time + shotClockSeconds;
         }
 
+        // Same-team possession continuation: keep the clock ticking, just
+        // update which jersey the countdown shows under.
+        private void UpdateShotClockCarrier(PlayerZoneTracker carrier)
+        {
+            shotClockCarrier = carrier;
+        }
+
         private void StopShotClock()
         {
+            shotClockTeam = null;
             shotClockCarrier = null;
             shotClockExpiresAt = -1f;
         }
@@ -166,18 +185,21 @@ namespace Sportland.Sports.Dodgeball
             delayClockExpiresAt = -1f;
         }
 
-        // Shot clock expired: the carrier held the ball too long. Forced drop
-        // + point penalty to their team. If they already lost the ball some
-        // other way before the clock fired (caught, opp-infield turnover, etc.)
-        // we no-op — the clock should have been stopped by the relevant event.
+        // Shot clock expired: the offensive team stalled. Apply the penalty
+        // to the team; if a current carrier exists (clock fired while they
+        // were holding it) force-drop the ball. If the clock fired mid-flight
+        // or while loose (no current carrier), the penalty still lands but
+        // there's no ball to drop.
         private void FireShotClockExpiry()
         {
+            var team = shotClockTeam;
             var carrier = shotClockCarrier;
             StopShotClock();
-            if (carrier == null || carrier.HeldBall == null) return;
-            AddScore(carrier.Spawn.team, -clockExpiryPenalty);
-            DodgeballPlayByPlay.Log($"{Label(carrier)} held the ball too long - -{clockExpiryPenalty} {TeamLetter(carrier.Spawn.team)} team");
-            carrier.HeldBall.Drop();   // → OnBecameLoose → starts the delay clock
+            if (!team.HasValue) return;
+            AddScore(team.Value, -clockExpiryPenalty);
+            string who = carrier != null ? Label(carrier) : $"team {TeamLetter(team.Value)}";
+            DodgeballPlayByPlay.Log($"{who} shot clock expired - -{clockExpiryPenalty} {TeamLetter(team.Value)} team");
+            if (carrier != null && carrier.HeldBall != null) carrier.HeldBall.Drop();
         }
 
         // Delay-of-game expired: the ball sat loose too long. Penalize the team
@@ -255,6 +277,17 @@ namespace Sportland.Sports.Dodgeball
                 {
                     AddScore(attacker.Spawn.team, mode.pointsPerHit);
                     RecordScore(attacker.Spawn.team, mode.pointsPerHit);
+                }
+
+                // Shot clock: a hit landing on an opposing player who is
+                // physically inside their own infield counts as a "successful
+                // attack" → stop the offensive team's clock. (Hits on a victim
+                // who's wandered out of their infield don't stop it.)
+                if (shotClockTeam.HasValue && shotClockTeam.Value == attacker.Spawn.team)
+                {
+                    Team oppOfClocked = shotClockTeam.Value == Team.A ? Team.B : Team.A;
+                    if (ZoneFactory.InfieldFor(oppOfClocked).Contains(victim.transform.position))
+                        StopShotClock();
                 }
 
                 bool outfielderInOppInfield = victim.Spawn.role == PlayerRole.Outfielder
@@ -362,7 +395,10 @@ namespace Sportland.Sports.Dodgeball
         // A throw/pass was released — open a fresh play.
         private void OnBallReleased(PlayerZoneTracker thrower, PlayerZoneTracker target, bool isThrow)
         {
-            StopShotClock();   // carrier just released — shot clock ends; delay clock starts when ball goes loose
+            // Note: shot clock keeps ticking — release doesn't stop it. The
+            // clock stops only on a successful attack (hit in opp infield /
+            // ground in opp infield) or when the other team gains possession.
+            shotClockCarrier = null;   // ball is in flight; no carrier to render under
             playOpen = true;
             playThrower = thrower;
             playTarget = target;
@@ -380,7 +416,17 @@ namespace Sportland.Sports.Dodgeball
         // uneventful pass (reached a teammate or rolled out) isn't worth a line.
         private void OnBallBecameLoose()
         {
-            StopShotClock();      // defensive — should already be stopped on release
+            shotClockCarrier = null;   // no current holder
+            // Stop the shot clock ONLY if the ball landed in the clocked team's
+            // opposing infield — the "shot reached opp territory" condition.
+            // Anything else (loose in own area, neutral strip, etc.) leaves the
+            // clock running so the offense feels the pressure.
+            if (shotClockTeam.HasValue && ball != null)
+            {
+                Team oppOfClocked = shotClockTeam.Value == Team.A ? Team.B : Team.A;
+                if (ZoneFactory.InfieldFor(oppOfClocked).Contains(ball.transform.position))
+                    StopShotClock();
+            }
             StartDelayClock();    // ball is on the ground; start the loose-ball alarm
             if (!playOpen) return;
             if (playIsThrow && ball != null) playDodge = ball.LastTargetDodge;
@@ -392,10 +438,18 @@ namespace Sportland.Sports.Dodgeball
         // catch attaches to the other team here and is skipped.)
         private void OnBallAttached(PlayerZoneTracker player)
         {
-            // Any pickup (catch, loose-ball grab, pass completion) starts a
-            // fresh shot clock on the new carrier and cancels the loose-ball
-            // alarm — fires before the play-by-play branching below.
-            if (player != null) { StartShotClock(player); StopDelayClock(); }
+            // Shot clock: same-team possession continuation (teammate pass /
+            // pickup) keeps the existing clock running with no reset. Possession
+            // swing to the OTHER team stops the old clock and starts a fresh
+            // one on the new team. Cancels the loose-ball alarm either way.
+            if (player != null)
+            {
+                if (shotClockTeam.HasValue && shotClockTeam.Value == player.Spawn.team)
+                    UpdateShotClockCarrier(player);
+                else
+                    StartShotClock(player);
+                StopDelayClock();
+            }
 
             if (!playOpen || playIsThrow || player == null) return;
             if (playThrower == null || player.Spawn.team != playThrower.Spawn.team) return;
