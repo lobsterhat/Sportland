@@ -70,6 +70,14 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("How much higher (in 0..1 score-potential space) a teammate's effective shot must be before a carrier-infielder passes instead of shooting themselves.")]
         [SerializeField] private float passOverThrowBias = 0.10f;
 
+        [Header("Run-jump attack")]
+        [Tooltip("Base probability (0..1) that a carrier-infielder commits to a running-jump throw on a given possession. The actual chance scales with the player's accuracy + speed — an aggressive specialist run-jumps more often than a cautious one.")]
+        [SerializeField, Range(0f, 1f)] private float runJumpProbability = 0.4f;
+        [Tooltip("Distance (u) to my zone's forward edge at which the run-up commits to the jump + release. Smaller = release closer to the line — more momentum but riskier (if I jump too late I cross the line on release and Phase D neuters the shot).")]
+        [SerializeField] private float runJumpEdgeDistance = 1.2f;
+        [Tooltip("Movement-input magnitude during the run-up. 1 = full run; lower values are less committal but build less momentum.")]
+        [SerializeField, Range(0.4f, 1f)] private float runJumpInputSpeed = 1f;
+
         [Header("Loose-ball retrieval")]
         [Tooltip("Dive for a bouncing (deflected) ball when its predicted landing is within this distance — a lunging catch with arms extended. The dive may cross the zone line (legal while airborne).")]
         [SerializeField] private float diveRange = 3f;
@@ -91,6 +99,12 @@ namespace Sportland.Sports.Dodgeball
 
         private float holdStartTime = -1f;       // when we picked up the ball (wind-up clock)
         private PlayerZoneTracker throwTarget;
+
+        // Run-jump attack phase. Decided once per possession when we lock on
+        // a target; committed until release. Reset on carry-home / pass /
+        // release.
+        private enum RunJumpPhase { None, RunUp }
+        private RunJumpPhase runJumpPhase = RunJumpPhase.None;
 
         /// <summary>
         /// Short label of the chain node driving this AI this frame ("Offense",
@@ -441,7 +455,8 @@ namespace Sportland.Sports.Dodgeball
 
         // ── Offense (holding the ball) ──
 
-        // Plant, face a target opponent, wind up, then throw.
+        // Plant, face a target opponent, wind up, then throw. Optionally
+        // commits to a running-jump attack instead of the stationary windup.
         private void Offense()
         {
             movement.SetStance(false);
@@ -454,11 +469,9 @@ namespace Sportland.Sports.Dodgeball
                 movement.SetFacing(back - (Vector2)transform.position);
                 MoveToward(back);
                 holdStartTime = -1f;   // wind-up only starts once we're set in our area
+                runJumpPhase = RunJumpPhase.None;
                 return;
             }
-
-            movement.IsRunning = false;
-            movement.ApplyMove(Vector2.zero);   // plant to throw / pass
 
             // Outfielders never shoot (no scoring credit). Carrier-infielders
             // shoot UNLESS a teammate is substantially better positioned for
@@ -467,15 +480,35 @@ namespace Sportland.Sports.Dodgeball
                             || ShouldPassToBetterTeammate();
             if (wantsToPass)
             {
-                throwTarget = null;   // clear any stale throw target before switching modes
+                throwTarget = null;
+                runJumpPhase = RunJumpPhase.None;
+                movement.IsRunning = false;
+                movement.ApplyMove(Vector2.zero);
                 PassToInfielder();
                 return;
             }
 
+            // Lock the target on first frame; roll for run-jump at the same time.
             if (throwTarget == null || throwTarget.Spawn.team == tracker.Spawn.team)
+            {
                 throwTarget = PickThrowTarget();
-            if (throwTarget == null) return;    // nobody to throw at — just hold
+                if (throwTarget != null && holdStartTime < 0f && runJumpPhase == RunJumpPhase.None)
+                {
+                    if (UnityEngine.Random.value < EffectiveRunJumpProb())
+                        runJumpPhase = RunJumpPhase.RunUp;
+                }
+            }
+            if (throwTarget == null) return;
 
+            if (runJumpPhase == RunJumpPhase.RunUp)
+            {
+                DoRunJumpAttack(throwTarget);
+                return;
+            }
+
+            // Stationary windup throw (default).
+            movement.IsRunning = false;
+            movement.ApplyMove(Vector2.zero);
             movement.SetFacing((Vector2)throwTarget.transform.position - (Vector2)transform.position);
 
             if (holdStartTime < 0f) holdStartTime = Time.time;
@@ -485,6 +518,68 @@ namespace Sportland.Sports.Dodgeball
                 holdStartTime = -1f;
                 throwTarget = null;
             }
+        }
+
+        // Per-player run-jump aggression: base probability scaled by the
+        // thrower's accuracy + speed. A 0/0 player rolls 0 (never), a 100/100
+        // player rolls up to 2× the base.
+        private float EffectiveRunJumpProb()
+        {
+            if (attr == null) return runJumpProbability;
+            float aggression = (attr.ThrowAccuracy01 + attr.ThrowSpeed01) * 0.5f;   // 0..1
+            return Mathf.Clamp01(runJumpProbability * aggression * 2f);
+        }
+
+        // Run toward the target; when within runJumpEdgeDistance of my zone's
+        // forward edge, jump and release SAME FRAME. The jump puts me airborne
+        // so I'm legal across the line; the release fires before my position
+        // crosses centerline so Phase D doesn't neuter the shot; the carrier
+        // velocity bonus is captured inside Ball.Throw at release.
+        private void DoRunJumpAttack(PlayerZoneTracker target)
+        {
+            movement.IsRunning = true;
+            Vector2 me = transform.position;
+            Vector2 dir = ((Vector2)target.transform.position - me);
+            if (dir.sqrMagnitude < 0.0001f) dir = Vector2.right;
+            dir.Normalize();
+
+            movement.SetFacing(dir);
+            // Don't clamp — we want to ride right up to the zone edge. Movement
+            // input is just dir at full magnitude; PlayerMovement handles speed.
+            movement.ApplyMove(dir * runJumpInputSpeed);
+
+            float edgeDist = DistanceToZoneEdgeAlong(dir);
+            if (edgeDist <= runJumpEdgeDistance && movement.IsGrounded)
+            {
+                movement.TryJump();
+                ThrowAtTarget(target);
+                holdStartTime = -1f;
+                throwTarget = null;
+                runJumpPhase = RunJumpPhase.None;
+            }
+        }
+
+        // Distance (u) from my current position to the AssignedZone boundary
+        // along direction `dir`. Used by the run-jump to know when we're close
+        // enough to the forward edge to commit the jump + release.
+        private float DistanceToZoneEdgeAlong(Vector2 dir)
+        {
+            Vector2 me = transform.position;
+            var zone = tracker.AssignedZone;
+            float tMax = float.MaxValue;
+            if (Mathf.Abs(dir.x) > 0.001f)
+            {
+                float edgeX = dir.x > 0f ? zone.max.x : zone.min.x;
+                float t = (edgeX - me.x) / dir.x;
+                if (t > 0f) tMax = Mathf.Min(tMax, t);
+            }
+            if (Mathf.Abs(dir.y) > 0.001f)
+            {
+                float edgeY = dir.y > 0f ? zone.max.y : zone.min.y;
+                float t = (edgeY - me.y) / dir.y;
+                if (t > 0f) tMax = Mathf.Min(tMax, t);
+            }
+            return tMax == float.MaxValue ? 0f : tMax;
         }
 
         // Carrier-infielder pass-vs-throw decision. Pass if a teammate's

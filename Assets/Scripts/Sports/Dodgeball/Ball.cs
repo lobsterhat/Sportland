@@ -1062,6 +1062,12 @@ namespace Sportland.Sports.Dodgeball
             if (!CarrierMayRelease()) { Drop(); return; }   // pressing throw while ineligible drops the ball
             if (direction.sqrMagnitude < 0.0001f) direction = Vector2.right;
 
+            // Capture carrier momentum BEFORE nulling carrierMovement — running
+            // throws hit harder because the carrier's lateral velocity is added
+            // to the release. A stationary throw adds zero, so this is a
+            // strict upgrade for anyone moving forward through the shot.
+            Vector2 carrierVel = carrierMovement != null ? carrierMovement.Velocity : Vector2.zero;
+
             recentThrower = carrier;
             throwerCooldownRemaining = throwerPickupCooldown;
             // Phase D: neutered if an outfielder released from inside the opposing infield.
@@ -1072,7 +1078,7 @@ namespace Sportland.Sports.Dodgeball
             carrierMovement = null;
 
             rb.simulated = true;
-            rb.linearVelocity = direction.normalized * power;
+            rb.linearVelocity = direction.normalized * power + carrierVel;
             heightVelocity = verticalVelocity;
             groundedSinceRelease = false;
             LastDeflector = null;
