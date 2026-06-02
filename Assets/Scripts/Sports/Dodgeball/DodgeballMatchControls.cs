@@ -34,7 +34,7 @@ namespace Sportland.Sports.Dodgeball
 
             var labels = court.GetComponent<DodgeballPlayerLabels>();
 
-            float h = 134f + 48f + (timed ? 44f : 0f) + (dropdownOpen ? presetNames.Length * 24f : 0f);
+            float h = 134f + 48f + 88f + (timed ? 44f : 0f) + (dropdownOpen ? presetNames.Length * 24f : 0f);
             float x = Screen.width - panelWidth - 12f;
             GUILayout.BeginArea(new Rect(x, topOffset, panelWidth, h), GUI.skin.box);
 
@@ -86,6 +86,15 @@ namespace Sportland.Sports.Dodgeball
 
             GUILayout.Label($"Penalty: {PlayerZoneTracker.ReturnGraceSeconds:F1}s");
             PlayerZoneTracker.ReturnGraceSeconds = GUILayout.HorizontalSlider(PlayerZoneTracker.ReturnGraceSeconds, 0.5f, 10f);
+
+            if (match != null)
+            {
+                GUILayout.Label($"Shot clock: {match.ShotClockSeconds:F1}s");
+                match.ShotClockSeconds = GUILayout.HorizontalSlider(match.ShotClockSeconds, 3f, 20f);
+
+                GUILayout.Label($"Delay of game: {match.DelayClockSeconds:F1}s");
+                match.DelayClockSeconds = GUILayout.HorizontalSlider(match.DelayClockSeconds, 2f, 15f);
+            }
 
             GUILayout.EndArea();
         }

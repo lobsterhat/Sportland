@@ -30,12 +30,16 @@ namespace Sportland.Sports.Dodgeball
         private GUIStyle style;
         private GUIStyle decisionStyle;
         private Camera cam;
+        private DodgeballMatch match;
+        private Ball ball;
 
         private void OnGUI()
         {
             if (!show) return;
             if (cam == null) cam = Camera.main;
             if (cam == null) return;
+            if (match == null) match = FindFirstObjectByType<DodgeballMatch>();
+            if (ball == null) ball = FindFirstObjectByType<Ball>();
             EnsureStyle();
 
             var all = PlayerZoneTracker.All;
@@ -63,6 +67,14 @@ namespace Sportland.Sports.Dodgeball
                     belowY += 20f;
                 }
 
+                // Shot clock: orange countdown under the current carrier.
+                if (t.HasBall && match != null && match.ShotClockRunning && match.ShotClockCarrier == t)
+                {
+                    var sRect = new Rect(rect.x, belowY, rect.width, 22f);
+                    DrawShadowed(sRect, $"{match.ShotClockRemaining:F1}", new Color(1f, 0.65f, 0.15f), style);
+                    belowY += 20f;
+                }
+
                 // AI decision (debug): which chain node is driving this player.
                 if (showAIDecisions)
                 {
@@ -72,6 +84,19 @@ namespace Sportland.Sports.Dodgeball
                         var dRect = new Rect(rect.x - 24f, belowY, rect.width + 48f, 18f);
                         DrawShadowed(dRect, ai.CurrentDecision, new Color(0.7f, 0.9f, 1f), decisionStyle);
                     }
+                }
+            }
+
+            // Delay-of-game countdown floating above the loose ball — orange
+            // text near the ball position so it's obvious which team needs to
+            // chase before their clock fires.
+            if (match != null && match.DelayClockRunning && ball != null)
+            {
+                Vector3 ballScreen = cam.WorldToScreenPoint(ball.transform.position + Vector3.up * 0.7f);
+                if (ballScreen.z > 0f)
+                {
+                    var dRect = new Rect(ballScreen.x - 28f, Screen.height - ballScreen.y - 12f, 56f, 22f);
+                    DrawShadowed(dRect, $"{match.DelayClockRemaining:F1}", new Color(1f, 0.65f, 0.15f), style);
                 }
             }
         }
