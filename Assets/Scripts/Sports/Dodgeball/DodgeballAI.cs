@@ -11,6 +11,7 @@ namespace Sportland.Sports.Dodgeball
     ///   TryReactToOpposingPass        — closest infielder intercepts; others set against the passer
     ///   TryReactToIncomingThrow       — emergency: catch / duck / jump / sidestep
     ///   TryPrepareForCarrier          — opposing carrier exists → face & hold zone depth
+    ///   TrySupportTeammate            — same-team carrier exists → off-ball support position
     ///   TryChaseLooseBall             — loose ball + I'm closest in my retrieval zone
     ///   Idle                          — fallback: drift home so formation holds
     ///
@@ -62,6 +63,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float laneClearRadius = 1.5f;
         [Tooltip("Ball Height (u) above which an intercepting defender jumps for extra reach (PickupHeightFor scales with the jump).")]
         [SerializeField] private float interceptJumpHeight = 1.4f;
+        [Tooltip("How far (u) an infielder shifts toward the opposing half when supporting an outfielder carrier — closer for the pass-back and the follow-up shot, but more exposed if the pass is intercepted.")]
+        [SerializeField] private float supportForwardShift = 1.5f;
 
         [Header("Loose-ball retrieval")]
         [Tooltip("Dive for a bouncing (deflected) ball when its predicted landing is within this distance — a lunging catch with arms extended. The dive may cross the zone line (legal while airborne).")]
@@ -117,6 +120,7 @@ namespace Sportland.Sports.Dodgeball
             if (TryReactToIncomingThrow())      return;
             EndThreat();
             if (TryPrepareForCarrier())         return;
+            if (TrySupportTeammate())           return;
             if (TryChaseLooseBall())            return;
             CurrentDecision = "Idle";
             Idle();
@@ -209,6 +213,61 @@ namespace Sportland.Sports.Dodgeball
             CurrentDecision = "Prepare";
             Prepare(carrier);
             return true;
+        }
+
+        // Both roles: my teammate has the ball. Slide to a useful off-ball spot
+        // so the offense looks like a play instead of one player working alone.
+        // Outfielders center in their strip (an obvious pass target); infielders
+        // supporting an outfielder carrier shift forward (closer for the pass-
+        // back + follow-up shot); infielders supporting another infielder hold
+        // spawn (maintains spread, prevents bunching).
+        private bool TrySupportTeammate()
+        {
+            var carrier = ball.Carrier;
+            if (carrier == null) return false;
+            if (carrier == tracker) return false;   // shouldn't reach here (TryActWithBall caught me)
+            if (carrier.Spawn.team != tracker.Spawn.team) return false;
+            CurrentDecision = "Support";
+            SupportTeammate(carrier);
+            return true;
+        }
+
+        private void SupportTeammate(PlayerZoneTracker carrier)
+        {
+            movement.IsRunning = false;
+            movement.SetStance(false);
+            Vector2 me = transform.position;
+            movement.SetFacing((Vector2)carrier.transform.position - me);
+
+            bool iAmInfielder = tracker.Spawn.role == PlayerRole.Infielder;
+            bool carrierIsOutfielder = carrier.Spawn.role == PlayerRole.Outfielder;
+            Vector2 supportTarget;
+
+            if (iAmInfielder)
+            {
+                if (carrierIsOutfielder)
+                {
+                    // Receiver setup: shift forward (toward opposing half) so
+                    // I'm closer for the pass-back and the follow-up shot.
+                    Vector2 forward = tracker.Spawn.team == Team.A ? Vector2.right : Vector2.left;
+                    supportTarget = (Vector2)tracker.Spawn.position + forward * supportForwardShift;
+                }
+                else
+                {
+                    // Infielder supporting another infielder: hold spawn so we
+                    // don't collapse onto the carrier and break the spread.
+                    supportTarget = tracker.Spawn.position;
+                }
+            }
+            else
+            {
+                // Outfielder: center in my strip — an obvious pass target from
+                // any angle, and the existing PassToInfielder targeting picks
+                // a closer player but a centered outfielder is reliably findable.
+                supportTarget = (tracker.AssignedZone.min + tracker.AssignedZone.max) * 0.5f;
+            }
+
+            MoveToward(ClampToZone(supportTarget));
         }
 
         // Loose ball retrieval. Two sub-cases, top-to-bottom:
