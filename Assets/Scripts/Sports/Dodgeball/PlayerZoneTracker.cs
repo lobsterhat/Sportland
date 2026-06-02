@@ -81,20 +81,22 @@ namespace Sportland.Sports.Dodgeball
         //   wasInOppInfieldGrounded — true if the player was grounded inside
         //     the opposing infield last tick. Used to detect grounded-entry
         //     transitions; airborne fly-overs (jump/dive) don't trigger.
-        //   opposingInfieldEnteredAt — timestamp of the most recent grounded
-        //     entry. After 2 s, if the carrier is still grounded inside the
-        //     opposing infield with the ball, the drop fires.
-        //   pendingDropAt — when a carrier crosses in with the ball we don't
-        //     drop instantly; we schedule the drop for entry-time + carrierDropDelay
-        //     so the player walks a step or two in and the ball escapes
-        //     naturally with their momentum. Cancelled if they retreat back
-        //     out before the drop fires. Negative = no drop pending.
+        //   hadBallLastTick — used to detect the just-picked-up transition,
+        //     so the 2 s "pass it out" timer starts on PICKUP-in-opp-infield
+        //     rather than on entry. A player who jumps the line empty and
+        //     throws before landing never picks up here, so never trips this.
+        //   pendingDropAt — unified deadline for the eventual drop. Set to
+        //     entry-time + carrierDropDelay (~0.3 s) when a carrier crosses
+        //     in with the ball, or to pickup-time + ReturnGraceSeconds (2 s)
+        //     when a player picks up a loose ball while already inside.
+        //     Cancelled if they retreat / lose the ball before it fires.
+        //     Negative = no drop pending.
         //   pickupLockedInOppInfield — true after the rules forced a drop
         //     this visit. Prevents the dropper from re-grabbing the loose ball
         //     at their feet and looping. Cleared only when they make it back
         //     to their own zone.
         private bool wasInOppInfieldGrounded;
-        private float opposingInfieldEnteredAt = -1f;
+        private bool hadBallLastTick;
         private float pendingDropAt = -1f;
         private bool pickupLockedInOppInfield;
 
@@ -138,7 +140,7 @@ namespace Sportland.Sports.Dodgeball
             outOfZoneSince = IsInZone ? -1f : Time.time;
             returnExpiryFired = false;
             wasInOppInfieldGrounded = IsInOpposingInfield && movement != null && movement.IsGrounded;
-            opposingInfieldEnteredAt = wasInOppInfieldGrounded ? Time.time : -1f;
+            hadBallLastTick = HasBall;
             pendingDropAt = -1f;
             pickupLockedInOppInfield = false;
         }
@@ -245,16 +247,21 @@ namespace Sportland.Sports.Dodgeball
                 DropHeldBall();
         }
 
-        // Grounded entry into the opposing infield while carrying the ball
-        // forces a drop, but not instantly — we schedule it for entry-time +
-        // carrierDropDelay so the player walks a step or two in and the ball
-        // slides out with their momentum, looking like a release rather than
-        // a teleport. No point penalty (turnover, possession swing only) for
-        // either role.
+        // Two distinct scenarios fire a drop, with different deadlines:
         //
-        // Empty-handed entry starts a 2 s presence window; if the player ends
-        // up grounded inside with the ball when it expires, the same momentum-
-        // aware turnover fires.
+        // (a) CARRIER crosses into opp infield with the ball → deferred 0.3 s
+        //     drop (carrierDropDelay) so the release looks natural — the
+        //     player walks a step or two in and the ball slides out with their
+        //     momentum rather than freezing at the line.
+        //
+        // (b) Player PICKS UP a loose ball while standing inside opp infield
+        //     → 2 s window (ReturnGraceSeconds) to pass it out. The timer
+        //     starts at the pickup moment, NOT at entry — a player who jumps
+        //     the line, throws mid-air, and lands empty in opp infield never
+        //     trips it because they never pick up. No advantage to lingering
+        //     empty-handed, but also no penalty.
+        //
+        // No point penalty for either path (just turnover / possession swing).
         //
         // After any forced drop the player is locked out of loose-ball pickup
         // until they make it back to their OWN zone — they can't re-grab the
@@ -276,34 +283,39 @@ namespace Sportland.Sports.Dodgeball
             // return to their assigned zone.
             if (IsInZone) pickupLockedInOppInfield = false;
 
-            if (!grounded) return;   // airborne doesn't trigger or progress timers
+            if (!grounded)
+            {
+                hadBallLastTick = HasBall;   // keep tracking through airborne so transitions are accurate on landing
+                return;
+            }
 
             bool justEntered = nowInOpp && !wasInOppInfieldGrounded;
+            bool justGotBall = HasBall && !hadBallLastTick;
 
-            if (justEntered)
+            // Carrier crossed in with the ball → deferred natural release.
+            if (justEntered && HasBall && pendingDropAt < 0f)
             {
-                opposingInfieldEnteredAt = Time.time;
-                if (HasBall && pendingDropAt < 0f)
-                    pendingDropAt = Time.time + carrierDropDelay;
+                pendingDropAt = Time.time + carrierDropDelay;
+            }
+            // Picked up the ball while standing inside opp infield → 2 s window.
+            else if (nowInOpp && justGotBall && pendingDropAt < 0f)
+            {
+                pendingDropAt = Time.time + ReturnGraceSeconds;
             }
 
             // Cancel a pending drop if the player retreated back out, or
-            // somehow lost the ball before the delay expired.
+            // lost the ball before the deadline expired.
             if (pendingDropAt >= 0f && (!nowInOpp || !HasBall))
                 pendingDropAt = -1f;
 
-            bool deferredFire = pendingDropAt >= 0f && Time.time >= pendingDropAt && HasBall;
-            bool expiryFire   = nowInOpp && HasBall
-                                && opposingInfieldEnteredAt >= 0f
-                                && Time.time - opposingInfieldEnteredAt >= ReturnGraceSeconds;
-
-            if (deferredFire || expiryFire)
+            if (pendingDropAt >= 0f && Time.time >= pendingDropAt && HasBall)
             {
                 DropAsTurnover();
                 pickupLockedInOppInfield = true;
                 pendingDropAt = -1f;
             }
 
+            hadBallLastTick = HasBall;
             wasInOppInfieldGrounded = nowInOpp;
         }
 

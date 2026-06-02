@@ -103,8 +103,13 @@ namespace Sportland.Sports.Dodgeball
         // Run-jump attack phase. Decided once per possession when we lock on
         // a target; committed until release. Reset on carry-home / pass /
         // release.
-        private enum RunJumpPhase { None, RunUp }
+        //   RunUp                — running toward the zone edge, ball held.
+        //   AirborneAwaitingApex — jumped, mid-air, holding the throw until
+        //                          the apex of the jump. Releasing earlier
+        //                          forfeits power and accuracy (timing skill).
+        private enum RunJumpPhase { None, RunUp, AirborneAwaitingApex }
         private RunJumpPhase runJumpPhase = RunJumpPhase.None;
+        private float runJumpJumpStartTime = -1f;
 
         /// <summary>
         /// Short label of the chain node driving this AI this frame ("Offense",
@@ -470,6 +475,7 @@ namespace Sportland.Sports.Dodgeball
                 MoveToward(back);
                 holdStartTime = -1f;   // wind-up only starts once we're set in our area
                 runJumpPhase = RunJumpPhase.None;
+                runJumpJumpStartTime = -1f;
                 return;
             }
 
@@ -482,6 +488,7 @@ namespace Sportland.Sports.Dodgeball
             {
                 throwTarget = null;
                 runJumpPhase = RunJumpPhase.None;
+                runJumpJumpStartTime = -1f;
                 movement.IsRunning = false;
                 movement.ApplyMove(Vector2.zero);
                 PassToInfielder();
@@ -530,32 +537,57 @@ namespace Sportland.Sports.Dodgeball
             return Mathf.Clamp01(runJumpProbability * aggression * 2f);
         }
 
-        // Run toward the target; when within runJumpEdgeDistance of my zone's
-        // forward edge, jump and release SAME FRAME. The jump puts me airborne
-        // so I'm legal across the line; the release fires before my position
-        // crosses centerline so Phase D doesn't neuter the shot; the carrier
-        // velocity bonus is captured inside Ball.Throw at release.
+        // Two-phase run-jump attack:
+        //   RunUp: run toward the target until within runJumpEdgeDistance of
+        //   my zone's forward edge, then TryJump and switch to AirborneAwaitingApex.
+        //   AirborneAwaitingApex: hold the throw mid-air until JumpApexTime
+        //   has elapsed since the jump, then release. Releasing at apex (or
+        //   shortly after, on descent) is the maximum-power timing — that's
+        //   the skill tax on this attack. The carrier-velocity bonus is the
+        //   running lateral speed (preserved through the jump since vertical
+        //   motion is decoupled from rb.linearVelocity).
         private void DoRunJumpAttack(PlayerZoneTracker target)
         {
-            movement.IsRunning = true;
-            Vector2 me = transform.position;
-            Vector2 dir = ((Vector2)target.transform.position - me);
-            if (dir.sqrMagnitude < 0.0001f) dir = Vector2.right;
-            dir.Normalize();
-
-            movement.SetFacing(dir);
-            // Don't clamp — we want to ride right up to the zone edge. Movement
-            // input is just dir at full magnitude; PlayerMovement handles speed.
-            movement.ApplyMove(dir * runJumpInputSpeed);
-
-            float edgeDist = DistanceToZoneEdgeAlong(dir);
-            if (edgeDist <= runJumpEdgeDistance && movement.IsGrounded)
+            if (runJumpPhase == RunJumpPhase.RunUp)
             {
-                movement.TryJump();
-                ThrowAtTarget(target);
-                holdStartTime = -1f;
-                throwTarget = null;
-                runJumpPhase = RunJumpPhase.None;
+                movement.IsRunning = true;
+                Vector2 me = transform.position;
+                Vector2 dir = ((Vector2)target.transform.position - me);
+                if (dir.sqrMagnitude < 0.0001f) dir = Vector2.right;
+                dir.Normalize();
+
+                movement.SetFacing(dir);
+                movement.ApplyMove(dir * runJumpInputSpeed);
+
+                float edgeDist = DistanceToZoneEdgeAlong(dir);
+                if (edgeDist <= runJumpEdgeDistance && movement.IsGrounded)
+                {
+                    movement.TryJump();
+                    runJumpPhase = RunJumpPhase.AirborneAwaitingApex;
+                    runJumpJumpStartTime = Time.time;
+                }
+                return;
+            }
+
+            if (runJumpPhase == RunJumpPhase.AirborneAwaitingApex)
+            {
+                // Lateral velocity is preserved during the jump (Height is
+                // decoupled), so we keep facing the target and hold input
+                // direction — Ball.Throw will capture the running velocity
+                // as the momentum bonus at release.
+                movement.SetFacing((Vector2)target.transform.position - (Vector2)transform.position);
+
+                float airTime = Time.time - runJumpJumpStartTime;
+                if (airTime >= movement.JumpApexTime)
+                {
+                    ThrowAtTarget(target);
+                    holdStartTime = -1f;
+                    throwTarget = null;
+                    runJumpPhase = RunJumpPhase.None;
+                    runJumpJumpStartTime = -1f;
+                }
+                // else: still rising — hold the throw. (Releasing early would
+                // forfeit power; the AI plays the optimal release timing.)
             }
         }
 
