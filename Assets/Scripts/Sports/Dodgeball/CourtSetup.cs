@@ -295,22 +295,29 @@ namespace Sportland.Sports.Dodgeball
         // biased means so infielders feel like throwers and outfielders feel
         // like retrievers. Spread ±18 around the mean (clamped to 0..100)
         // gives meaningful variety without anyone being unusable.
+        //
+        // Star players: each team's A_In_1 / B_In_1 get a +starBoost shift on
+        // every stat, so they're consistently the highest-scoring shooters
+        // and the AI's best-player routing converges on them.
         private static void RandomizeStats(PlayerSpawn spawn, DodgeballAttributes dba, GeneralAttributes gen)
         {
+            const float starBoost = 18f;
             var rng = new System.Random(spawn.id.GetHashCode());
             float Roll(float mean, float spread) =>
                 Mathf.Clamp(mean + ((float)(rng.NextDouble() - 0.5) * 2f * spread), 0f, 100f);
 
             bool isInfielder = spawn.role == PlayerRole.Infielder;
+            bool isStar = spawn.id == "A_In_1" || spawn.id == "B_In_1";
+            float boost = isStar ? starBoost : 0f;
 
-            dba.throwSpeed    = Roll(isInfielder ? 65f : 50f, 18f);
-            dba.throwAccuracy = Roll(isInfielder ? 65f : 55f, 18f);
-            dba.anticipation  = Roll(60f, 18f);
-            dba.catching      = Roll(isInfielder ? 60f : 70f, 15f);
+            dba.throwSpeed    = Roll((isInfielder ? 65f : 50f) + boost, 18f);
+            dba.throwAccuracy = Roll((isInfielder ? 65f : 55f) + boost, 18f);
+            dba.anticipation  = Roll(60f + boost, 18f);
+            dba.catching      = Roll((isInfielder ? 60f : 70f) + boost, 15f);
 
-            gen.luck      = Roll(50f, 15f);
-            gen.toughness = Roll(50f, 18f);
-            gen.maxEnergy = Mathf.Lerp(80f, 120f, (float)rng.NextDouble());
+            gen.luck      = Roll(50f + boost * 0.5f, 15f);
+            gen.toughness = Roll(50f + boost, 18f);
+            gen.maxEnergy = Mathf.Lerp(80f, 120f, (float)rng.NextDouble()) + (isStar ? 20f : 0f);
         }
 
         // Builds the player root in code and attaches the sprite (or a
