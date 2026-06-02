@@ -27,5 +27,16 @@ namespace Sportland.Sports.Dodgeball
         public float ThrowAccuracy01 => Mathf.Clamp01(throwAccuracy / 100f);
         public float Anticipation01 => Mathf.Clamp01(anticipation / 100f);
         public float Catching01 => Mathf.Clamp01(catching / 100f);
+
+        /// <summary>
+        /// Composite "how well will this player convert a possession into
+        /// points?" score, 0..1. Used by the AI to route the ball to the best
+        /// shooter. Accuracy gets the heaviest weight (a wild throw doesn't
+        /// score regardless of speed), then speed (faster ball is harder to
+        /// catch), then anticipation (better lead on a moving target).
+        /// </summary>
+        public float ScorePotential01 => 0.55f * ThrowAccuracy01
+                                       + 0.35f * ThrowSpeed01
+                                       + 0.10f * Anticipation01;
     }
 }

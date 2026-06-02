@@ -266,10 +266,15 @@ namespace Sportland.Sports.Dodgeball
             tracker.Initialize(spawn);
             tracker.Number = number;
 
-            // Ability ratings used by skill checks (catching, etc.). Defaults
-            // are uniform for now; tune per-player in the Inspector later.
-            if (go.GetComponent<GeneralAttributes>() == null) go.AddComponent<GeneralAttributes>();
-            if (go.GetComponent<DodgeballAttributes>() == null) go.AddComponent<DodgeballAttributes>();
+            // Ability ratings used by skill checks (catching, etc.) and AI
+            // routing decisions (ScorePotential01). Randomized per-player with
+            // a deterministic seed off spawn.id so each player has a stable
+            // personality across game restarts; means are role-biased
+            // (infielders lean stronger throwers, outfielders lean better
+            // catchers — they retrieve a lot of loose balls).
+            var gen = go.GetComponent<GeneralAttributes>() ?? go.AddComponent<GeneralAttributes>();
+            var dba = go.GetComponent<DodgeballAttributes>() ?? go.AddComponent<DodgeballAttributes>();
+            RandomizeStats(spawn, dba, gen);
 
             var visual = go.GetComponentInChildren<DodgeballPlayerVisual>();
             if (visual != null) visual.Configure(spawn.team, spawn.role, tracker);
@@ -283,6 +288,29 @@ namespace Sportland.Sports.Dodgeball
             }
 
             spawnedPlayers.Add(go);
+        }
+
+        // Per-player stat differentiation. Deterministic RNG keyed off spawn.id
+        // so a given player has a stable personality across restarts; role-
+        // biased means so infielders feel like throwers and outfielders feel
+        // like retrievers. Spread ±18 around the mean (clamped to 0..100)
+        // gives meaningful variety without anyone being unusable.
+        private static void RandomizeStats(PlayerSpawn spawn, DodgeballAttributes dba, GeneralAttributes gen)
+        {
+            var rng = new System.Random(spawn.id.GetHashCode());
+            float Roll(float mean, float spread) =>
+                Mathf.Clamp(mean + ((float)(rng.NextDouble() - 0.5) * 2f * spread), 0f, 100f);
+
+            bool isInfielder = spawn.role == PlayerRole.Infielder;
+
+            dba.throwSpeed    = Roll(isInfielder ? 65f : 50f, 18f);
+            dba.throwAccuracy = Roll(isInfielder ? 65f : 55f, 18f);
+            dba.anticipation  = Roll(60f, 18f);
+            dba.catching      = Roll(isInfielder ? 60f : 70f, 15f);
+
+            gen.luck      = Roll(50f, 15f);
+            gen.toughness = Roll(50f, 18f);
+            gen.maxEnergy = Mathf.Lerp(80f, 120f, (float)rng.NextDouble());
         }
 
         // Builds the player root in code and attaches the sprite (or a

@@ -65,6 +65,10 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float interceptJumpHeight = 1.4f;
         [Tooltip("How far (u) an infielder shifts toward the opposing half when supporting an outfielder carrier — closer for the pass-back and the follow-up shot, but more exposed if the pass is intercepted.")]
         [SerializeField] private float supportForwardShift = 1.5f;
+        [Tooltip("Per-unit distance penalty applied when comparing pass-target score potential. A far teammate needs to be substantially better to be preferred over a close one.")]
+        [SerializeField] private float passDistancePenalty01 = 0.02f;
+        [Tooltip("How much higher (in 0..1 score-potential space) a teammate's effective shot must be before a carrier-infielder passes instead of shooting themselves.")]
+        [SerializeField] private float passOverThrowBias = 0.10f;
 
         [Header("Loose-ball retrieval")]
         [Tooltip("Dive for a bouncing (deflected) ball when its predicted landing is within this distance — a lunging catch with arms extended. The dive may cross the zone line (legal while airborne).")]
@@ -456,9 +460,17 @@ namespace Sportland.Sports.Dodgeball
             movement.IsRunning = false;
             movement.ApplyMove(Vector2.zero);   // plant to throw / pass
 
-            // Outfielders feed the front court: lob the ball back to an infielder
-            // rather than throwing at opponents.
-            if (tracker.Spawn.role != PlayerRole.Infielder) { PassToInfielder(); return; }
+            // Outfielders never shoot (no scoring credit). Carrier-infielders
+            // shoot UNLESS a teammate is substantially better positioned for
+            // the kill — then route the ball there first.
+            bool wantsToPass = tracker.Spawn.role != PlayerRole.Infielder
+                            || ShouldPassToBetterTeammate();
+            if (wantsToPass)
+            {
+                throwTarget = null;   // clear any stale throw target before switching modes
+                PassToInfielder();
+                return;
+            }
 
             if (throwTarget == null || throwTarget.Spawn.team == tracker.Spawn.team)
                 throwTarget = PickThrowTarget();
@@ -473,6 +485,24 @@ namespace Sportland.Sports.Dodgeball
                 holdStartTime = -1f;
                 throwTarget = null;
             }
+        }
+
+        // Carrier-infielder pass-vs-throw decision. Pass if a teammate's
+        // effective shot (their ScorePotential01, minus the per-unit pass
+        // distance penalty) beats mine by at least passOverThrowBias. The
+        // threshold keeps the decision stable so we don't oscillate mid-windup
+        // as positions shift slightly.
+        private bool ShouldPassToBetterTeammate()
+        {
+            if (attr == null) return false;
+            var best = BestTeammateInfielderToPass();
+            if (best == null) return false;
+            var bestAttr = best.GetComponent<DodgeballAttributes>();
+            if (bestAttr == null) return false;
+            float myScore = attr.ScorePotential01;
+            float dist = Vector2.Distance(transform.position, best.transform.position);
+            float theirEffective = bestAttr.ScorePotential01 - passDistancePenalty01 * dist;
+            return theirEffective > myScore + passOverThrowBias;
         }
 
         // Nearest opposing infielder. Outfielders can't be eliminated, so they
@@ -620,11 +650,14 @@ namespace Sportland.Sports.Dodgeball
                 tracker.ArmCatch();
         }
 
-        // Outfielder offense: lob the ball back to the nearest teammate infielder
-        // (over the opposing court — Ball.Pass raises the arc to clear opponents).
+        // Pass the ball to the best-positioned teammate infielder — used by
+        // outfielders feeding the front court AND by carrier-infielders who've
+        // decided their teammate has a better shot. "Best" = highest
+        // ScorePotential01 minus a distance penalty, so a close-but-okay
+        // teammate beats a far-but-great one.
         private void PassToInfielder()
         {
-            var target = NearestTeammateInfielder();
+            var target = BestTeammateInfielderToPass();
             if (target == null) return;   // no infielder to feed — just hold
 
             movement.SetFacing((Vector2)target.transform.position - (Vector2)transform.position);
@@ -744,6 +777,32 @@ namespace Sportland.Sports.Dodgeball
                 if (t == null || t.Spawn.team != team || t.Spawn.role != PlayerRole.Infielder) continue;
                 float d = ((Vector2)t.transform.position - me).sqrMagnitude;
                 if (d < bestDistSq) { bestDistSq = d; best = t; }
+            }
+            return best;
+        }
+
+        // Pick the same-team infielder with the highest effective pass-target
+        // score (DodgeballAttributes.ScorePotential01 minus a per-unit distance
+        // penalty). Self-excluded so a carrier-infielder doesn't pass to
+        // themselves. Used by both outfielder passing AND carrier-infielder
+        // "pass to better shooter" logic.
+        private PlayerZoneTracker BestTeammateInfielderToPass()
+        {
+            PlayerZoneTracker best = null;
+            float bestScore = float.NegativeInfinity;
+            Vector2 me = transform.position;
+            var team = tracker.Spawn.team;
+            var trackers = PlayerZoneTracker.All;
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null || t == tracker) continue;
+                if (t.Spawn.team != team || t.Spawn.role != PlayerRole.Infielder) continue;
+                var a = t.GetComponent<DodgeballAttributes>();
+                if (a == null) continue;
+                float dist = Vector2.Distance(me, t.transform.position);
+                float score = a.ScorePotential01 - passDistancePenalty01 * dist;
+                if (score > bestScore) { bestScore = score; best = t; }
             }
             return best;
         }
