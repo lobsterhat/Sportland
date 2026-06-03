@@ -507,7 +507,11 @@ namespace Sportland.Sports.Dodgeball
             }
             if (throwTarget == null) return;
 
-            if (runJumpPhase == RunJumpPhase.RunUp)
+            // Both run-jump phases (running up AND mid-air awaiting apex) route
+            // through DoRunJumpAttack; otherwise the airborne phase falls
+            // through to the stationary windup and the AI ends up throwing
+            // AFTER landing.
+            if (runJumpPhase != RunJumpPhase.None)
             {
                 DoRunJumpAttack(throwTarget);
                 return;
