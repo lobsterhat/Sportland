@@ -126,6 +126,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float maxLobApex = 4.5f;
         [Tooltip("Half-width (u) of the lob lane used to detect opponents to clear. Wider = more passes get the clearance bump.")]
         [SerializeField] private float lobLaneRadius = 1.5f;
+        [Tooltip("Lateral-speed multiplier applied to lobs after distance scaling. <1 makes lobs floatier — the vertical sin-arc duration is coupled to the lateral time, so slowing lateral motion proportionally slows the vertical arc. Chest passes are unaffected.")]
+        [SerializeField] private float lobLateralSpeedMul = 0.55f;
         [Tooltip("Constant downward acceleration applied to Height in the Thrown state (units/sec^2).")]
         [SerializeField] private float gravity = 12f;
 
@@ -1256,6 +1258,11 @@ namespace Sportland.Sports.Dodgeball
 
             // Long passes are thrown harder so they don't float across the court.
             float effectiveSpeed = Mathf.Min(lateralSpeed + passSpeedPerUnit * dist, maxPassSpeed);
+
+            // Lobs travel laterally slower so the arc is floaty rather than a
+            // quick pop-up. Vertical sin-arc duration is coupled to lateral,
+            // so this slows the up-and-back-down motion equally.
+            if (isLob) effectiveSpeed *= lobLateralSpeedMul;
 
             // Lobs arc higher the further they travel — and higher still when an
             // opponent stands in the lane, so the pass clears them.
