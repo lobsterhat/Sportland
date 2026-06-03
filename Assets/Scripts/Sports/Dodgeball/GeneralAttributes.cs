@@ -25,5 +25,17 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>Toughness on a 0..1 scale.</summary>
         public float Toughness01 => Mathf.Clamp01(toughness / 100f);
+
+        [Tooltip("0..100. How sharply this player can reverse direction at speed. Higher = shorter pivot delay when input flips >90° relative to current velocity (with a floor — even elite players have some momentum cost).")]
+        [Range(0f, 100f)] public float changeOfDirection = 50f;
+
+        /// <summary>ChangeOfDirection on a 0..1 scale.</summary>
+        public float ChangeOfDirection01 => Mathf.Clamp01(changeOfDirection / 100f);
+
+        [Tooltip("0..100. How long the player can sustain top-tier exertion before slowing down. Stubbed for future stamina/fatigue work; not wired into movement yet.")]
+        [Range(0f, 100f)] public float endurance = 50f;
+
+        /// <summary>Endurance on a 0..1 scale.</summary>
+        public float Endurance01 => Mathf.Clamp01(endurance / 100f);
     }
 }

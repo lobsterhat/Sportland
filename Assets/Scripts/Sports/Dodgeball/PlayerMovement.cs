@@ -36,6 +36,12 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Brief 'gather your feet' pause (s) after landing during which movement input is ignored. Prevents instant re-aim mid-stride; lets natural damping bleed off the jump's lateral momentum.")]
         [SerializeField] private float jumpRecoverDuration = 0.15f;
 
+        [Header("Pivot delay (sharp direction change)")]
+        [Tooltip("When the input direction differs from current velocity by more than 90° AND the player is moving at >pivotMinSpeed, this delay (s) kicks in before the new direction is accepted. The pivot duration scales down with GeneralAttributes.ChangeOfDirection01 (faster pivot for higher-stat players, with a floor at 0.4× the base).")]
+        [SerializeField] private float pivotDuration = 0.2f;
+        [Tooltip("Minimum current lateral speed (u/s) for the pivot delay to trigger. Below this, players can turn freely at walking pace.")]
+        [SerializeField] private float pivotMinSpeed = 4.5f;
+
         [Header("Dash (sidestep evade)")]
         [Tooltip("Speed (u/s) of the evade dash burst.")]
         [SerializeField] private float dashSpeed = 14f;
@@ -81,7 +87,10 @@ namespace Sportland.Sports.Dodgeball
         private float jumpTimer = -1f;
         private float jumpRecoverTimer = -1f;
         private float dampingBeforeJump = -1f;   // sentinel; >=0 means a jump is in progress and we've stashed the rb's linearDamping
+        private float pivotTimer = -1f;
+        private GeneralAttributes generalCache;
         public bool IsJumpRecovering => jumpRecoverTimer >= 0f;
+        public bool IsPivoting => pivotTimer >= 0f;
         private float duckTimer = -1f;
         private float dashTimer = -1f;
         private float dashCooldownTimer = -1f;
@@ -177,7 +186,25 @@ namespace Sportland.Sports.Dodgeball
             // Jump-recovery is a brief landing pause so you can't instantly
             // pivot the moment your feet touch down.
             if (IsAirborne || IsJumpRecovering) return;
+            // Pivot delay: while turning sharply at speed, ignore input —
+            // damping bleeds off momentum until we're slow enough to commit
+            // to the new direction.
+            if (IsPivoting) return;
+
             Vector2 clamped = input.sqrMagnitude > 1f ? input.normalized : input;
+
+            // Sharp-direction-change detection: input flips >90° relative to
+            // current velocity AND we're moving at running speed. Starts the
+            // pivot delay; ignored on the same frame so damping kicks in.
+            Vector2 currentForCheck = rb.linearVelocity;
+            if (currentForCheck.sqrMagnitude > pivotMinSpeed * pivotMinSpeed
+                && clamped.sqrMagnitude > 0.04f
+                && Vector2.Dot(currentForCheck.normalized, clamped.normalized) < 0f)
+            {
+                pivotTimer = 0f;
+                return;
+            }
+
             if (!facingOverriddenThisFrame && clamped.sqrMagnitude > 0.04f) Facing = clamped.normalized;
             float speed = (IsRunning ? runSpeed : walkSpeed) * (InDefensiveStance ? stanceSpeedMultiplier : 1f);
             Vector2 target = clamped * speed;
@@ -185,6 +212,15 @@ namespace Sportland.Sports.Dodgeball
             IsAccelerating = (target - current).sqrMagnitude > 0.0001f;
             rb.linearVelocity = Vector2.MoveTowards(
                 current, target, acceleration * Time.deltaTime);
+        }
+
+        // Pivot duration shrinks with the player's ChangeOfDirection rating;
+        // floor at 0.4× the base so even elite players have some momentum cost.
+        private float EffectivePivotDuration()
+        {
+            if (generalCache == null) generalCache = GetComponent<GeneralAttributes>();
+            if (generalCache == null) return pivotDuration;
+            return pivotDuration * Mathf.Lerp(1.0f, 0.4f, generalCache.ChangeOfDirection01);
         }
 
         public void TryJump()
@@ -262,6 +298,12 @@ namespace Sportland.Sports.Dodgeball
             {
                 jumpRecoverTimer += Time.deltaTime;
                 if (jumpRecoverTimer >= jumpRecoverDuration) jumpRecoverTimer = -1f;
+            }
+
+            if (IsPivoting)
+            {
+                pivotTimer += Time.deltaTime;
+                if (pivotTimer >= EffectivePivotDuration()) pivotTimer = -1f;
             }
 
             if (IsDucking)

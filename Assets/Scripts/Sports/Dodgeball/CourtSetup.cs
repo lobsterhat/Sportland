@@ -315,9 +315,11 @@ namespace Sportland.Sports.Dodgeball
             dba.anticipation  = Roll(60f + boost, 18f);
             dba.catching      = Roll((isInfielder ? 60f : 70f) + boost, 15f);
 
-            gen.luck      = Roll(50f + boost * 0.5f, 15f);
-            gen.toughness = Roll(50f + boost, 18f);
-            gen.maxEnergy = Mathf.Lerp(80f, 120f, (float)rng.NextDouble()) + (isStar ? 20f : 0f);
+            gen.luck              = Roll(50f + boost * 0.5f, 15f);
+            gen.toughness         = Roll(50f + boost, 18f);
+            gen.changeOfDirection = Roll(50f + boost * 0.5f, 18f);
+            gen.endurance         = Roll(50f + boost * 0.5f, 15f);
+            gen.maxEnergy         = Mathf.Lerp(80f, 120f, (float)rng.NextDouble()) + (isStar ? 20f : 0f);
         }
 
         // Builds the player root in code and attaches the sprite (or a

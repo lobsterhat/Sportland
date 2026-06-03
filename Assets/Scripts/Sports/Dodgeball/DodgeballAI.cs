@@ -950,14 +950,20 @@ namespace Sportland.Sports.Dodgeball
             return best;
         }
 
+        // Drift back to my spawn home. Sprints if I'm out of my assigned zone
+        // (in particular after a run-jump landing in opp infield, so I don't
+        // get stranded), walks the last stretch once back in my zone. The
+        // pivot delay (PlayerMovement) will still gate the U-turn if I'm
+        // moving forward and the home direction reverses my velocity.
         private void Idle()
         {
-            movement.IsRunning = false;
-            movement.SetStance(false);
             Vector2 home = tracker.Spawn.position;
             Vector2 delta = home - (Vector2)transform.position;
-            movement.ApplyMove(delta.sqrMagnitude > homeDeadzone * homeDeadzone
-                ? Vector2.ClampMagnitude(delta, 1f) : Vector2.zero);
+            bool farFromHome = delta.sqrMagnitude > homeDeadzone * homeDeadzone;
+
+            movement.IsRunning = farFromHome && !tracker.IsInZone;
+            movement.SetStance(false);
+            movement.ApplyMove(farFromHome ? Vector2.ClampMagnitude(delta, 1f) : Vector2.zero);
         }
 
         private void MoveToward(Vector2 target, float maxInput = 1f)
