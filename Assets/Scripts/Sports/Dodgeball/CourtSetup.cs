@@ -37,6 +37,11 @@ namespace Sportland.Sports.Dodgeball
         public const float HalfWidth = CourtWidth / 2f;   // 9
         public const float HalfHeight = CourtHeight / 2f; // 4.5
 
+        /// <summary>Outer hard bound (half-width) of the play area — the court + the outfielder strip on either side. Players are clamped to this in PlayerMovement.LateUpdate so nothing can slide off-screen.</summary>
+        public const float PlayAreaHalfWidth = HalfWidth + ZoneFactory.StripDepth;   // 12
+        /// <summary>Outer hard bound (half-height) of the play area — the court + the outfielder strip top and bottom.</summary>
+        public const float PlayAreaHalfHeight = HalfHeight + ZoneFactory.StripDepth; // 7.5
+
         // ---- Outfielder offsets from court boundary ----
         // How far behind the baseline outfielders stand:
         public const float BackOutfielderOffset = 1.5f;   // beyond ±9 on X

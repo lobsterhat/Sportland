@@ -380,6 +380,27 @@ namespace Sportland.Sports.Dodgeball
             // Cleared after every controller's Update has run, so next frame
             // ApplyMove resumes steering-based facing unless SetFacing is called again.
             facingOverriddenThisFrame = false;
+
+            // Hard play-area clamp. Runs after every other system has moved
+            // the player this frame — catches anything that would otherwise
+            // slide off-screen (run-jump momentum, dash overshoot, etc.).
+            // Zeroes velocity along the clamped axis so we don't keep slamming.
+            var p = transform.position;
+            const float maxX = CourtSetup.PlayAreaHalfWidth;
+            const float maxY = CourtSetup.PlayAreaHalfHeight;
+            bool clampedX = false, clampedY = false;
+            if (p.x < -maxX) { p.x = -maxX; clampedX = true; }
+            else if (p.x > maxX) { p.x = maxX; clampedX = true; }
+            if (p.y < -maxY) { p.y = -maxY; clampedY = true; }
+            else if (p.y > maxY) { p.y = maxY; clampedY = true; }
+            if (clampedX || clampedY)
+            {
+                transform.position = p;
+                var v = rb.linearVelocity;
+                if (clampedX) v.x = 0f;
+                if (clampedY) v.y = 0f;
+                rb.linearVelocity = v;
+            }
         }
     }
 }
