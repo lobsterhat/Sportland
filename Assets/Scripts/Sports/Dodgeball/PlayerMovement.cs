@@ -37,8 +37,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float jumpRecoverDuration = 0.15f;
 
         [Header("Pivot delay (sharp direction change)")]
-        [Tooltip("When the input direction differs from current velocity by more than 90° AND the player is moving at >pivotMinSpeed, this delay (s) kicks in before the new direction is accepted. The pivot duration scales down with GeneralAttributes.ChangeOfDirection01 (faster pivot for higher-stat players, with a floor at 0.4× the base).")]
-        [SerializeField] private float pivotDuration = 0.2f;
+        [Tooltip("When the input direction differs from current velocity by more than 90° AND the player is moving at >pivotMinSpeed, this delay (s) kicks in before the new direction is accepted. The pivot duration scales down with GeneralAttributes.ChangeOfDirection01 (faster pivot for higher-stat players, with a floor at 0.4× the base). Currently 0 (disabled) while we tune; bump to ~0.2 to bring back the sharp-turn delay.")]
+        [SerializeField] private float pivotDuration = 0f;
         [Tooltip("Minimum current lateral speed (u/s) for the pivot delay to trigger. Below this, players can turn freely at walking pace.")]
         [SerializeField] private float pivotMinSpeed = 4.5f;
 
