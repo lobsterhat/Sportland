@@ -87,6 +87,7 @@ namespace Sportland.Sports.Dodgeball
         private float jumpTimer = -1f;
         private float jumpRecoverTimer = -1f;
         private float dampingBeforeJump = -1f;   // sentinel; >=0 means a jump is in progress and we've stashed the rb's linearDamping
+        private Vector2 landingVelocity = Vector2.zero;   // captured at land; linearly tapered to zero over jumpRecoverDuration
         private float pivotTimer = -1f;
         private GeneralAttributes generalCache;
         public bool IsJumpRecovering => jumpRecoverTimer >= 0f;
@@ -284,8 +285,13 @@ namespace Sportland.Sports.Dodgeball
                     CurrentJumpHeight = 0f;
                     // Restore the rb's normal damping that we zeroed at TryJump.
                     if (dampingBeforeJump >= 0f) { rb.linearDamping = dampingBeforeJump; dampingBeforeJump = -1f; }
-                    // Brief landing pause before input is accepted again.
+                    // Brief landing pause + linear velocity taper. Capture the
+                    // velocity now so we can bleed it to zero in-place over the
+                    // recovery window — "lands on their feet and slows down"
+                    // rather than coasting off-screen on the launch momentum.
+                    landingVelocity = rb.linearVelocity;
                     if (jumpRecoverDuration > 0f) jumpRecoverTimer = 0f;
+                    else { rb.linearVelocity = Vector2.zero; landingVelocity = Vector2.zero; }
                     OnLanded?.Invoke(this);
                 }
                 else
@@ -297,7 +303,17 @@ namespace Sportland.Sports.Dodgeball
             else if (IsJumpRecovering)
             {
                 jumpRecoverTimer += Time.deltaTime;
-                if (jumpRecoverTimer >= jumpRecoverDuration) jumpRecoverTimer = -1f;
+                // Linear taper from landingVelocity → 0 over jumpRecoverDuration.
+                // Driven directly (overrides damping) so the player decelerates
+                // predictably regardless of the rb's damping setting.
+                float u = Mathf.Clamp01(jumpRecoverTimer / jumpRecoverDuration);
+                rb.linearVelocity = landingVelocity * (1f - u);
+                if (jumpRecoverTimer >= jumpRecoverDuration)
+                {
+                    jumpRecoverTimer = -1f;
+                    rb.linearVelocity = Vector2.zero;
+                    landingVelocity = Vector2.zero;
+                }
             }
 
             if (IsPivoting)
