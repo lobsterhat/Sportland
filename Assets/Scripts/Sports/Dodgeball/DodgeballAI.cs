@@ -466,6 +466,18 @@ namespace Sportland.Sports.Dodgeball
         {
             movement.SetStance(false);
 
+            // Airborne: don't re-decide anything. The launch velocity is the
+            // throw's momentum bonus, and the player's trajectory shouldn't be
+            // re-routed mid-jump (carry-home would fire when their position
+            // crosses the line and turn them back). Just complete the run-jump
+            // if one is in progress.
+            if (!movement.IsGrounded)
+            {
+                if (runJumpPhase != RunJumpPhase.None && throwTarget != null)
+                    DoRunJumpAttack(throwTarget);
+                return;
+            }
+
             // Grabbed the ball out of our area — carry it home before we can throw.
             if (!tracker.IsInZone)
             {

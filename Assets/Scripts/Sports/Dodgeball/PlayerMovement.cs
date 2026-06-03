@@ -33,6 +33,8 @@ namespace Sportland.Sports.Dodgeball
         [Header("Jump")]
         [SerializeField] private float jumpHeight = 1.5f;  // peak hop height
         [SerializeField] private float jumpDuration = 0.6f;
+        [Tooltip("Brief 'gather your feet' pause (s) after landing during which movement input is ignored. Prevents instant re-aim mid-stride; lets natural damping bleed off the jump's lateral momentum.")]
+        [SerializeField] private float jumpRecoverDuration = 0.15f;
 
         [Header("Dash (sidestep evade)")]
         [Tooltip("Speed (u/s) of the evade dash burst.")]
@@ -77,6 +79,9 @@ namespace Sportland.Sports.Dodgeball
 
         private Rigidbody2D rb;
         private float jumpTimer = -1f;
+        private float jumpRecoverTimer = -1f;
+        private float dampingBeforeJump = -1f;   // sentinel; >=0 means a jump is in progress and we've stashed the rb's linearDamping
+        public bool IsJumpRecovering => jumpRecoverTimer >= 0f;
         private float duckTimer = -1f;
         private float dashTimer = -1f;
         private float dashCooldownTimer = -1f;
@@ -168,6 +173,10 @@ namespace Sportland.Sports.Dodgeball
         public void ApplyMove(Vector2 input)
         {
             if (IsDashing || IsDiving || IsRecovering) return;   // dash/dive drive velocity directly; recovery is prone
+            // Airborne preserves its launch velocity — no input mid-flight.
+            // Jump-recovery is a brief landing pause so you can't instantly
+            // pivot the moment your feet touch down.
+            if (IsAirborne || IsJumpRecovering) return;
             Vector2 clamped = input.sqrMagnitude > 1f ? input.normalized : input;
             if (!facingOverriddenThisFrame && clamped.sqrMagnitude > 0.04f) Facing = clamped.normalized;
             float speed = (IsRunning ? runSpeed : walkSpeed) * (InDefensiveStance ? stanceSpeedMultiplier : 1f);
@@ -180,7 +189,15 @@ namespace Sportland.Sports.Dodgeball
 
         public void TryJump()
         {
-            if (!IsAirborne && !IsDucking && !IsDashing && !IsDiving && !IsRecovering) jumpTimer = 0f;
+            if (!IsAirborne && !IsDucking && !IsDashing && !IsDiving && !IsRecovering)
+            {
+                jumpTimer = 0f;
+                // Zero the rigidbody's damping for the duration of the jump
+                // so the launch velocity persists end-to-end. Restored on
+                // landing. Sentinel -1 means "no jump in progress."
+                dampingBeforeJump = rb.linearDamping;
+                rb.linearDamping = 0f;
+            }
         }
 
         /// <summary>Start/refresh a duck. Holds for duckDuration after the last call. Ignored while airborne or dashing.</summary>
@@ -229,6 +246,10 @@ namespace Sportland.Sports.Dodgeball
                 {
                     jumpTimer = -1f;
                     CurrentJumpHeight = 0f;
+                    // Restore the rb's normal damping that we zeroed at TryJump.
+                    if (dampingBeforeJump >= 0f) { rb.linearDamping = dampingBeforeJump; dampingBeforeJump = -1f; }
+                    // Brief landing pause before input is accepted again.
+                    if (jumpRecoverDuration > 0f) jumpRecoverTimer = 0f;
                     OnLanded?.Invoke(this);
                 }
                 else
@@ -236,6 +257,11 @@ namespace Sportland.Sports.Dodgeball
                     // Parabolic arc: 4*t*(1-t) peaks at t=0.5 with value 1.
                     CurrentJumpHeight = 4f * t * (1f - t) * jumpHeight;
                 }
+            }
+            else if (IsJumpRecovering)
+            {
+                jumpRecoverTimer += Time.deltaTime;
+                if (jumpRecoverTimer >= jumpRecoverDuration) jumpRecoverTimer = -1f;
             }
 
             if (IsDucking)
