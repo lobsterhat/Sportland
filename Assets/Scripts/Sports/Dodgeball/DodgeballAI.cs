@@ -61,6 +61,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float hardPassSpeedMul = 1.6f;
         [Tooltip("Perpendicular distance (u) within which an opponent counts as 'in the lane' — flips the pass from hard chest to lob, and tells defenders where to step in.")]
         [SerializeField] private float laneClearRadius = 1.5f;
+        [Tooltip("Wider lane-clearance radius (u) used specifically for outfielder→infielder passes. Outfielder paths are long and cross opposing territory, so the lane check should be more cautious — even a defender 2-3 m off the direct line has time to step into a chest pass. Bump higher to force more lobs.")]
+        [SerializeField] private float outfielderPassLaneRadius = 2.5f;
         [Tooltip("Ball Height (u) above which an intercepting defender jumps for extra reach (PickupHeightFor scales with the jump).")]
         [SerializeField] private float interceptJumpHeight = 1.4f;
         [Tooltip("How far (u) an infielder shifts toward the opposing half when supporting an outfielder carrier — closer for the pass-back and the follow-up shot, but more exposed if the pass is intercepted.")]
@@ -808,9 +810,13 @@ namespace Sportland.Sports.Dodgeball
             if (holdStartTime < 0f) holdStartTime = Time.time;
             if (Time.time - holdStartTime >= windupTime)
             {
-                // Lane clear → hard chest pass (fast & flat, catches defense
-                // unaware); opponent in the lane → lob over them.
-                bool laneClear = LaneIsClear(target.transform.position);
+                // Lane check: outfielders use a wider clearance radius because
+                // their passes are long and cross opposing territory — a
+                // defender 2-3 m off the direct line still has time to step
+                // into a chest pass.
+                bool isOutfielderPass = tracker.Spawn.role != PlayerRole.Infielder;
+                float laneRadius = isOutfielderPass ? outfielderPassLaneRadius : laneClearRadius;
+                bool laneClear = LaneIsClear(target.transform.position, laneRadius);
                 float speed = laneClear ? passSpeed * hardPassSpeedMul : passSpeed;
                 ball.IntendedTarget = target;
                 ball.Pass(target.transform.position, speed, isLob: !laneClear);
@@ -877,8 +883,12 @@ namespace Sportland.Sports.Dodgeball
         }
 
         // No opponent stands within laneClearRadius of the passer→target segment
-        // (and between the two, not before / past the ends).
-        private bool LaneIsClear(Vector2 target)
+        // (and between the two, not before / past the ends). Default overload
+        // uses the standard laneClearRadius; the radius parameter overload
+        // lets callers (like outfielder passes) widen the check.
+        private bool LaneIsClear(Vector2 target) => LaneIsClear(target, laneClearRadius);
+
+        private bool LaneIsClear(Vector2 target, float radius)
         {
             Vector2 ballPos = transform.position;
             Vector2 seg = target - ballPos;
@@ -894,7 +904,7 @@ namespace Sportland.Sports.Dodgeball
                 Vector2 toT = (Vector2)t.transform.position - ballPos;
                 float along = Vector2.Dot(toT, dir);
                 if (along <= 0.5f || along >= segLen - 0.5f) continue;
-                if (Vector2.Distance(ballPos + dir * along, t.transform.position) <= laneClearRadius)
+                if (Vector2.Distance(ballPos + dir * along, t.transform.position) <= radius)
                     return false;
             }
             return true;
