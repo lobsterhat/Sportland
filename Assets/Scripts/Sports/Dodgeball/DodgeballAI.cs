@@ -65,8 +65,10 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float outfielderPassLaneRadius = 2.5f;
         [Tooltip("Ball Height (u) above which an intercepting defender jumps for extra reach (PickupHeightFor scales with the jump).")]
         [SerializeField] private float interceptJumpHeight = 1.4f;
-        [Tooltip("How far (u) an infielder shifts toward the opposing half when supporting an outfielder carrier — closer for the pass-back and the follow-up shot, but more exposed if the pass is intercepted.")]
+        [Tooltip("How far (u) an infielder shifts toward the opposing half when supporting an outfielder carrier — closer for the pass-back and the follow-up shot, but more exposed if the pass is intercepted. Applies to non-best-shooter teammates; the best shooter retreats by supportRetreatShift instead.")]
         [SerializeField] private float supportForwardShift = 1.5f;
+        [Tooltip("How far (u) the BEST-SHOOTER teammate infielder retreats AWAY from the centerline when supporting an outfielder carrier. Creates a deep, safe lob target the outfielder can drop the ball into past the front-line defenders.")]
+        [SerializeField] private float supportRetreatShift = 2.5f;
         [Tooltip("Per-unit distance penalty applied when comparing pass-target score potential. A far teammate needs to be substantially better to be preferred over a close one.")]
         [SerializeField] private float passDistancePenalty01 = 0.02f;
         [Tooltip("How much higher (in 0..1 score-potential space) a teammate's effective shot must be before a carrier-infielder passes instead of shooting themselves.")]
@@ -272,10 +274,15 @@ namespace Sportland.Sports.Dodgeball
             {
                 if (carrierIsOutfielder)
                 {
-                    // Receiver setup: shift forward (toward opposing half) so
-                    // I'm closer for the pass-back and the follow-up shot.
+                    // Best-shooter teammate (highest ScorePotential) RETREATS
+                    // deep — gives the outfielder a safe lob target past the
+                    // centerline defenders. Other infielders shift forward as
+                    // close-support options so the defense has to split.
+                    bool iAmBestShooter = AmIBestShooterOnMyTeam();
                     Vector2 forward = tracker.Spawn.team == Team.A ? Vector2.right : Vector2.left;
-                    supportTarget = (Vector2)tracker.Spawn.position + forward * supportForwardShift;
+                    supportTarget = iAmBestShooter
+                        ? (Vector2)tracker.Spawn.position - forward * supportRetreatShift
+                        : (Vector2)tracker.Spawn.position + forward * supportForwardShift;
                 }
                 else
                 {
@@ -795,15 +802,27 @@ namespace Sportland.Sports.Dodgeball
                 tracker.ArmCatch();
         }
 
-        // Pass the ball to the best-positioned teammate infielder — used by
-        // outfielders feeding the front court AND by carrier-infielders who've
-        // decided their teammate has a better shot. "Best" = highest
-        // ScorePotential01 minus a distance penalty, so a close-but-okay
-        // teammate beats a far-but-great one.
+        // Pass the ball to the best-positioned teammate. Default target is
+        // the highest-scoring teammate infielder; outfielder carriers fall
+        // back to a teammate outfielder (backcourt rotation) when no infielder
+        // lane is clear, since rotating to a better angle beats forcing a
+        // blocked lob.
         private void PassToInfielder()
         {
             var target = BestTeammateInfielderToPass();
-            if (target == null) return;   // no infielder to feed — just hold
+            bool isOutfielderCarrier = tracker.Spawn.role != PlayerRole.Infielder;
+
+            // Outfielder fallback: if my best-infielder pass would be blocked,
+            // rotate the ball to a teammate outfielder with a clear lane. They
+            // can try the delivery from their position next tick.
+            if (isOutfielderCarrier && target != null
+                && !LaneIsClear(target.transform.position, outfielderPassLaneRadius))
+            {
+                var rotation = BestTeammateOutfielderWithClearLane();
+                if (rotation != null) target = rotation;
+            }
+
+            if (target == null) return;   // nobody to feed — just hold
 
             movement.SetFacing((Vector2)target.transform.position - (Vector2)transform.position);
 
@@ -814,8 +833,7 @@ namespace Sportland.Sports.Dodgeball
                 // their passes are long and cross opposing territory — a
                 // defender 2-3 m off the direct line still has time to step
                 // into a chest pass.
-                bool isOutfielderPass = tracker.Spawn.role != PlayerRole.Infielder;
-                float laneRadius = isOutfielderPass ? outfielderPassLaneRadius : laneClearRadius;
+                float laneRadius = isOutfielderCarrier ? outfielderPassLaneRadius : laneClearRadius;
                 bool laneClear = LaneIsClear(target.transform.position, laneRadius);
                 float speed = laneClear ? passSpeed * hardPassSpeedMul : passSpeed;
                 ball.IntendedTarget = target;
@@ -928,6 +946,49 @@ namespace Sportland.Sports.Dodgeball
             {
                 var t = trackers[i];
                 if (t == null || t.Spawn.team != team || t.Spawn.role != PlayerRole.Infielder) continue;
+                float d = ((Vector2)t.transform.position - me).sqrMagnitude;
+                if (d < bestDistSq) { bestDistSq = d; best = t; }
+            }
+            return best;
+        }
+
+        // True if no same-team infielder has a higher ScorePotential01 than me.
+        // Drives the "best-shooter retreats deep when our outfielder has the
+        // ball" behavior in TrySupportTeammate — the star is the lob target.
+        private bool AmIBestShooterOnMyTeam()
+        {
+            if (attr == null || tracker.Spawn.role != PlayerRole.Infielder) return false;
+            float myScore = attr.ScorePotential01;
+            var team = tracker.Spawn.team;
+            var trackers = PlayerZoneTracker.All;
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null || t == tracker) continue;
+                if (t.Spawn.team != team || t.Spawn.role != PlayerRole.Infielder) continue;
+                var a = t.GetComponent<DodgeballAttributes>();
+                if (a != null && a.ScorePotential01 > myScore) return false;
+            }
+            return true;
+        }
+
+        // Nearest same-team outfielder whose current position has a clear
+        // pass lane from me (using the wider outfielderPassLaneRadius).
+        // Used as a backcourt-rotation fallback when no infielder lane is
+        // clear — the receiving outfielder will try to deliver next tick.
+        private PlayerZoneTracker BestTeammateOutfielderWithClearLane()
+        {
+            PlayerZoneTracker best = null;
+            float bestDistSq = float.MaxValue;
+            Vector2 me = transform.position;
+            var team = tracker.Spawn.team;
+            var trackers = PlayerZoneTracker.All;
+            for (int i = 0; i < trackers.Count; i++)
+            {
+                var t = trackers[i];
+                if (t == null || t == tracker) continue;
+                if (t.Spawn.team != team || t.Spawn.role != PlayerRole.Outfielder) continue;
+                if (!LaneIsClear(t.transform.position, outfielderPassLaneRadius)) continue;
                 float d = ((Vector2)t.transform.position - me).sqrMagnitude;
                 if (d < bestDistSq) { bestDistSq = d; best = t; }
             }
