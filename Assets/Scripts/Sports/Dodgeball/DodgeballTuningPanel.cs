@@ -19,7 +19,8 @@ namespace Sportland.Sports.Dodgeball
     public class DodgeballTuningPanel : MonoBehaviour
     {
         [SerializeField] private float panelWidth = 290f;
-        [SerializeField] private float topOffset = 12f;
+        [Tooltip("Top edge (px). Pushed down to sit below the DodgeballDiagnosticsHUD stack at top-left.")]
+        [SerializeField] private float topOffset = 420f;
         [SerializeField] private float bottomMargin = 12f;
 
         private Ball ball;
