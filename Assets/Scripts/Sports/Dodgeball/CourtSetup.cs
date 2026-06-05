@@ -82,6 +82,7 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private bool showPlayByPlay = true;
         [Tooltip("Show the Match controls panel (mode dropdown + Reset button) top-right.")]
         [SerializeField] private bool showMatchControls = true;
+        [SerializeField] private bool showTuningPanel = true;
 
         [Header("Match")]
         [Tooltip("Scoring rules asset. Leave null to use Start Mode below (built in code).")]
@@ -150,6 +151,7 @@ namespace Sportland.Sports.Dodgeball
             if (showPlayerLabels) gameObject.AddComponent<DodgeballPlayerLabels>();
             if (showPlayByPlay) gameObject.AddComponent<DodgeballPlayByPlay>();
             if (showMatchControls) gameObject.AddComponent<DodgeballMatchControls>();
+            if (showTuningPanel) gameObject.AddComponent<DodgeballTuningPanel>();
             if (runMatch)
             {
                 match = gameObject.AddComponent<DodgeballMatch>();

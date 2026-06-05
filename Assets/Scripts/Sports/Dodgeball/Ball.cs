@@ -113,21 +113,21 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float floorOffsetY = -0.79f;
         [Tooltip("Ball Height while carried (chest level, above feet).")]
         [SerializeField] private float carryHeight = 1.29f;
-        [SerializeField] private float lobApex = 0.15f;   // baseline reset; tune up if lobs feel too flat
+        public float lobApex = 0.15f;
         [Tooltip("Extra lateral pass speed (u/s) per unit of distance — long passes are thrown harder.")]
         [SerializeField] private float passSpeedPerUnit = 0.35f;
         [Tooltip("Cap on lateral pass speed (u/s) after distance scaling.")]
         [SerializeField] private float maxPassSpeed = 24f;
         [Tooltip("Extra lob apex (height) per unit of pass distance.")]
-        [SerializeField] private float lobApexPerUnit = 0.06f;
+        public float lobApexPerUnit = 0.06f;
         [Tooltip("Lob apex floor when an opponent stands in the pass lane (clears a standing reach).")]
-        [SerializeField] private float lobClearanceApex = 1f;
+        public float lobClearanceApex = 1f;
         [Tooltip("Maximum lob apex after scaling (keeps it 'a little height', not a moonball).")]
-        [SerializeField] private float maxLobApex = 1.5f;
+        public float maxLobApex = 1.5f;
         [Tooltip("Half-width (u) of the lob lane used to detect opponents to clear.")]
-        [SerializeField] private float lobLaneRadius = 0.9f;
+        public float lobLaneRadius = 0.9f;
         [Tooltip("Lateral-speed multiplier applied to lobs after distance scaling. <1 makes lobs floatier. 1.0 = same speed as a chest pass arrival.")]
-        [SerializeField] private float lobLateralSpeedMul = 1.0f;
+        public float lobLateralSpeedMul = 1.0f;
         [Tooltip("Constant downward acceleration applied to Height in the Thrown state (units/sec^2).")]
         [SerializeField] private float gravity = 12f;
 

@@ -34,13 +34,13 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float jumpHeight = 1.5f;  // peak hop height
         [SerializeField] private float jumpDuration = 0.6f;
         [Tooltip("Brief 'gather your feet' pause (s) after landing during which movement input is ignored. Prevents instant re-aim mid-stride; lets natural damping bleed off the jump's lateral momentum.")]
-        [SerializeField] private float jumpRecoverDuration = 0.15f;
+        public float jumpRecoverDuration = 0.15f;
 
         [Header("Pivot delay (sharp direction change)")]
-        [Tooltip("When the input direction differs from current velocity by more than 90° AND the player is moving at >pivotMinSpeed, this delay (s) kicks in before the new direction is accepted. The pivot duration scales down with GeneralAttributes.ChangeOfDirection01 (faster pivot for higher-stat players, with a floor at 0.4× the base). Currently 0 (disabled) while we tune; bump to ~0.2 to bring back the sharp-turn delay.")]
-        [SerializeField] private float pivotDuration = 0f;
+        [Tooltip("When the input direction differs from current velocity by more than 90° AND the player is moving at >pivotMinSpeed, this delay (s) kicks in before the new direction is accepted. The pivot duration scales down with GeneralAttributes.ChangeOfDirection01 (faster pivot for higher-stat players, with a floor at 0.4× the base).")]
+        public float pivotDuration = 0f;
         [Tooltip("Minimum current lateral speed (u/s) for the pivot delay to trigger. Below this, players can turn freely at walking pace.")]
-        [SerializeField] private float pivotMinSpeed = 4.5f;
+        public float pivotMinSpeed = 4.5f;
 
         [Header("Dash (sidestep evade)")]
         [Tooltip("Speed (u/s) of the evade dash burst.")]

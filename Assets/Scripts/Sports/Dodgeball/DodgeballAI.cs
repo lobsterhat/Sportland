@@ -60,28 +60,28 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Speed multiplier on passSpeed for a hard chest pass when the lane is clear — fast & flat, harder to set up against, easier to intercept.")]
         [SerializeField] private float hardPassSpeedMul = 1.6f;
         [Tooltip("Perpendicular distance (u) within which an opponent counts as 'in the lane' — flips the pass from hard chest to lob, and tells defenders where to step in.")]
-        [SerializeField] private float laneClearRadius = 1.5f;
-        [Tooltip("Wider lane-clearance radius (u) used specifically for outfielder→infielder passes. Outfielder paths are long and cross opposing territory, so the lane check should be more cautious — even a defender 2-3 m off the direct line has time to step into a chest pass. Bump higher to force more lobs. Currently matches the standard laneClearRadius while we tune.")]
-        [SerializeField] private float outfielderPassLaneRadius = 1.5f;
+        public float laneClearRadius = 1.5f;
+        [Tooltip("Wider lane-clearance radius (u) used specifically for outfielder→infielder passes. Outfielder paths are long and cross opposing territory, so the lane check should be more cautious — even a defender 2-3 m off the direct line has time to step into a chest pass. Bump higher to force more lobs.")]
+        public float outfielderPassLaneRadius = 1.5f;
         [Tooltip("Ball Height (u) above which an intercepting defender jumps for extra reach (PickupHeightFor scales with the jump).")]
         [SerializeField] private float interceptJumpHeight = 1.4f;
         [Tooltip("How far (u) an infielder shifts toward the opposing half when supporting an outfielder carrier — closer for the pass-back and the follow-up shot, but more exposed if the pass is intercepted. Applies to non-best-shooter teammates; the best shooter retreats by supportRetreatShift instead.")]
-        [SerializeField] private float supportForwardShift = 1.5f;
-        [Tooltip("How far (u) the BEST-SHOOTER teammate infielder retreats AWAY from the centerline when supporting an outfielder carrier. Creates a deep, safe lob target the outfielder can drop the ball into past the front-line defenders. Currently 0 (disabled — no retreat); bump to ~2.5 to bring back the deep-target behavior.")]
-        [SerializeField] private float supportRetreatShift = 0f;
+        public float supportForwardShift = 1.5f;
+        [Tooltip("How far (u) the BEST-SHOOTER teammate infielder retreats AWAY from the centerline when supporting an outfielder carrier. Creates a deep, safe lob target the outfielder can drop the ball into past the front-line defenders.")]
+        public float supportRetreatShift = 0f;
 
-        [Tooltip("When true, an outfielder carrier whose lane to the best infielder is blocked will rotate the ball to a teammate outfielder with a clear lane instead (backcourt rotation). Currently disabled while we tune; flip on once positioning feels stable.")]
-        [SerializeField] private bool enableOutfielderRotation = false;
+        [Tooltip("When true, an outfielder carrier whose lane to the best infielder is blocked will rotate the ball to a teammate outfielder with a clear lane instead (backcourt rotation).")]
+        public bool enableOutfielderRotation = false;
         [Tooltip("Per-unit distance penalty applied when comparing pass-target score potential. A far teammate needs to be substantially better to be preferred over a close one.")]
-        [SerializeField] private float passDistancePenalty01 = 0.02f;
+        public float passDistancePenalty01 = 0.02f;
         [Tooltip("How much higher (in 0..1 score-potential space) a teammate's effective shot must be before a carrier-infielder passes instead of shooting themselves.")]
-        [SerializeField] private float passOverThrowBias = 0.10f;
+        public float passOverThrowBias = 0.10f;
 
         [Header("Run-jump attack")]
-        [Tooltip("Base probability (0..1) that a carrier-infielder commits to a running-jump throw on a given possession. The actual chance scales with the player's accuracy + speed — an aggressive specialist run-jumps more often than a cautious one. Currently 0 (disabled) while we tune lobs / positioning; bump to ~0.4 to bring run-jump throws back.")]
-        [SerializeField, Range(0f, 1f)] private float runJumpProbability = 0f;
+        [Tooltip("Base probability (0..1) that a carrier-infielder commits to a running-jump throw on a given possession. The actual chance scales with the player's accuracy + speed — an aggressive specialist run-jumps more often than a cautious one.")]
+        [Range(0f, 1f)] public float runJumpProbability = 0f;
         [Tooltip("Distance (u) to my zone's forward edge at which the run-up commits to the jump + release. Smaller = release closer to the line — more momentum but riskier (if I jump too late I cross the line on release and Phase D neuters the shot).")]
-        [SerializeField] private float runJumpEdgeDistance = 1.2f;
+        public float runJumpEdgeDistance = 1.2f;
         [Tooltip("Movement-input magnitude during the run-up. 1 = full run; lower values are less committal but build less momentum.")]
         [SerializeField, Range(0.4f, 1f)] private float runJumpInputSpeed = 1f;
 
@@ -91,7 +91,7 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Speed when ambling toward a loose ball, as a fraction of walk speed — there's no urgency, so it shouldn't sprint. 1 = full walk.")]
         [SerializeField, Range(0.2f, 1f)] private float looseChaseSpeed = 0.6f;
         [Tooltip("Cross-retrieval distance cap (u). Don't chase a loose ball outside my own zone if it's farther than this — keeps the whole infield from sprinting after a deep-corner ball.")]
-        [SerializeField] private float crossRetrieveMaxDist = 8f;
+        public float crossRetrieveMaxDist = 8f;
 
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
