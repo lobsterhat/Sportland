@@ -40,23 +40,112 @@ namespace Sportland.Sports.Dodgeball
         private PlayerZoneTracker testThrower;
         private PlayerZoneTracker testReceiver;
 
+        // Currently-controlled players (their DodgeballAI is disabled while
+        // we hold them). Tracked separately from testThrower / testReceiver
+        // so a mid-hold selection change correctly restores the previous
+        // player's AI before disabling the new one's.
+        private PlayerZoneTracker controlledThrower;
+        private PlayerZoneTracker controlledReceiver;
+        private bool throwerSuppressed;   // L-stick click suppresses control until L1 is released and re-pressed
+        private bool receiverSuppressed;  // R-stick click suppresses control until L2 is released and re-pressed
+
         private void Update()
         {
-            // Mouse picks: left = thrower, right = receiver. Ignored if no
-            // player is within pickRadius of the click — so clicking empty
-            // space (or on the panel UI) doesn't clear the selection.
-            if (Mouse.current == null || Camera.main == null) return;
+            // ── Mouse picks: left=thrower, right=receiver. Empty-space
+            // clicks don't change the selection (pickRadius gate).
+            if (Camera.main != null && Mouse.current != null)
+            {
+                if (Mouse.current.leftButton.wasPressedThisFrame)
+                {
+                    var hit = PickPlayerAtScreen(Mouse.current.position.ReadValue());
+                    if (hit != null) testThrower = hit;
+                }
+                if (Mouse.current.rightButton.wasPressedThisFrame)
+                {
+                    var hit = PickPlayerAtScreen(Mouse.current.position.ReadValue());
+                    if (hit != null) testReceiver = hit;
+                }
+            }
 
-            if (Mouse.current.leftButton.wasPressedThisFrame)
+            // ── Gamepad: ball returns + take control of thrower / receiver.
+            var pad = Gamepad.current;
+            if (pad != null)
             {
-                var hit = PickPlayerAtScreen(Mouse.current.position.ReadValue());
-                if (hit != null) testThrower = hit;
+                bool l1Down     = pad.leftShoulder.isPressed;
+                bool l1Pressed  = pad.leftShoulder.wasPressedThisFrame;
+                bool l2Down     = pad.leftTrigger.IsPressed();   // analog → button via Unity's default press point
+                bool l2Pressed  = pad.leftTrigger.wasPressedThisFrame;
+                bool r2Pressed  = pad.rightTrigger.wasPressedThisFrame;
+                bool lsClicked  = pad.leftStickButton.wasPressedThisFrame;
+                bool rsClicked  = pad.rightStickButton.wasPressedThisFrame;
+
+                // L1 press → ball returns to thrower (a new hold starts here
+                // too, so clear any prior suppression).
+                if (l1Pressed)
+                {
+                    throwerSuppressed = false;
+                    if (testThrower != null && ball != null) ball.ForcePickup(testThrower);
+                }
+                // L2 press: same suppression reset, no ball transfer (L2 just
+                // takes control of the receiver, R2 returns the ball).
+                if (l2Pressed) receiverSuppressed = false;
+
+                // R2 press → ball returns to receiver.
+                if (r2Pressed && testReceiver != null && ball != null)
+                    ball.ForcePickup(testReceiver);
+
+                // Stick clicks suppress the current hold's control until the
+                // hold-trigger is released and re-pressed.
+                if (lsClicked) throwerSuppressed = true;
+                if (rsClicked) receiverSuppressed = true;
+
+                // Compute who should be under user control THIS FRAME.
+                PlayerZoneTracker desiredThrower  = (l1Down && !throwerSuppressed)  ? testThrower  : null;
+                PlayerZoneTracker desiredReceiver = (l2Down && !receiverSuppressed) ? testReceiver : null;
+
+                ApplyControl(ref controlledThrower,  desiredThrower);
+                ApplyControl(ref controlledReceiver, desiredReceiver);
+
+                // Drive movement: left stick for thrower, right stick for receiver.
+                if (controlledThrower != null)
+                {
+                    var m = controlledThrower.GetComponent<PlayerMovement>();
+                    if (m != null) m.ApplyMove(pad.leftStick.ReadValue());
+                }
+                if (controlledReceiver != null)
+                {
+                    var m = controlledReceiver.GetComponent<PlayerMovement>();
+                    if (m != null) m.ApplyMove(pad.rightStick.ReadValue());
+                }
             }
-            if (Mouse.current.rightButton.wasPressedThisFrame)
+        }
+
+        // Take or release control of a single player. Toggles DodgeballAI.enabled
+        // so the AI doesn't fight the user's stick input while held.
+        private void ApplyControl(ref PlayerZoneTracker current, PlayerZoneTracker desired)
+        {
+            if (current == desired) return;
+            // Release previous.
+            if (current != null)
             {
-                var hit = PickPlayerAtScreen(Mouse.current.position.ReadValue());
-                if (hit != null) testReceiver = hit;
+                var ai = current.GetComponent<DodgeballAI>();
+                if (ai != null) ai.enabled = true;
             }
+            // Take new.
+            if (desired != null)
+            {
+                var ai = desired.GetComponent<DodgeballAI>();
+                if (ai != null) ai.enabled = false;
+            }
+            current = desired;
+        }
+
+        private void OnDisable()
+        {
+            // Restore AI on anyone we were controlling so they don't get
+            // stuck idle if the panel is removed mid-test.
+            ApplyControl(ref controlledThrower, null);
+            ApplyControl(ref controlledReceiver, null);
         }
 
         private void OnGUI()
@@ -81,7 +170,13 @@ namespace Sportland.Sports.Dodgeball
             scroll = GUILayout.BeginScrollView(scroll);
 
             // ---------- THROW TESTER ----------
-            Section("THROW TESTER (mouse: L=thrower, R=receiver)");
+            Section("THROW TESTER");
+            GUILayout.Label("Mouse: L=thrower  R=receiver");
+            GUILayout.Label("L1 press: ball→thrower  R2: ball→receiver");
+            GUILayout.Label("Hold L1: move thrower (L stick)");
+            GUILayout.Label("Hold L2: move receiver (R stick)");
+            GUILayout.Label("Click L/R stick: release control");
+            GUILayout.Space(4f);
             GUILayout.Label("Thrower: " + LabelFor(testThrower));
             GUILayout.Label("Receiver: " + LabelFor(testReceiver));
 
