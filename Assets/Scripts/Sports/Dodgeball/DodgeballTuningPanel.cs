@@ -47,6 +47,11 @@ namespace Sportland.Sports.Dodgeball
         // work, they just don't freeze anyone.
         private bool debugMode;
 
+        /// <summary>True while any tuning panel has Debug Mode on. Other debug
+        /// systems (e.g. DodgeballCannon's right-stick movement) consult this
+        /// to release gamepad sticks for the tester's use.</summary>
+        public static bool DebugModeActive { get; private set; }
+
         // Currently-frozen players (AI off). Tracked separately from
         // testThrower / testReceiver so a selection change mid-debug-mode
         // correctly restores the previous player's AI before disabling
@@ -79,6 +84,10 @@ namespace Sportland.Sports.Dodgeball
             PlayerZoneTracker shouldFreezeReceiver = debugMode ? testReceiver : null;
             ApplyFreeze(ref frozenThrower,  shouldFreezeThrower);
             ApplyFreeze(ref frozenReceiver, shouldFreezeReceiver);
+
+            // Publish the mode so other debug systems (cannon stick-move) can
+            // release the gamepad sticks while we're using them here.
+            DebugModeActive = debugMode;
 
             if (!debugMode) return;   // gamepad shortcuts + stick movement only apply in debug mode
 
@@ -130,6 +139,7 @@ namespace Sportland.Sports.Dodgeball
             // idle if the panel is removed mid-test or the scene is unloaded.
             ApplyFreeze(ref frozenThrower,  null);
             ApplyFreeze(ref frozenReceiver, null);
+            DebugModeActive = false;
         }
 
         private void OnGUI()

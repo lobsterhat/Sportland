@@ -69,8 +69,11 @@ namespace Sportland.Sports.Dodgeball
         }
 
         // Right stick nudges the cannon around the court for debugging.
+        // Released to the tuning panel's throw-tester when its Debug Mode is
+        // on (the right stick is used there to move the receiver).
         private void HandlePositionStick()
         {
+            if (DodgeballTuningPanel.DebugModeActive) return;
             var gp = Gamepad.current;
             if (gp == null) return;
             Vector2 stick = gp.rightStick.ReadValue();
