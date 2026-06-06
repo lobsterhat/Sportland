@@ -62,6 +62,9 @@ namespace Sportland.Sports.Dodgeball
 
         private bool disableTimers;
         private bool disableOpposingTeam;
+        private bool soloPairOnly;
+        private bool soloModeActive;                                              // tracks whether players are currently hidden
+        private readonly List<GameObject> currentlyHidden = new List<GameObject>(); // who we've SetActive(false)'d
 
         private PlayerZoneTracker testThrower;
         private PlayerZoneTracker testReceiver;   // receiver for pass, target for throw
@@ -113,6 +116,11 @@ namespace Sportland.Sports.Dodgeball
 
             // Freeze the opposing team if the toggle is on (tester modes only).
             ApplyOpposingTeamFreeze(inTesterMode && disableOpposingTeam);
+
+            // Hide everyone except the thrower / receiver if "Solo pair only"
+            // is on. SetActive(false) drops them from PlayerZoneTracker.All,
+            // so other systems naturally ignore them while hidden.
+            ApplySoloMode(inTesterMode);
 
             // Publish statics for other systems.
             DebugModeActive = inTesterMode;
@@ -168,6 +176,7 @@ namespace Sportland.Sports.Dodgeball
             GUILayout.Space(4f);
             disableTimers       = GUILayout.Toggle(disableTimers,       " Disable timers");
             disableOpposingTeam = GUILayout.Toggle(disableOpposingTeam, " Disable opposing team");
+            soloPairOnly        = GUILayout.Toggle(soloPairOnly,        " Solo pair only (hide other 10)");
 
             GUILayout.Space(8f);
 
@@ -410,11 +419,68 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
+        // Hide every player except the picked pair while soloPairOnly is on.
+        // Re-activates them when toggled off, when selection changes, or when
+        // the skill leaves tester mode. SetActive(false) auto-unregisters the
+        // tracker from PlayerZoneTracker.All, so other systems see only the
+        // pair while hidden — TryTakeBall, AI iteration, etc.
+        private void ApplySoloMode(bool inTesterMode)
+        {
+            bool desiredActive = inTesterMode && soloPairOnly && testThrower != null;
+
+            // Detect a pair change that needs re-application (the new pair
+            // might be in our currently-hidden list).
+            bool pairChanged = false;
+            if (desiredActive && soloModeActive)
+            {
+                if (testThrower  != null && currentlyHidden.Contains(testThrower.gameObject))  pairChanged = true;
+                if (testReceiver != null && currentlyHidden.Contains(testReceiver.gameObject)) pairChanged = true;
+            }
+
+            if (desiredActive == soloModeActive && !pairChanged) return;   // no-op
+
+            // Restore everyone we previously hid.
+            for (int i = 0; i < currentlyHidden.Count; i++)
+            {
+                var go = currentlyHidden[i];
+                if (go != null) go.SetActive(true);
+            }
+            currentlyHidden.Clear();
+
+            if (!desiredActive)
+            {
+                soloModeActive = false;
+                return;
+            }
+
+            // Hide everyone except the picked pair. Snapshot the registry
+            // because SetActive(false) mutates it via OnDisable.
+            var snapshot = new List<PlayerZoneTracker>(PlayerZoneTracker.All);
+            for (int i = 0; i < snapshot.Count; i++)
+            {
+                var t = snapshot[i];
+                if (t == null) continue;
+                if (t == testThrower || t == testReceiver) continue;
+                var go = t.gameObject;
+                currentlyHidden.Add(go);
+                go.SetActive(false);
+            }
+            soloModeActive = true;
+        }
+
         private void OnDisable()
         {
             ApplyFreeze(ref frozenThrower,  null);
             ApplyFreeze(ref frozenReceiver, null);
             ApplyOpposingTeamFreeze(false);
+            // Bring back any solo-hidden players.
+            for (int i = 0; i < currentlyHidden.Count; i++)
+            {
+                var go = currentlyHidden[i];
+                if (go != null) go.SetActive(true);
+            }
+            currentlyHidden.Clear();
+            soloModeActive = false;
             DebugModeActive = false;
             TimersDisabled  = false;
         }
