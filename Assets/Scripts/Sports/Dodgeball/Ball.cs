@@ -120,8 +120,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float maxPassSpeed = 24f;
         [Tooltip("Extra lob apex (height) per unit of pass distance.")]
         public float lobApexPerUnit = 0.06f;
-        [Tooltip("Lob apex floor when an opponent stands in the pass lane (clears a standing reach).")]
-        public float lobClearanceApex = 1f;
+        [Tooltip("Lob apex floor (u) when an opponent stands in the pass lane. 3.5 is above a jumping defender's reach (~3 u) so they can't intercept at the midpoint of the arc. Capped by maxLobApex — keep maxLobApex ≥ this value or the clearance bump gets clipped right back down.")]
+        public float lobClearanceApex = 3.5f;
         [Tooltip("Maximum lob apex (u) after scaling. 3.5 lets long outfielder→infielder lobs clear defender jump-reach (~3 u) at the midpoint while still capping the moonball case.")]
         public float maxLobApex = 3.5f;
         [Tooltip("Half-width (u) of the lob lane used to detect opponents to clear.")]
