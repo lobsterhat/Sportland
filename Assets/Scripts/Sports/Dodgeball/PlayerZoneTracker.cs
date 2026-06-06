@@ -100,8 +100,8 @@ namespace Sportland.Sports.Dodgeball
         private float pendingDropAt = -1f;
         private bool pickupLockedInOppInfield;
 
-        /// <summary>True if a recent opp-infield drop has locked this player out of loose-ball pickup until they leave / jump. Read by Ball.TryTakeBall to break the drop/re-grab loop.</summary>
-        public bool PickupLockedInOppInfield => pickupLockedInOppInfield;
+        /// <summary>True if a recent opp-infield drop has locked this player out of loose-ball pickup until they leave / jump. Read by Ball.TryTakeBall to break the drop/re-grab loop. Suppressed while debug TimersDisabled is on so stale lockout state doesn't block test pickups.</summary>
+        public bool PickupLockedInOppInfield => pickupLockedInOppInfield && !DodgeballTuningPanel.TimersDisabled;
 
         // Timestamps of recent crossings (entering out-of-zone state).
         // Pruned to the rolling window each frame.
@@ -218,6 +218,7 @@ namespace Sportland.Sports.Dodgeball
         private void CheckReturnTimer()
         {
             if (IsInZone || outOfZoneSince < 0f || returnExpiryFired) return;
+            if (DodgeballTuningPanel.TimersDisabled) return;
 
             if (Time.time - outOfZoneSince >= ReturnGraceSeconds)
             {
@@ -241,6 +242,7 @@ namespace Sportland.Sports.Dodgeball
         private void EnforceCarrierInZone()
         {
             if (IsInOpposingInfield) return;
+            if (DodgeballTuningPanel.TimersDisabled) return;
 
             if (HasBall && !IsInZone && movement.IsGrounded
                 && outOfZoneSince >= 0f && Time.time - outOfZoneSince >= ReturnGraceSeconds)
@@ -274,6 +276,7 @@ namespace Sportland.Sports.Dodgeball
         private void EnforceOpposingInfieldRules()
         {
             if (movement == null) return;
+            if (DodgeballTuningPanel.TimersDisabled) return;
 
             bool nowInOpp = IsInOpposingInfield;
             bool grounded = movement.IsGrounded;

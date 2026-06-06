@@ -141,6 +141,7 @@ namespace Sportland.Sports.Dodgeball
         private void TickClocks()
         {
             if (matchOver) return;
+            if (DodgeballTuningPanel.TimersDisabled) return;   // debug skill bypass
 
             if (shotClockExpiresAt >= 0f && Time.time >= shotClockExpiresAt)
                 FireShotClockExpiry();
