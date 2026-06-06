@@ -67,8 +67,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float interceptJumpHeight = 1.4f;
         [Tooltip("How far (u) an infielder shifts toward the opposing half when supporting an outfielder carrier — closer for the pass-back and the follow-up shot, but more exposed if the pass is intercepted. Applies to non-best-shooter teammates; the best shooter retreats by supportRetreatShift instead.")]
         public float supportForwardShift = 1.5f;
-        [Tooltip("How far (u) the BEST-SHOOTER teammate infielder retreats AWAY from the centerline when supporting an outfielder carrier. Creates a deep, safe lob target the outfielder can drop the ball into past the front-line defenders.")]
-        public float supportRetreatShift = 0f;
+        [Tooltip("How far (u) the BEST-SHOOTER teammate infielder retreats AWAY from the centerline when supporting an outfielder carrier. Creates a deep, safe lob target the outfielder can drop the ball into past the front-line defenders. Slider 0..5 in the tuning panel; bake the value you like in code.")]
+        public float supportRetreatShift = 2f;
 
         [Tooltip("When true, an outfielder carrier whose lane to the best infielder is blocked will rotate the ball to a teammate outfielder with a clear lane instead (backcourt rotation).")]
         public bool enableOutfielderRotation = false;

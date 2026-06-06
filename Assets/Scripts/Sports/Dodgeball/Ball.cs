@@ -122,8 +122,8 @@ namespace Sportland.Sports.Dodgeball
         public float lobApexPerUnit = 0.06f;
         [Tooltip("Lob apex floor when an opponent stands in the pass lane (clears a standing reach).")]
         public float lobClearanceApex = 1f;
-        [Tooltip("Maximum lob apex after scaling (keeps it 'a little height', not a moonball).")]
-        public float maxLobApex = 1.5f;
+        [Tooltip("Maximum lob apex (u) after scaling. 3.5 lets long outfielder→infielder lobs clear defender jump-reach (~3 u) at the midpoint while still capping the moonball case.")]
+        public float maxLobApex = 3.5f;
         [Tooltip("Half-width (u) of the lob lane used to detect opponents to clear.")]
         public float lobLaneRadius = 0.9f;
         [Tooltip("Lateral-speed multiplier applied to lobs after distance scaling. <1 makes lobs floatier. 1.0 = same speed as a chest pass arrival.")]
