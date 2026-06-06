@@ -113,19 +113,19 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float floorOffsetY = -0.79f;
         [Tooltip("Ball Height while carried (chest level, above feet).")]
         [SerializeField] private float carryHeight = 1.29f;
-        public float lobApex = 0.15f;
+        public float lobApex = 0.5f;
         [Tooltip("Extra lateral pass speed (u/s) per unit of distance — long passes are thrown harder.")]
         [SerializeField] private float passSpeedPerUnit = 0.35f;
         [Tooltip("Cap on lateral pass speed (u/s) after distance scaling.")]
         [SerializeField] private float maxPassSpeed = 24f;
-        [Tooltip("Extra lob apex (height) per unit of pass distance.")]
-        public float lobApexPerUnit = 0.06f;
+        [Tooltip("Extra lob apex (u) per unit of pass distance. 0.15 gives a 13 m outfielder→infielder lob a ~2 u natural apex before any clearance bump — visible arc, steeper launch.")]
+        public float lobApexPerUnit = 0.15f;
         [Tooltip("Lob apex floor (u) when an opponent stands in the pass lane. 3.5 is above a jumping defender's reach (~3 u) so they can't intercept at the midpoint of the arc. Capped by maxLobApex — keep maxLobApex ≥ this value or the clearance bump gets clipped right back down.")]
         public float lobClearanceApex = 3.5f;
         [Tooltip("Maximum lob apex (u) after scaling. 3.5 lets long outfielder→infielder lobs clear defender jump-reach (~3 u) at the midpoint while still capping the moonball case.")]
         public float maxLobApex = 3.5f;
-        [Tooltip("Half-width (u) of the lob lane used to detect opponents to clear.")]
-        public float lobLaneRadius = 0.9f;
+        [Tooltip("Half-width (u) of the lob lane used to detect opponents to clear. 2.0 matches DodgeballAI.outfielderPassLaneRadius so the AI's 'lane blocked → lob' decision and the Ball's 'apply clearance' decision agree on what counts as an in-lane defender.")]
+        public float lobLaneRadius = 2.0f;
         [Tooltip("Lateral-speed multiplier applied to lobs after distance scaling. <1 makes lobs floatier. 1.0 = same speed as a chest pass arrival.")]
         public float lobLateralSpeedMul = 1.0f;
         [Tooltip("Constant downward acceleration applied to Height in the Thrown state (units/sec^2).")]

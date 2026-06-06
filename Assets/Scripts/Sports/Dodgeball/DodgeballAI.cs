@@ -61,8 +61,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float hardPassSpeedMul = 1.6f;
         [Tooltip("Perpendicular distance (u) within which an opponent counts as 'in the lane' — flips the pass from hard chest to lob, and tells defenders where to step in.")]
         public float laneClearRadius = 1.5f;
-        [Tooltip("Wider lane-clearance radius (u) used specifically for outfielder→infielder passes. Outfielder paths are long and cross opposing territory, so the lane check should be more cautious — even a defender 2-3 m off the direct line has time to step into a chest pass. Bump higher to force more lobs.")]
-        public float outfielderPassLaneRadius = 1.5f;
+        [Tooltip("Wider lane-clearance radius (u) used specifically for outfielder→infielder passes. Outfielder paths are long and cross opposing territory, so the lane check should be more cautious — even a defender 2-3 m off the direct line has time to step into a chest pass. Bump higher to force more lobs. 2.0 matches Ball.lobLaneRadius so the AI's decision and the Ball's clearance bump agree.")]
+        public float outfielderPassLaneRadius = 2.0f;
         [Tooltip("Ball Height (u) above which an intercepting defender jumps for extra reach (PickupHeightFor scales with the jump).")]
         [SerializeField] private float interceptJumpHeight = 1.4f;
         [Tooltip("How far (u) an infielder shifts toward the opposing half when supporting an outfielder carrier — closer for the pass-back and the follow-up shot, but more exposed if the pass is intercepted. Applies to non-best-shooter teammates; the best shooter retreats by supportRetreatShift instead.")]
