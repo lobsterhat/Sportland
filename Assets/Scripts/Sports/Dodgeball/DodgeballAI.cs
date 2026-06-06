@@ -92,6 +92,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField, Range(0.2f, 1f)] private float looseChaseSpeed = 0.6f;
         [Tooltip("Cross-retrieval distance cap (u). Don't chase a loose ball outside my own zone if it's farther than this — keeps the whole infield from sprinting after a deep-corner ball.")]
         public float crossRetrieveMaxDist = 8f;
+        [Tooltip("How far (u) beyond my assigned strip the predicted ball-landing can be and still trigger the outfielder anticipate behavior. Wider = outfielders react to off-line throws / lobs more aggressively, but they may abandon their strip more often.")]
+        public float anticipateBuffer = 2f;
 
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
@@ -172,18 +174,55 @@ namespace Sportland.Sports.Dodgeball
             return true;
         }
 
-        // Outfielders only: an opposing throw is in flight and lands in my
-        // strip. Get under it to take it out of the air or off the hop.
-        // If it's not landing in my strip we fall through to ChaseLooseBall / Idle.
+        // Outfielders only: a ball is in flight (Thrown) OR still in motion
+        // after first ground contact (Bouncing), and its predicted landing is
+        // near my strip. Get under it to take it out of the air or off the hop.
+        //
+        // "Near" = in my AssignedZone OR within anticipateBuffer of it — gives
+        // a little forgiveness for off-line throws / wall-bounce mispredictions.
+        //
+        // The closest same-team outfielder commits; the others fall through to
+        // their Idle / strip-center support spot so we don't have all three
+        // chasing the same ball.
         private bool TryAnticipateOutfielderCatch()
         {
             if (tracker.Spawn.role == PlayerRole.Infielder) return false;
             EndThreat();
-            if (ball.CurrentState != Ball.State.Thrown) return false;
+
+            var st = ball.CurrentState;
+            if (st != Ball.State.Thrown && st != Ball.State.Bouncing) return false;
+
             Vector2 land = ball.PredictGroundPoint();
-            if (!tracker.AssignedZone.Contains(land)) return false;
+            if (!IsNearMyStrip(land)) return false;
+            if (!IsClosestSameTeamOutfielderToPoint(land)) return false;
+
             CurrentDecision = "Anticipate";
             AnticipateCatch(land);
+            return true;
+        }
+
+        private bool IsNearMyStrip(Vector2 point)
+        {
+            var zone = tracker.AssignedZone;
+            if (zone.Contains(point)) return true;
+            Vector2 clamped = zone.Clamp(point);
+            return Vector2.Distance(clamped, point) <= anticipateBuffer;
+        }
+
+        // True if no same-team outfielder is closer to point than I am.
+        private bool IsClosestSameTeamOutfielderToPoint(Vector2 point)
+        {
+            float myDistSq = ((Vector2)transform.position - point).sqrMagnitude;
+            var team = tracker.Spawn.team;
+            var all = PlayerZoneTracker.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var t = all[i];
+                if (t == null || t == tracker) continue;
+                if (t.Spawn.team != team || t.Spawn.role != PlayerRole.Outfielder) continue;
+                float d = ((Vector2)t.transform.position - point).sqrMagnitude;
+                if (d < myDistSq) return false;
+            }
             return true;
         }
 
