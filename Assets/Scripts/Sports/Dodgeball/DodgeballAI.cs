@@ -381,14 +381,20 @@ namespace Sportland.Sports.Dodgeball
             {
                 // Outfielder on offense (my team has the ball). Top / bottom
                 // slide FORWARD toward the backline — that's where missed
-                // shots and deflections tend to end up after our attack. The
-                // back outfielder is already deep; keep them centered in
-                // their strip as the obvious pass target.
+                // shots and deflections tend to end up after our attack.
+                // The BACK outfielder slides up/down to match the Y of the
+                // current throw target, so they're already in line with any
+                // overshoot past that target. Falls back to strip center
+                // when no throw target is set (pre-windup, mid-pass, etc.).
                 Vector2 stripCenter = (tracker.AssignedZone.min + tracker.AssignedZone.max) * 0.5f;
                 bool isBack = tracker.Spawn.id.EndsWith("_Back");
                 if (isBack)
                 {
-                    supportTarget = stripCenter;
+                    float targetY = stripCenter.y;
+                    var intent = ball.IntendedTarget;
+                    if (intent != null && intent.Spawn.team != tracker.Spawn.team)
+                        targetY = intent.transform.position.y;
+                    supportTarget = new Vector2(stripCenter.x, targetY);
                 }
                 else
                 {
