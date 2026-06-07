@@ -10,7 +10,7 @@ namespace Sportland.Sports.Dodgeball
     ///   TryAnticipateOutfielderCatch  — outfielder reading a throw landing in my strip
     ///   TryReactToOpposingPass        — closest infielder intercepts; others set against the passer
     ///   TryReactToIncomingThrow       — emergency: catch / duck / jump / sidestep
-    ///   TryPrepareForCarrier          — opposing carrier exists → face & hold zone depth
+    ///   TryPrepareForCarrier          — opposing carrier exists → infielders back off, outfielders slide toward midline (top/bottom)
     ///   TrySupportTeammate            — same-team carrier exists → off-ball support position
     ///   TryChaseLooseBall             — loose ball + I'm closest in my retrieval zone
     ///   Idle                          — fallback: drift home so formation holds
@@ -94,6 +94,10 @@ namespace Sportland.Sports.Dodgeball
         public float crossRetrieveMaxDist = 8f;
         [Tooltip("How far (u) beyond my assigned strip the predicted ball-landing can be and still trigger the outfielder anticipate behavior. Wider = outfielders react to off-line throws / lobs more aggressively, but they may abandon their strip more often.")]
         public float anticipateBuffer = 2f;
+        [Tooltip("How far (u) a top/bottom outfielder slides FORWARD (toward the backline of opposing infield) when their team is on offense — coverage for missed shots and deflections that end up deep.")]
+        public float outfielderBacklineShift = 2f;
+        [Tooltip("How far (u) a top/bottom outfielder slides BACKWARD (toward the midline / centerline) when their team is on defense — coverage for deflections coming back toward our side after the opposing team's throw.")]
+        public float outfielderMidlineShift = 2f;
         [Tooltip("Distance (u) from a movement target at which input starts scaling down toward zero. Players approaching a position will decelerate over this radius rather than carrying their momentum past the target. Smaller = sharper stops but more overshoot risk; larger = gentler arrival but slower.")]
         public float arrivalSlowdownRadius = 1.8f;
 
@@ -274,16 +278,54 @@ namespace Sportland.Sports.Dodgeball
             return true;
         }
 
-        // Infielders only: an opposing carrier exists — back off along the
-        // zone-depth axis so any throw has further to travel.
+        // An opposing carrier exists.
+        //   Infielders: back off along the zone-depth axis so any throw has
+        //   further to travel.
+        //   Outfielders: top/bottom slide TOWARD the midline — deflections off
+        //   our defenders bounce back that way after the opposing throw.
+        //   Back outfielder stays centered in their strip.
         private bool TryPrepareForCarrier()
         {
-            if (tracker.Spawn.role != PlayerRole.Infielder) return false;
             var carrier = ball.Carrier;
             if (carrier == null || carrier.Spawn.team == tracker.Spawn.team) return false;
+
+            if (tracker.Spawn.role == PlayerRole.Infielder)
+            {
+                CurrentDecision = "Prepare";
+                Prepare(carrier);
+                return true;
+            }
+
             CurrentDecision = "Prepare";
-            Prepare(carrier);
+            PrepareOutfielderDefense(carrier);
             return true;
+        }
+
+        // Outfielder defensive positioning. Faces the opposing carrier; top
+        // and bottom outfielders slide toward the midline (back toward our
+        // half) since that's where deflections off our defenders end up.
+        // Back outfielder holds strip center.
+        private void PrepareOutfielderDefense(PlayerZoneTracker carrier)
+        {
+            movement.IsRunning = false;
+            movement.SetStance(true);   // set and watching the ball
+            Vector2 me = transform.position;
+            movement.SetFacing((Vector2)carrier.transform.position - me);
+
+            Vector2 stripCenter = (tracker.AssignedZone.min + tracker.AssignedZone.max) * 0.5f;
+            bool isBack = tracker.Spawn.id.EndsWith("_Back");
+            Vector2 target;
+            if (isBack)
+            {
+                target = stripCenter;
+            }
+            else
+            {
+                Vector2 forward = tracker.Spawn.team == Team.A ? Vector2.right : Vector2.left;
+                target = stripCenter - forward * outfielderMidlineShift;
+            }
+
+            MoveToward(ClampToZone(target));
         }
 
         // Both roles: my teammate has the ball. Slide to a useful off-ball spot
@@ -337,10 +379,22 @@ namespace Sportland.Sports.Dodgeball
             }
             else
             {
-                // Outfielder: center in my strip — an obvious pass target from
-                // any angle, and the existing PassToInfielder targeting picks
-                // a closer player but a centered outfielder is reliably findable.
-                supportTarget = (tracker.AssignedZone.min + tracker.AssignedZone.max) * 0.5f;
+                // Outfielder on offense (my team has the ball). Top / bottom
+                // slide FORWARD toward the backline — that's where missed
+                // shots and deflections tend to end up after our attack. The
+                // back outfielder is already deep; keep them centered in
+                // their strip as the obvious pass target.
+                Vector2 stripCenter = (tracker.AssignedZone.min + tracker.AssignedZone.max) * 0.5f;
+                bool isBack = tracker.Spawn.id.EndsWith("_Back");
+                if (isBack)
+                {
+                    supportTarget = stripCenter;
+                }
+                else
+                {
+                    Vector2 forward = tracker.Spawn.team == Team.A ? Vector2.right : Vector2.left;
+                    supportTarget = stripCenter + forward * outfielderBacklineShift;
+                }
             }
 
             MoveToward(ClampToZone(supportTarget));
