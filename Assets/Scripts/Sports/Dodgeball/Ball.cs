@@ -130,6 +130,8 @@ namespace Sportland.Sports.Dodgeball
         public float lobLateralSpeedMul = 1.0f;
         [Tooltip("Constant downward acceleration applied to Height in the Thrown state (units/sec^2).")]
         [SerializeField] private float gravity = 12f;
+        [Tooltip("Gravity multiplier applied ONLY to a throw's initial flight (before the first ground touch). <1 makes attacks float longer / travel flatter for game-feel. Lobs, chest passes, and post-bounce rolling all use full gravity — this knob only affects the airtime of a launched throw.")]
+        [Range(0.1f, 1f)] [SerializeField] private float throwGravityMul = 0.6f;
 
         [Header("Throw bounce zones (Height above the floor)")]
         [Tooltip("Ball Height at/above this lands in the head zone.")]
@@ -404,10 +406,14 @@ namespace Sportland.Sports.Dodgeball
 
         private void UpdateThrown()
         {
-            // Gravity pulls the ball down continuously. Initial vertical
-            // velocity is 0 (set in Throw), so the trajectory is a parabola
-            // from the launch height to the floor.
-            heightVelocity -= gravity * Time.deltaTime;
+            // Gravity pulls the ball down continuously. Before the first
+            // ground touch, throwGravityMul lightens the pull so attacks
+            // float across the court rather than dropping like rocks
+            // (game-feel knob). Once the ball has bounced once,
+            // groundedSinceRelease is set and we revert to full gravity
+            // so bounces and rolls behave normally.
+            float gNow = groundedSinceRelease ? gravity : gravity * throwGravityMul;
+            heightVelocity -= gNow * Time.deltaTime;
             Height += heightVelocity * Time.deltaTime;
             SampleTargetDodge();
 
@@ -1122,7 +1128,10 @@ namespace Sportland.Sports.Dodgeball
 
             Vector2 dir = toTarget / dist;
             float t = FlightTime(dist, power);
-            float vy = (carryHeight - Height + 0.5f * gravity * t * t) / t;
+            // Use the SAME reduced gravity that the integrator will apply
+            // pre-bounce so the math agrees with what the ball actually does.
+            float gNow = gravity * throwGravityMul;
+            float vy = (carryHeight - Height + 0.5f * gNow * t * t) / t;
             vy = Mathf.Min(vy, 0f);   // never throw UP off the thrower's hand — flat or descending only
             Throw(dir, power, vy);
         }
@@ -1158,7 +1167,12 @@ namespace Sportland.Sports.Dodgeball
             float speed = rb != null ? rb.linearVelocity.magnitude : 0f;
             if (speed < 0.01f) return Height;
             float t = FlightTime(lateralDistance, speed);
-            return Mathf.Max(0f, Height + heightVelocity * t - 0.5f * gravity * t * t);
+            // Pre-bounce flight uses the reduced throw gravity; once
+            // groundedSinceRelease is true the ball is bouncing and the
+            // defender prediction shouldn't fire anyway (defenders react to
+            // direct shots, not rollers).
+            float gNow = groundedSinceRelease ? gravity : gravity * throwGravityMul;
+            return Mathf.Max(0f, Height + heightVelocity * t - 0.5f * gNow * t * t);
         }
 
         /// <summary>
