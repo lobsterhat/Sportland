@@ -706,7 +706,17 @@ namespace Sportland.Sports.Dodgeball
                 Mathf.Max(0.01f, catchTuning.maxSpeed - catchTuning.comfortableSpeed));
             f.speedPenalty = speedT * catchTuning.speedPenalty;
 
-            // Facing: catcher's Facing vs the ball's movement vector.
+            // Facing: catcher's Facing vs the ball's incoming direction.
+            // facingAlignment = cos(angle between facing and where the ball
+            // is coming FROM); +1 = looking directly at the incoming ball,
+            // -1 = looking directly away.
+            //
+            // Three-zone stepped penalty (no head-on bonus):
+            //   front 90° cone  (alignment ≥ cos45° ≈ 0.707) → 0 penalty
+            //   side 45° wedges (0 ≤ alignment < 0.707)      → half penalty
+            //   back 180°       (alignment < 0)              → full penalty
+            //
+            // Total wedge coverage: 1/4 front + 1/8 + 1/8 sides + 1/2 back.
             Vector2 vel = rb.linearVelocity;
             if (vel.sqrMagnitude < 0.0001f && state == State.Passing) vel = passEnd - passStart;
             if (vel.sqrMagnitude < 0.0001f)
@@ -717,9 +727,12 @@ namespace Sportland.Sports.Dodgeball
             else
             {
                 Vector2 facing = move != null ? move.Facing : Vector2.right;
-                f.facingAlignment = -Vector2.Dot(facing.normalized, vel.normalized); // +1 = head-on
-                f.facingFactor = Mathf.Lerp(-catchTuning.facingPenalty, catchTuning.facingBonus,
-                                            (f.facingAlignment + 1f) * 0.5f);
+                f.facingAlignment = -Vector2.Dot(facing.normalized, vel.normalized);
+                float penaltyScale;
+                if (f.facingAlignment >= 0.7071068f)      penaltyScale = 0f;     // front quarter
+                else if (f.facingAlignment >= 0f)         penaltyScale = 0.5f;   // side eighths
+                else                                      penaltyScale = 1f;     // back half
+                f.facingFactor = -catchTuning.facingPenalty * penaltyScale;
             }
 
             // Timing: press-window reaction. Neutral (0) until a catch is armed.

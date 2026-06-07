@@ -166,7 +166,13 @@ namespace Sportland.Sports.Dodgeball
             // ball each frame so the player backpedals/strafes. PlayerMovement
             // applies the slow-down; the catch/evade upside comes for free.
             if (inStance && tracker.HasBall) { inStance = false; movement.SetStance(false); }
-            if (inStance)
+
+            // L2 held (Sprint binding) → look for the ball: snap facing toward
+            // the ball each frame, the same way stance does. Momentary instead
+            // of a toggle. Carrying disables it — facing your own held ball is
+            // a no-op anyway.
+            bool lookForBall = actions.Sprint.IsPressed() && !tracker.HasBall;
+            if (inStance || lookForBall)
             {
                 if (cachedBall == null) cachedBall = FindAnyObjectByType<Ball>();
                 if (cachedBall != null)
