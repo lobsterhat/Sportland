@@ -37,8 +37,8 @@ namespace Sportland.Sports.Dodgeball
         public float jumpRecoverDuration = 0.15f;
 
         [Header("Pivot delay (sharp direction change)")]
-        [Tooltip("When the input direction differs from current velocity by more than 90° AND the player is moving at >pivotMinSpeed, this delay (s) kicks in before the new direction is accepted. The pivot duration scales down with GeneralAttributes.ChangeOfDirection01 (faster pivot for higher-stat players, with a floor at 0.4× the base).")]
-        public float pivotDuration = 0f;
+        [Tooltip("When the input direction differs from current velocity by more than 90° AND the player is moving at >pivotMinSpeed, this delay (s) kicks in before the new direction is accepted. During the pivot, velocity actively tapers to zero (linear) — the player visibly brakes, then commits to the new direction. Scales down with GeneralAttributes.ChangeOfDirection01 (faster pivot for higher-stat players, with a floor at 0.4× the base).")]
+        public float pivotDuration = 0.18f;
         [Tooltip("Minimum current lateral speed (u/s) for the pivot delay to trigger. Below this, players can turn freely at walking pace.")]
         public float pivotMinSpeed = 4.5f;
 
@@ -89,6 +89,7 @@ namespace Sportland.Sports.Dodgeball
         private float dampingBeforeJump = -1f;   // sentinel; >=0 means a jump is in progress and we've stashed the rb's linearDamping
         private Vector2 landingVelocity = Vector2.zero;   // captured at land; linearly tapered to zero over jumpRecoverDuration
         private float pivotTimer = -1f;
+        private Vector2 pivotStartVelocity = Vector2.zero;   // captured at pivot start; linearly tapered to zero over pivotDuration
         private GeneralAttributes generalCache;
         public bool IsJumpRecovering => jumpRecoverTimer >= 0f;
         public bool IsPivoting => pivotTimer >= 0f;
@@ -203,6 +204,7 @@ namespace Sportland.Sports.Dodgeball
                 && Vector2.Dot(currentForCheck.normalized, clamped.normalized) < 0f)
             {
                 pivotTimer = 0f;
+                pivotStartVelocity = currentForCheck;   // taper from here to zero across pivotDuration
                 return;
             }
 
@@ -319,7 +321,17 @@ namespace Sportland.Sports.Dodgeball
             if (IsPivoting)
             {
                 pivotTimer += Time.deltaTime;
-                if (pivotTimer >= EffectivePivotDuration()) pivotTimer = -1f;
+                float effDur = EffectivePivotDuration();
+                // Active brake: linearly drive velocity from pivotStartVelocity
+                // to zero across the pivot window. Player visibly decelerates,
+                // then commits to the new direction once input is accepted again.
+                float u = effDur > 0f ? Mathf.Clamp01(pivotTimer / effDur) : 1f;
+                rb.linearVelocity = pivotStartVelocity * (1f - u);
+                if (pivotTimer >= effDur)
+                {
+                    pivotTimer = -1f;
+                    pivotStartVelocity = Vector2.zero;
+                }
             }
 
             if (IsDucking)
