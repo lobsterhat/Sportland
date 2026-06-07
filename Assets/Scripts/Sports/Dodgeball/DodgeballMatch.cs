@@ -437,6 +437,15 @@ namespace Sportland.Sports.Dodgeball
                                            && victim.IsGrounded;
                 bool vulnerable = victim.Spawn.role == PlayerRole.Infielder || outfielderInOppInfield;
 
+                // Bonus rule: hitting an outfielder who's in the opposing
+                // infield is a punish for being where they shouldn't be —
+                // attacker gets extra points on top of pointsPerHit.
+                if (outfielderInOppInfield && mode.outfielderInOppInfieldBonus != 0)
+                {
+                    AddScore(attacker.Spawn.team, mode.outfielderInOppInfieldBonus);
+                    RecordScore(attacker.Spawn.team, mode.outfielderInOppInfieldBonus);
+                }
+
                 if (vulnerable)
                 {
                     switch (mode.victimOutcome)
@@ -485,6 +494,21 @@ namespace Sportland.Sports.Dodgeball
         private void OnBallCaught(PlayerZoneTracker catcher)
         {
             if (matchOver || catcher == null) return;
+
+            // Bonus rule: an outfielder catching a ball while standing in the
+            // opposing infield gives the ATTACKER points — the catch counts
+            // as a play out of position, not as a clean defensive read. Runs
+            // before the normal catch effects so the turnover still happens.
+            if (catcher.Spawn.role == PlayerRole.Outfielder
+                && catcher.IsInOpposingInfield
+                && mode.outfielderInOppInfieldBonus != 0
+                && ball != null && ball.RecentThrower != null
+                && ball.RecentThrower.Spawn.team != catcher.Spawn.team)
+            {
+                var attacker = ball.RecentThrower;
+                AddScore(attacker.Spawn.team, mode.outfielderInOppInfieldBonus);
+                RecordScore(attacker.Spawn.team, mode.outfielderInOppInfieldBonus);
+            }
 
             if (mode.catchEffect == CatchEffect.ScoreAndReviveTeam)
             {

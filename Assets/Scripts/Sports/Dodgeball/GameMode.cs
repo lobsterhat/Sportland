@@ -66,6 +66,10 @@ namespace Sportland.Sports.Dodgeball
         [Header("On catch")]
         public CatchEffect catchEffect = CatchEffect.TurnoverOnly;
 
+        [Header("Outfielder in opposing infield")]
+        [Tooltip("Bonus points awarded to the ATTACKING team when their throw hits OR is caught by an outfielder positioned inside the opposing infield (the outfielder's team's opposing infield — i.e., the infield they're not supposed to be in). Stacks on top of pointsPerHit / pointsPerCatch. Discourages outfielders from venturing into the opposing infield to make plays. Set to 0 to disable.")]
+        public int outfielderInOppInfieldBonus = 1;
+
         [Header("On timer expiry")]
         [Tooltip("What happens when a clock expires (per-team shot clock, return-to-zone window, loose-ball delay-of-game). PointPenalty = current -clockExpiryPenalty to the offending team. TurnoverOnly = ball drops if held but no score change, and the delay-of-game clock is disabled entirely (no penalty to apply on a loose ball). Modes that don't score on hits (Elimination, Energy) should use TurnoverOnly.")]
         public ClockExpiryEffect clockExpiryEffect = ClockExpiryEffect.PointPenalty;
@@ -101,7 +105,7 @@ namespace Sportland.Sports.Dodgeball
                     m.pointsPerCatch = 0;
                     m.victimOutcome = VictimOutcome.None;
                     m.catchEffect = CatchEffect.TurnoverOnly;
-                    m.clockExpiryEffect = ClockExpiryEffect.PointPenalty;
+                    m.clockExpiryEffect = ClockExpiryEffect.TurnoverOnly;
                     break;
 
                 case Preset.Elimination:   // Mode 2 — N hits and you're out
