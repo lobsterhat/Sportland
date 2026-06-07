@@ -416,6 +416,8 @@ namespace Sportland.Sports.Dodgeball
         //     The "Cross" decision label flags this in the debug overlay.
         private bool TryChaseLooseBall()
         {
+            // Ref is mid-handoff; nobody scrambles for the parked ball.
+            if (DodgeballMatch.RefereeTransferActive) return false;
             if (!BallSettled()) return false;
 
             Vector2 ballPos = ball.transform.position;

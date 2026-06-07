@@ -533,6 +533,10 @@ namespace Sportland.Sports.Dodgeball
         // take here just leaves the ball in play (no carom).
         private void TryPickup()
         {
+            // Referee is mid-handoff — no proximity pickups during the pause.
+            // The recipient receives the ball via ForcePickup when the
+            // transfer timer expires.
+            if (DodgeballMatch.RefereeTransferActive) return;
             // No top height guard: a jumping defender extends their catch reach,
             // so the per-player check inside TryTakeBall is what decides.
             var trackers = PlayerZoneTracker.All;

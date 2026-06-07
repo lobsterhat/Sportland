@@ -30,6 +30,10 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Point penalty applied to the offending team when either clock expires.")]
         [SerializeField] private int clockExpiryPenalty = 1;
 
+        [Header("Referee reset")]
+        [Tooltip("Seconds the game pauses while the referee transfers the ball to a player on the OTHER team after any clock expiry. Match clock, shot clock, and delay-of-game all halt during this window. AI bails out of loose-ball chase so no scramble happens.")]
+        [SerializeField] private float refTransferDuration = 1.5f;
+
         // Live shot clock state — keyed off the OFFENSIVE TEAM, not a single
         // carrier. Continues through teammate passes / pickups; the carrier
         // reference is just a UI hint for which jersey to render the countdown
@@ -39,6 +43,11 @@ namespace Sportland.Sports.Dodgeball
         private float shotClockExpiresAt = -1f;
         // Live delay-of-game state: when the loose-ball alarm fires (-1 = not running).
         private float delayClockExpiresAt = -1f;
+        // Live referee-transfer state. >= 0 = we're mid-transfer; game time
+        // and all rule clocks are paused, AI ignores the loose ball, the
+        // recipient receives the ball via ForcePickup when the timer expires.
+        private float refTransferEndsAt = -1f;
+        private PlayerZoneTracker refTransferRecipient;
 
         /// <summary>Tunable shot-clock period (s).</summary>
         public float ShotClockSeconds { get => shotClockSeconds; set => shotClockSeconds = Mathf.Max(1f, value); }
@@ -56,6 +65,12 @@ namespace Sportland.Sports.Dodgeball
         public bool ShotClockRunning => shotClockTeam.HasValue && shotClockExpiresAt >= 0f;
         /// <summary>True if the loose-ball delay clock is currently running.</summary>
         public bool DelayClockRunning => delayClockExpiresAt >= 0f && ball != null && ball.CurrentState == Ball.State.Loose;
+        /// <summary>True while the referee is mid-transfer (between any clock expiry and the recipient receiving the ball). Match clock and all rule clocks paused; AI bails out of loose-ball chase.</summary>
+        public bool RefTransferActive => refTransferEndsAt >= 0f;
+        /// <summary>Seconds remaining in the current referee transfer; 0 when not running.</summary>
+        public float RefTransferRemaining => refTransferEndsAt < 0f ? 0f : Mathf.Max(0f, refTransferEndsAt - Time.time);
+        /// <summary>Static convenience for AI / Ball checks (no match reference needed). Cleared on match disable.</summary>
+        public static bool RefereeTransferActive { get; private set; }
 
         private Ball ball;
         private bool subscribed;
@@ -102,6 +117,9 @@ namespace Sportland.Sports.Dodgeball
             playOpen = false;
             StopShotClock();
             StopDelayClock();
+            refTransferEndsAt = -1f;
+            refTransferRecipient = null;
+            RefereeTransferActive = false;
         }
 
         private void Awake()
@@ -111,6 +129,7 @@ namespace Sportland.Sports.Dodgeball
 
         private void OnDestroy()
         {
+            RefereeTransferActive = false;   // don't leak across scene reloads
             if (ball != null && subscribed)
             {
                 ball.OnHit -= OnBallHit;
@@ -127,8 +146,10 @@ namespace Sportland.Sports.Dodgeball
         private void Update()
         {
             EnsureSubscribed();
+            TickRefTransfer();    // resolve a pending ref-transfer first
             TickClocks();
             if (matchOver || !mode.isTimed) return;
+            if (RefTransferActive) return;   // game time stops while ref holds the ball
 
             timeRemaining -= Time.deltaTime;
             if (timeRemaining <= 0f) { timeRemaining = 0f; EndMatch(); }
@@ -142,6 +163,7 @@ namespace Sportland.Sports.Dodgeball
         {
             if (matchOver) return;
             if (DodgeballTuningPanel.TimersDisabled) return;   // debug skill bypass
+            if (RefTransferActive) return;                     // ref holds the ball; no clock progress
 
             if (shotClockExpiresAt >= 0f && Time.time >= shotClockExpiresAt)
                 FireShotClockExpiry();
@@ -176,6 +198,88 @@ namespace Sportland.Sports.Dodgeball
             shotClockExpiresAt = -1f;
         }
 
+        // ----- Referee transfer -----
+        // After any clock expiry the ref takes the ball off the offending
+        // team and hands it to a player on the OTHER team. Game time and
+        // all rule clocks halt for refTransferDuration; AI ignores the
+        // parked ball; then ForcePickup attaches it to the recipient and
+        // play resumes (their new shot clock arms via OnBallAttached).
+
+        private void TickRefTransfer()
+        {
+            if (!RefTransferActive) return;
+            if (Time.time >= refTransferEndsAt)
+                CompleteRefereeTransfer();
+        }
+
+        // recipientTeam: who gets the ball.
+        // offendingDescriptor: label for the play-by-play log.
+        private void StartRefereeTransfer(Team recipientTeam, string offendingDescriptor)
+        {
+            if (matchOver) return;
+            // Force-drop any held ball — the carrier surrenders to the ref.
+            if (ball != null && ball.Carrier != null) ball.Drop();
+            // Halt rule clocks; the new team's shot clock arms on pickup.
+            StopShotClock();
+            StopDelayClock();
+
+            refTransferRecipient = PickRefereeRecipient(recipientTeam);
+            refTransferEndsAt = Time.time + Mathf.Max(0.1f, refTransferDuration);
+            RefereeTransferActive = true;
+
+            string who = refTransferRecipient != null
+                ? Label(refTransferRecipient)
+                : $"team {TeamLetter(recipientTeam)}";
+            DodgeballPlayByPlay.Log($"Referee takes ball from {offendingDescriptor}, handing to {who}");
+        }
+
+        private void CompleteRefereeTransfer()
+        {
+            refTransferEndsAt = -1f;
+            RefereeTransferActive = false;
+
+            // Re-pick if the original recipient was benched / removed mid-pause.
+            var recipient = refTransferRecipient;
+            if (recipient == null || benched.Contains(recipient))
+            {
+                Team t = recipient != null ? recipient.Spawn.team : Team.A;
+                recipient = PickRefereeRecipient(t);
+            }
+            refTransferRecipient = null;
+
+            if (recipient != null && ball != null)
+            {
+                ball.ForcePickup(recipient);
+                DodgeballPlayByPlay.Log($"Referee hands ball to {Label(recipient)}");
+            }
+        }
+
+        // Closest live infielder to the centerline (x=0). Falls back to an
+        // outfielder if the infield is empty (e.g., Mode 2 eliminations).
+        // Returns null only when the recipient team has no playable players.
+        private PlayerZoneTracker PickRefereeRecipient(Team team)
+        {
+            var pick = PickClosestEligibleToCenter(team, PlayerRole.Infielder);
+            if (pick != null) return pick;
+            return PickClosestEligibleToCenter(team, PlayerRole.Outfielder);
+        }
+
+        private PlayerZoneTracker PickClosestEligibleToCenter(Team team, PlayerRole role)
+        {
+            PlayerZoneTracker best = null;
+            float bestDist = float.MaxValue;
+            foreach (var p in PlayerZoneTracker.All)
+            {
+                if (p == null) continue;
+                if (p.Spawn.team != team) continue;
+                if (p.Spawn.role != role) continue;
+                if (benched.Contains(p)) continue;
+                float dx = Mathf.Abs(p.transform.position.x);
+                if (dx < bestDist) { bestDist = dx; best = p; }
+            }
+            return best;
+        }
+
         private void StartDelayClock()
         {
             // Turnover-only modes don't penalize on a loose ball, so there's
@@ -190,11 +294,10 @@ namespace Sportland.Sports.Dodgeball
         }
 
         // Shot clock expired: the offensive team stalled. PointPenalty modes
-        // deduct points from the team; TurnoverOnly modes just force the
-        // drop. If a current carrier exists (clock fired while they were
-        // holding it) force-drop the ball regardless of mode — the stall
-        // ended, possession swings. Mid-flight / loose at expiry has no
-        // carrier to drop.
+        // deduct points from the team; TurnoverOnly modes skip the penalty.
+        // Either way, the referee takes the ball off the offending team and
+        // hands it to a player on the OTHER team (StartRefereeTransfer
+        // force-drops any held ball as part of the takeover).
         private void FireShotClockExpiry()
         {
             var team = shotClockTeam;
@@ -212,7 +315,8 @@ namespace Sportland.Sports.Dodgeball
             {
                 DodgeballPlayByPlay.Log($"{who} shot clock expired - turnover");
             }
-            if (carrier != null && carrier.HeldBall != null) carrier.HeldBall.Drop();
+            Team opp = team.Value == Team.A ? Team.B : Team.A;
+            StartRefereeTransfer(opp, who);
         }
 
         // Delay-of-game expired: the ball sat loose too long. PointPenalty
@@ -238,7 +342,11 @@ namespace Sportland.Sports.Dodgeball
             Team offendingTeam = ballX < 0f ? Team.A : Team.B;
             AddScore(offendingTeam, -clockExpiryPenalty);
             DodgeballPlayByPlay.Log($"Loose ball sat too long in {TeamLetter(offendingTeam)} territory - -{clockExpiryPenalty} {TeamLetter(offendingTeam)} team");
-            delayClockExpiresAt = Time.time + delayClockSeconds;   // re-arm
+            // Ref takes the loose ball from the offending half and hands it
+            // to the other team. (Replaces the previous "re-arm and tick
+            // again" loop — the ref ends the stall instead.)
+            Team opp = offendingTeam == Team.A ? Team.B : Team.A;
+            StartRefereeTransfer(opp, $"team {TeamLetter(offendingTeam)}");
         }
 
         // Optional debug override: each frame after gameplay-side Updates,
@@ -501,19 +609,24 @@ namespace Sportland.Sports.Dodgeball
         }
 
         // A carrier was forced to drop the ball (return window expired).
-        // PointPenalty modes: -1 to their team. TurnoverOnly modes: ball is
-        // already loose by the time this fires; no score change. Play stays
-        // open in either case.
+        // PointPenalty modes: -1 to their team. TurnoverOnly modes: no
+        // score change. Either way the referee then takes the ball off
+        // them and hands it to a player on the OTHER team.
         private void OnPlayerForcedDrop(PlayerZoneTracker player)
         {
             if (matchOver || player == null) return;
-            if (mode != null && mode.clockExpiryEffect == ClockExpiryEffect.TurnoverOnly)
+            bool penalize = mode == null || mode.clockExpiryEffect == ClockExpiryEffect.PointPenalty;
+            if (penalize)
+            {
+                AddScore(player.Spawn.team, -1);
+                DodgeballPlayByPlay.Log($"{Label(player)} didn't return in time, dropped ball - -1 {TeamLetter(player.Spawn.team)} team");
+            }
+            else
             {
                 DodgeballPlayByPlay.Log($"{Label(player)} didn't return in time, dropped ball - turnover");
-                return;
             }
-            AddScore(player.Spawn.team, -1);
-            DodgeballPlayByPlay.Log($"{Label(player)} didn't return in time, dropped ball - -1 {TeamLetter(player.Spawn.team)} team");
+            Team opp = player.Spawn.team == Team.A ? Team.B : Team.A;
+            StartRefereeTransfer(opp, Label(player));
         }
 
         // An outfielder + ball + opposing infield triggered the turnover rule
