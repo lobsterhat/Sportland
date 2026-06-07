@@ -1103,20 +1103,26 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>
         /// Throw at a target position. Computes the vertical velocity that
-        /// would land the ball at carryHeight after the lateral flight time,
-        /// then clamps it to be non-positive so the ball never arcs UP off
-        /// the thrower's hand. The result:
-        ///   - Standing / running throw from carryHeight → vy = 0 → flat
-        ///     trajectory with gravity providing the droop.
-        ///   - Jump / dive throw from above carryHeight → vy negative → ball
-        ///     descends from the jumper's apex (spike).
+        /// would land the ball at <paramref name="targetHeight"/> after the
+        /// lateral flight time, then clamps it to be non-positive so the
+        /// ball never arcs UP off the thrower's hand.
+        ///
+        /// <paramref name="targetHeight"/>: pass a negative number (or
+        /// omit) to default to carryHeight (chest). The AI passes a lower,
+        /// scattered value for jump attacks so spikes land at waist height
+        /// and may go negative on a wild miss — driving the ball into the
+        /// ground short of the target instead of always arriving at chest.
+        ///
+        /// Net result:
+        ///   - Standing / running throw → vy = 0 → flat with gravity droop.
+        ///   - Jump / dive throw → vy negative → spike descending from apex.
         /// Long throws may hit the ground before reaching the target and
-        /// bounce / roll the rest of the way — same as a real hard throw
-        /// that can't make the distance on a flat line.
+        /// bounce / roll the rest of the way.
         /// </summary>
-        public void ThrowAt(Vector2 targetPos, float power)
+        public void ThrowAt(Vector2 targetPos, float power, float targetHeight = -1f)
         {
             if (carrier == null) return;
+            if (targetHeight < 0f) targetHeight = carryHeight;
 
             Vector2 toTarget = targetPos - (Vector2)transform.position;
             float dist = toTarget.magnitude;
@@ -1131,7 +1137,7 @@ namespace Sportland.Sports.Dodgeball
             // Use the SAME reduced gravity that the integrator will apply
             // pre-bounce so the math agrees with what the ball actually does.
             float gNow = gravity * throwGravityMul;
-            float vy = (carryHeight - Height + 0.5f * gNow * t * t) / t;
+            float vy = (targetHeight - Height + 0.5f * gNow * t * t) / t;
             vy = Mathf.Min(vy, 0f);   // never throw UP off the thrower's hand — flat or descending only
             Throw(dir, power, vy);
         }

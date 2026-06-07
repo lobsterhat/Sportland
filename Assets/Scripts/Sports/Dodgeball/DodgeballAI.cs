@@ -55,6 +55,10 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float maxThrowSpeed = 36f;
         [Tooltip("At accuracy 0, the aim scatters up to this many units per unit of distance (→0 at accuracy 100).")]
         [SerializeField] private float accuracyErrorPerUnit = 0.15f;
+        [Tooltip("Base target height (u) for a jump-attack throw, instead of carryHeight (chest). 0.9 = waist; a spike lands lower than a flat throw would. Set to carryHeight (1.29) to match standing throws.")]
+        [SerializeField] private float jumpThrowAimHeight = 0.9f;
+        [Tooltip("Vertical scatter coefficient for jump throws (per unit of throw distance, scaled by 1 - accuracy01). A low-accuracy thrower at long distance can have their spike's target height pushed below zero — the ball short-arcs into the ground instead of arriving at the target. 0.08 gives a 0.3-accuracy thrower at 8m about ±0.45 u of vertical miss.")]
+        [SerializeField] private float jumpThrowVerticalScatter = 0.08f;
         [Tooltip("Base lateral speed (u/s) of an outfielder's lob back to an infielder; scales up with distance.")]
         [SerializeField] private float passSpeed = 12f;
         [Tooltip("Speed multiplier on passSpeed for a hard chest pass when the lane is clear — fast & flat, harder to set up against, easier to intercept.")]
@@ -792,10 +796,21 @@ namespace Sportland.Sports.Dodgeball
 
             Vector2 aim = ball.LeadAim(transform.position, target.transform.position, targetVel, power, anticipation);
             ball.IntendedTarget = target;
-            // Throws never arc UP off the thrower's hand — ground throws end
-            // up flat (vy=0), jump/dive throws descend from launch height.
-            // Ball.ThrowAt enforces this unconditionally now.
-            ball.ThrowAt(ApplyAccuracy(aim), power);
+            // Throws never arc UP off the thrower's hand. For airborne
+            // releases (jump / dive), aim a little lower (waist-height
+            // spike) AND add vertical scatter — a wild jump throw can have
+            // its target height pushed below 0, in which case the math
+            // produces a steep enough vy that the ball hits the ground
+            // before reaching the target.
+            float targetHeight = -1f;   // ThrowAt default = carryHeight
+            if (!movement.IsGrounded)
+            {
+                float acc01 = attr != null ? attr.ThrowAccuracy01 : 0.6f;
+                float dist = Vector2.Distance(transform.position, target.transform.position);
+                float vErr = (1f - acc01) * jumpThrowVerticalScatter * dist;
+                targetHeight = jumpThrowAimHeight + Random.Range(-vErr, vErr);
+            }
+            ball.ThrowAt(ApplyAccuracy(aim), power, targetHeight);
         }
 
         // Scatter the aim; the miss grows with distance and with how far below
