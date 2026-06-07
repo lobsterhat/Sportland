@@ -792,7 +792,10 @@ namespace Sportland.Sports.Dodgeball
 
             Vector2 aim = ball.LeadAim(transform.position, target.transform.position, targetVel, power, anticipation);
             ball.IntendedTarget = target;
-            ball.ThrowAt(ApplyAccuracy(aim), power);
+            // Airborne release (jump attack / dive) → spike: ball descends
+            // from the launch height instead of arcing up to reach the target.
+            bool spike = !movement.IsGrounded;
+            ball.ThrowAt(ApplyAccuracy(aim), power, spike);
         }
 
         // Scatter the aim; the miss grows with distance and with how far below

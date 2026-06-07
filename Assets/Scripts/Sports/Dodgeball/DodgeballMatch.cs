@@ -191,6 +191,19 @@ namespace Sportland.Sports.Dodgeball
             shotClockCarrier = carrier;
         }
 
+        // Possession swings without a known carrier (e.g., a throw settled in
+        // the receiving team's infield — they "own" the loose ball now). The
+        // clock starts ticking against that team from the moment of swing;
+        // when one of their players picks the ball up, OnBallAttached sees
+        // same-team continuation and just hands the carrier reference over
+        // without resetting the countdown.
+        private void StartShotClockForTeam(Team team)
+        {
+            shotClockTeam = team;
+            shotClockCarrier = null;
+            shotClockExpiresAt = Time.time + shotClockSeconds;
+        }
+
         private void StopShotClock()
         {
             shotClockTeam = null;
@@ -549,14 +562,24 @@ namespace Sportland.Sports.Dodgeball
             // Stop the shot clock ONLY if the ball landed in the clocked team's
             // opposing infield — the "shot reached opp territory" condition.
             // Anything else (loose in own area, neutral strip, etc.) leaves the
-            // clock running so the offense feels the pressure.
+            // clock running so the offense feels the pressure. When the swing
+            // does happen, we ALSO start a fresh shot clock for the receiving
+            // team — they're now in possession of the loose ball and have to
+            // use it. Delay-of-game is suppressed in that case (the shot
+            // clock is the only stalling pressure that should be active).
+            bool shotReachedOppInfield = false;
             if (shotClockTeam.HasValue && ball != null)
             {
                 Team oppOfClocked = shotClockTeam.Value == Team.A ? Team.B : Team.A;
                 if (ZoneFactory.InfieldFor(oppOfClocked).Contains(ball.transform.position))
+                {
                     StopShotClock();
+                    StartShotClockForTeam(oppOfClocked);
+                    shotReachedOppInfield = true;
+                }
             }
-            StartDelayClock();    // ball is on the ground; start the loose-ball alarm
+            if (!shotReachedOppInfield)
+                StartDelayClock();    // ball is on the ground; start the loose-ball alarm
             if (!playOpen) return;
             if (playIsThrow && ball != null) playDodge = ball.LastTargetDodge;
             FlushPlay();   // throw → miss; a pass that reached no one → incomplete

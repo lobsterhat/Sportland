@@ -1100,8 +1100,16 @@ namespace Sportland.Sports.Dodgeball
         /// when the ball reaches the target. Drag is ignored in the math
         /// (the ball will fall slightly short of far targets); the resulting
         /// arc is what a "thrower aiming up" would do to extend the reach.
+        ///
+        /// <paramref name="spike"/> clamps the initial vertical velocity to
+        /// be non-positive — used by jump attacks so the trajectory never
+        /// rises above the launch (apex) height. The ball descends
+        /// monotonically from the jumper's hand to the target. For long
+        /// throws this means it may bounce short of the target and roll the
+        /// rest of the way (no upward boost is allowed), which reads as a
+        /// proper spike rather than the ball arcing UP off a jumper's hand.
         /// </summary>
-        public void ThrowAt(Vector2 targetPos, float power)
+        public void ThrowAt(Vector2 targetPos, float power, bool spike = false)
         {
             if (carrier == null) return;
 
@@ -1116,6 +1124,7 @@ namespace Sportland.Sports.Dodgeball
             Vector2 dir = toTarget / dist;
             float t = FlightTime(dist, power);
             float vy = (carryHeight - Height + 0.5f * gravity * t * t) / t;
+            if (spike) vy = Mathf.Min(vy, 0f);   // no upward arc from a jump launch
             Throw(dir, power, vy);
         }
 
