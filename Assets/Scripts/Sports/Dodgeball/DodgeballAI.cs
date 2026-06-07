@@ -94,6 +94,8 @@ namespace Sportland.Sports.Dodgeball
         public float crossRetrieveMaxDist = 8f;
         [Tooltip("How far (u) beyond my assigned strip the predicted ball-landing can be and still trigger the outfielder anticipate behavior. Wider = outfielders react to off-line throws / lobs more aggressively, but they may abandon their strip more often.")]
         public float anticipateBuffer = 2f;
+        [Tooltip("Distance (u) from a movement target at which input starts scaling down toward zero. Players approaching a position will decelerate over this radius rather than carrying their momentum past the target. Smaller = sharper stops but more overshoot risk; larger = gentler arrival but slower.")]
+        public float arrivalSlowdownRadius = 1.8f;
 
         private PlayerMovement movement;
         private PlayerZoneTracker tracker;
@@ -1066,9 +1068,8 @@ namespace Sportland.Sports.Dodgeball
 
         // Drift back to my spawn home. Sprints if I'm out of my assigned zone
         // (in particular after a run-jump landing in opp infield, so I don't
-        // get stranded), walks the last stretch once back in my zone. The
-        // pivot delay (PlayerMovement) will still gate the U-turn if I'm
-        // moving forward and the home direction reverses my velocity.
+        // get stranded), walks the last stretch once back in my zone. Uses the
+        // shared MoveToward arrival ramp so we don't blow past the spawn point.
         private void Idle()
         {
             Vector2 home = tracker.Spawn.position;
@@ -1077,13 +1078,29 @@ namespace Sportland.Sports.Dodgeball
 
             movement.IsRunning = farFromHome && !tracker.IsInZone;
             movement.SetStance(false);
-            movement.ApplyMove(farFromHome ? Vector2.ClampMagnitude(delta, 1f) : Vector2.zero);
+
+            if (farFromHome) MoveToward(home);
+            else             movement.ApplyMove(Vector2.zero);
         }
 
+        // Move toward a target with an arrival ramp: input scales linearly from
+        // full at arrivalSlowdownRadius down to zero at the target itself.
+        // Players bleed off velocity BEFORE reaching the spot rather than
+        // carrying their momentum past it.
         private void MoveToward(Vector2 target, float maxInput = 1f)
         {
             Vector2 delta = target - (Vector2)transform.position;
-            movement.ApplyMove(delta.sqrMagnitude > 0.0004f ? Vector2.ClampMagnitude(delta, maxInput) : Vector2.zero);
+            float distSq = delta.sqrMagnitude;
+            if (distSq < 0.0004f)
+            {
+                movement.ApplyMove(Vector2.zero);
+                return;
+            }
+
+            float dist = Mathf.Sqrt(distSq);
+            Vector2 dir = delta / dist;
+            float scale = Mathf.Clamp01(dist / arrivalSlowdownRadius);
+            movement.ApplyMove(dir * (maxInput * scale));
         }
 
         private Vector2 ClampToZone(Vector2 pos) => tracker.AssignedZone.Clamp(pos);
