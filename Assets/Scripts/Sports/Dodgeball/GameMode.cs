@@ -18,6 +18,14 @@ namespace Sportland.Sports.Dodgeball
         ScoreAndReviveTeam,  // point + recall all benched teammates (Mode 4)
     }
 
+    /// <summary>What happens when a rule timer expires (shot clock, return-to-zone,
+    /// loose-ball delay-of-game).</summary>
+    public enum ClockExpiryEffect
+    {
+        PointPenalty,   // -clockExpiryPenalty to the offending team; ball drops if held (Modes 1 / 4)
+        TurnoverOnly,   // ball drops if held (becomes loose); no score change; delay clock disabled (Modes 2 / 3)
+    }
+
     /// <summary>
     /// Data-driven rules for a dodgeball match. Author one asset per mode
     /// (Create &gt; Sportland &gt; Dodgeball &gt; Game Mode); the runtime
@@ -58,6 +66,10 @@ namespace Sportland.Sports.Dodgeball
         [Header("On catch")]
         public CatchEffect catchEffect = CatchEffect.TurnoverOnly;
 
+        [Header("On timer expiry")]
+        [Tooltip("What happens when a clock expires (per-team shot clock, return-to-zone window, loose-ball delay-of-game). PointPenalty = current -clockExpiryPenalty to the offending team. TurnoverOnly = ball drops if held but no score change, and the delay-of-game clock is disabled entirely (no penalty to apply on a loose ball). Modes that don't score on hits (Elimination, Energy) should use TurnoverOnly.")]
+        public ClockExpiryEffect clockExpiryEffect = ClockExpiryEffect.PointPenalty;
+
         [Header("Energy (Mode 3 — VictimOutcome.DamageEnergy)")]
         [Tooltip("Energy lost per unit of ball impact speed, before toughness reduction.")]
         public float damagePerSpeed = 1.5f;
@@ -82,10 +94,14 @@ namespace Sportland.Sports.Dodgeball
             {
                 case Preset.RunningHits:   // Mode 1 — most hits over the clock
                     m.modeName = "Running Hits";
-                    m.isTimed = true; m.secondsPerPeriod = 120f; m.endOnTeamWipeout = false;
-                    m.pointsPerHit = 1; m.pointsPerCatch = 0;
+                    m.isTimed = true;
+                    m.secondsPerPeriod = 120f;
+                    m.endOnTeamWipeout = false;
+                    m.pointsPerHit = 1;
+                    m.pointsPerCatch = 0;
                     m.victimOutcome = VictimOutcome.None;
                     m.catchEffect = CatchEffect.TurnoverOnly;
+                    m.clockExpiryEffect = ClockExpiryEffect.PointPenalty;
                     break;
 
                 case Preset.Elimination:   // Mode 2 — N hits and you're out
@@ -94,6 +110,7 @@ namespace Sportland.Sports.Dodgeball
                     m.pointsPerHit = 0; m.pointsPerCatch = 0;
                     m.victimOutcome = VictimOutcome.CountToOut; m.hitsToOut = 3;
                     m.catchEffect = CatchEffect.TurnoverOnly;
+                    m.clockExpiryEffect = ClockExpiryEffect.TurnoverOnly;
                     break;
 
                 case Preset.Energy:        // Mode 3 — drain energy to eliminate
@@ -102,6 +119,7 @@ namespace Sportland.Sports.Dodgeball
                     m.pointsPerHit = 0; m.pointsPerCatch = 0;
                     m.victimOutcome = VictimOutcome.DamageEnergy;
                     m.catchEffect = CatchEffect.TurnoverOnly;
+                    m.clockExpiryEffect = ClockExpiryEffect.TurnoverOnly;
                     break;
 
                 case Preset.Hybrid:        // Mode 4 — sideline + catch-revive, timed
@@ -110,6 +128,7 @@ namespace Sportland.Sports.Dodgeball
                     m.pointsPerHit = 1; m.pointsPerCatch = 1;
                     m.victimOutcome = VictimOutcome.Sideline;
                     m.catchEffect = CatchEffect.ScoreAndReviveTeam;
+                    m.clockExpiryEffect = ClockExpiryEffect.PointPenalty;
                     break;
             }
             return m;

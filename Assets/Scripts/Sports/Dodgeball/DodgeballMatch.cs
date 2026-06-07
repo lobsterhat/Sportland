@@ -178,6 +178,9 @@ namespace Sportland.Sports.Dodgeball
 
         private void StartDelayClock()
         {
+            // Turnover-only modes don't penalize on a loose ball, so there's
+            // nothing for this clock to do — leave it disarmed.
+            if (mode != null && mode.clockExpiryEffect == ClockExpiryEffect.TurnoverOnly) return;
             delayClockExpiresAt = Time.time + delayClockSeconds;
         }
 
@@ -186,27 +189,38 @@ namespace Sportland.Sports.Dodgeball
             delayClockExpiresAt = -1f;
         }
 
-        // Shot clock expired: the offensive team stalled. Apply the penalty
-        // to the team; if a current carrier exists (clock fired while they
-        // were holding it) force-drop the ball. If the clock fired mid-flight
-        // or while loose (no current carrier), the penalty still lands but
-        // there's no ball to drop.
+        // Shot clock expired: the offensive team stalled. PointPenalty modes
+        // deduct points from the team; TurnoverOnly modes just force the
+        // drop. If a current carrier exists (clock fired while they were
+        // holding it) force-drop the ball regardless of mode — the stall
+        // ended, possession swings. Mid-flight / loose at expiry has no
+        // carrier to drop.
         private void FireShotClockExpiry()
         {
             var team = shotClockTeam;
             var carrier = shotClockCarrier;
             StopShotClock();
             if (!team.HasValue) return;
-            AddScore(team.Value, -clockExpiryPenalty);
+            bool penalize = mode == null || mode.clockExpiryEffect == ClockExpiryEffect.PointPenalty;
             string who = carrier != null ? Label(carrier) : $"team {TeamLetter(team.Value)}";
-            DodgeballPlayByPlay.Log($"{who} shot clock expired - -{clockExpiryPenalty} {TeamLetter(team.Value)} team");
+            if (penalize)
+            {
+                AddScore(team.Value, -clockExpiryPenalty);
+                DodgeballPlayByPlay.Log($"{who} shot clock expired - -{clockExpiryPenalty} {TeamLetter(team.Value)} team");
+            }
+            else
+            {
+                DodgeballPlayByPlay.Log($"{who} shot clock expired - turnover");
+            }
             if (carrier != null && carrier.HeldBall != null) carrier.HeldBall.Drop();
         }
 
-        // Delay-of-game expired: the ball sat loose too long. Penalize the team
-        // in whose half it's resting (team A = left half, x < 0; team B = right).
-        // Then re-arm the clock so the penalty keeps ticking until somebody
-        // actually picks the ball up.
+        // Delay-of-game expired: the ball sat loose too long. PointPenalty
+        // modes penalize the team in whose half it's resting (team A = left
+        // half, x < 0; team B = right) and re-arm the clock so the penalty
+        // keeps ticking until somebody picks the ball up. TurnoverOnly modes
+        // disable this clock in StartDelayClock — this branch is unreachable
+        // there, but bail safely if it does fire.
         private void FireDelayClockExpiry()
         {
             if (ball == null || ball.CurrentState != Ball.State.Loose)
@@ -214,8 +228,14 @@ namespace Sportland.Sports.Dodgeball
                 StopDelayClock();
                 return;
             }
-            float bx = ball.transform.position.x;
-            Team offendingTeam = bx < 0f ? Team.A : Team.B;
+            if (mode != null && mode.clockExpiryEffect == ClockExpiryEffect.TurnoverOnly)
+            {
+                StopDelayClock();
+                return;
+            }
+
+            float ballX = ball.transform.position.x;
+            Team offendingTeam = ballX < 0f ? Team.A : Team.B;
             AddScore(offendingTeam, -clockExpiryPenalty);
             DodgeballPlayByPlay.Log($"Loose ball sat too long in {TeamLetter(offendingTeam)} territory - -{clockExpiryPenalty} {TeamLetter(offendingTeam)} team");
             delayClockExpiresAt = Time.time + delayClockSeconds;   // re-arm
@@ -480,12 +500,18 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
-        // A carrier was forced to drop the ball (return window expired) — -1 to
-        // their team. Their team takes the deduction; play stays open for the
-        // newly loose ball.
+        // A carrier was forced to drop the ball (return window expired).
+        // PointPenalty modes: -1 to their team. TurnoverOnly modes: ball is
+        // already loose by the time this fires; no score change. Play stays
+        // open in either case.
         private void OnPlayerForcedDrop(PlayerZoneTracker player)
         {
             if (matchOver || player == null) return;
+            if (mode != null && mode.clockExpiryEffect == ClockExpiryEffect.TurnoverOnly)
+            {
+                DodgeballPlayByPlay.Log($"{Label(player)} didn't return in time, dropped ball - turnover");
+                return;
+            }
             AddScore(player.Spawn.team, -1);
             DodgeballPlayByPlay.Log($"{Label(player)} didn't return in time, dropped ball - -1 {TeamLetter(player.Spawn.team)} team");
         }
