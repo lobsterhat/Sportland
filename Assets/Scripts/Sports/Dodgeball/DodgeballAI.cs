@@ -792,10 +792,10 @@ namespace Sportland.Sports.Dodgeball
 
             Vector2 aim = ball.LeadAim(transform.position, target.transform.position, targetVel, power, anticipation);
             ball.IntendedTarget = target;
-            // Airborne release (jump attack / dive) → spike: ball descends
-            // from the launch height instead of arcing up to reach the target.
-            bool spike = !movement.IsGrounded;
-            ball.ThrowAt(ApplyAccuracy(aim), power, spike);
+            // Throws never arc UP off the thrower's hand — ground throws end
+            // up flat (vy=0), jump/dive throws descend from launch height.
+            // Ball.ThrowAt enforces this unconditionally now.
+            ball.ThrowAt(ApplyAccuracy(aim), power);
         }
 
         // Scatter the aim; the miss grows with distance and with how far below
