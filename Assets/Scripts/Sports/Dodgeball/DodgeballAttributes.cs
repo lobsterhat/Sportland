@@ -40,10 +40,21 @@ namespace Sportland.Sports.Dodgeball
         public float EffectiveAnticipation01  => Effective(Anticipation01,  AbilityStat.Anticipation);
         public float EffectiveCatching01      => Effective(Catching01,      AbilityStat.Catching);
 
-        // Special Ability hook point. Identity until the ability system exists;
-        // the `stat` key is already threaded through so the future change is
-        // entirely inside this method.
-        private float Effective(float base01, AbilityStat stat) => base01;
+        // Special Ability hook. Folds the player's active-ability multiplier
+        // for `stat` into the base rating. With no PlayerAbilities sibling, or
+        // no abilities authored on it, MultiplierFor returns 1 → the base is
+        // returned unchanged, so this is behavior-neutral until abilities
+        // exist. The sibling lookup is cached once (PlayerAbilities lives on
+        // the prefab from Awake when present).
+        private PlayerAbilities abilities;
+        private bool abilitiesResolved;
+
+        private float Effective(float base01, AbilityStat stat)
+        {
+            if (!abilitiesResolved) { abilities = GetComponent<PlayerAbilities>(); abilitiesResolved = true; }
+            float mult = abilities != null ? abilities.MultiplierFor(stat) : 1f;
+            return Mathf.Clamp01(base01 * mult);
+        }
 
         /// <summary>
         /// Composite "how well will this player convert a possession into
