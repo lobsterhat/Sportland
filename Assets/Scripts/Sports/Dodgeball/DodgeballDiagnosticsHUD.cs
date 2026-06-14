@@ -38,7 +38,9 @@ namespace Sportland.Sports.Dodgeball
             y += 6f;
             y = DrawPanel(BuildThrowLines(), anchor.x, y);
             y += 6f;
-            DrawPanel(BuildCatchLines(), anchor.x, y);
+            y = DrawPanel(BuildCatchLines(), anchor.x, y);
+            y += 6f;
+            DrawPanel(BuildAbilityLines(), anchor.x, y);
         }
 
         private float DrawPanel(string[] lines, float x, float y)
@@ -168,6 +170,53 @@ namespace Sportland.Sports.Dodgeball
                 lines.Add("(none yet)");
             }
 
+            return lines.ToArray();
+        }
+
+        // Special Abilities on the controlled player: each ability's active
+        // state, stacks, remaining latched time, and the per-stat multipliers
+        // it is currently contributing at its live stack count.
+        private string[] BuildAbilityLines()
+        {
+            var input = DodgeballPlayerInput.Current;
+            if (input == null)
+                return new[] { "== ABILITIES ==", "(no controller)" };
+
+            var pa = input.GetComponent<PlayerAbilities>();
+            if (pa == null)
+                return new[] { "== ABILITIES ==", "(no PlayerAbilities on this player)" };
+
+            var rts = pa.Runtimes;
+            if (rts.Count == 0)
+                return new[] { "== ABILITIES ==", "(none assigned)" };
+
+            var lines = new List<string> { "== ABILITIES ==" };
+            for (int i = 0; i < rts.Count; i++)
+            {
+                var rt = rts[i];
+                var ab = rt.ability;
+                string nm = !string.IsNullOrEmpty(ab.displayName) ? ab.displayName : ab.name;
+
+                if (!rt.active)
+                {
+                    lines.Add($"{nm}  idle");
+                    continue;
+                }
+
+                string dur = rt.activeUntil >= 0f
+                    ? $"  ({Mathf.Max(0f, rt.activeUntil - Time.time):F1}s)"
+                    : "";
+                lines.Add($"{nm}  ACTIVE  stacks {rt.stacks}{dur}");
+
+                var mods = ab.Modifiers;
+                string m = "";
+                for (int j = 0; j < mods.Count; j++)
+                {
+                    float mult = ab.StackedMultiplier(mods[j].stat, rt.stacks);
+                    m += $"{mods[j].stat} x{mult:F2}  ";
+                }
+                if (m.Length > 0) lines.Add("  " + m.TrimEnd());
+            }
             return lines.ToArray();
         }
 

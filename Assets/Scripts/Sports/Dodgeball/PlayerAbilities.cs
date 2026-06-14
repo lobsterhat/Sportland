@@ -33,6 +33,9 @@ namespace Sportland.Sports.Dodgeball
 
         public PlayerZoneTracker Tracker => tracker;
 
+        /// <summary>Read-only view of the per-ability runtime state (for HUD / debug).</summary>
+        public IReadOnlyList<AbilityRuntime> Runtimes => runtimes;
+
         private void Awake()
         {
             tracker = GetComponent<PlayerZoneTracker>();

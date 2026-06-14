@@ -36,6 +36,9 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Max stack count. Each Increase adds a stack; the modifier is raised to the power of the current stacks.")]
         [Min(1)] public int maxStacks = 1;
 
+        /// <summary>Read-only view of the per-stat modifiers (for HUD / debug).</summary>
+        public IReadOnlyList<StatModifier> Modifiers => modifiers;
+
         /// <summary>
         /// This ability's multiplier for <paramref name="stat"/> at the given
         /// stack count. baseMult^stacks; 1 if the ability doesn't touch the
