@@ -43,7 +43,7 @@ namespace Sportland.Sports.Dodgeball
             public float maxSpeed = 24f;                          // full speed penalty at/above this
             [Range(0f, 1f)] public float speedPenalty = 0.40f;
             [Range(0f, 1f)] public float facingBonus = 0.15f;     // facing the ball head-on
-            [Range(0f, 1f)] public float facingPenalty = 0.60f;   // facing fully away
+            [Range(0f, 1f)] public float facingPenalty = 0.95f;   // facing fully away
             [Range(0f, 1f)] public float stancePenalty = 0.35f;   // not set in a defensive stance
             [Range(0f, 1f)] public float timingBonus = 0.20f;     // press right as the ball arrives
             [Range(0f, 1f)] public float timingPenalty = 0.30f;   // press at the edge of the window
@@ -691,7 +691,7 @@ namespace Sportland.Sports.Dodgeball
 
             var catchAttr = catcher.GetComponent<DodgeballAttributes>();
             var genAttr   = catcher.GetComponent<GeneralAttributes>();
-            f.catching01 = catchAttr != null ? catchAttr.Catching01 : 0.6f;
+            f.catching01 = catchAttr != null ? catchAttr.EffectiveCatching01 : 0.6f;
             f.luck01     = genAttr != null ? genAttr.Luck01 : 0.5f;
             var move = catcher.GetComponent<PlayerMovement>();
 

@@ -297,14 +297,14 @@ namespace Sportland.Sports.Dodgeball
         private float ThrowReleaseSpeed()
         {
             var attr = GetComponent<DodgeballAttributes>();
-            float s01 = attr != null ? attr.ThrowSpeed01 : 0.6f;
+            float s01 = attr != null ? attr.EffectiveThrowSpeed01 : 0.6f;
             return Mathf.Lerp(minThrowSpeed, maxThrowSpeed, s01);
         }
 
         private float OwnAnticipation01()
         {
             var attr = GetComponent<DodgeballAttributes>();
-            return attr != null ? attr.Anticipation01 : 0f;
+            return attr != null ? attr.EffectiveAnticipation01 : 0f;
         }
 
         private static Vector2 TargetVelocity(PlayerZoneTracker t)
@@ -318,7 +318,7 @@ namespace Sportland.Sports.Dodgeball
         private Vector2 ApplyAccuracyToAim(Vector2 aimPoint)
         {
             var attr = GetComponent<DodgeballAttributes>();
-            float acc01 = attr != null ? attr.ThrowAccuracy01 : 0.6f;
+            float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
             float dist = Vector2.Distance(transform.position, aimPoint);
             float maxError = (1f - acc01) * accuracyErrorPerUnit * dist;
             return aimPoint + Random.insideUnitCircle * maxError;
@@ -328,7 +328,7 @@ namespace Sportland.Sports.Dodgeball
         private Vector2 ApplyAccuracyToDirection(Vector2 dir)
         {
             var attr = GetComponent<DodgeballAttributes>();
-            float acc01 = attr != null ? attr.ThrowAccuracy01 : 0.6f;
+            float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
             float maxAngle = (1f - acc01) * maxInaccuracyAngleDeg;
             float angle = Random.Range(-maxAngle, maxAngle);
             Vector2 rotated = Quaternion.Euler(0f, 0f, angle) * (Vector3)dir;

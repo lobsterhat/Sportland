@@ -485,7 +485,7 @@ namespace Sportland.Sports.Dodgeball
         private Reaction Decide(float predictedHeight)
         {
             bool canCatch = tracker.CanCatchBall() && predictedHeight <= maxCatchHeight;
-            float catch01 = attr != null ? attr.Catching01 : 0.6f;
+            float catch01 = attr != null ? attr.EffectiveCatching01 : 0.6f;
             if (canCatch && Random.value < catch01) return Reaction.Catch;
 
             if (predictedHeight >= highBallThreshold) return Reaction.Duck;
@@ -668,7 +668,7 @@ namespace Sportland.Sports.Dodgeball
         private float EffectiveRunJumpProb()
         {
             if (attr == null) return runJumpProbability;
-            float aggression = (attr.ThrowAccuracy01 + attr.ThrowSpeed01) * 0.5f;   // 0..1
+            float aggression = (attr.EffectiveThrowAccuracy01 + attr.EffectiveThrowSpeed01) * 0.5f;   // 0..1
             return Mathf.Clamp01(runJumpProbability * aggression * 2f);
         }
 
@@ -789,8 +789,8 @@ namespace Sportland.Sports.Dodgeball
 
         private void ThrowAtTarget(PlayerZoneTracker target)
         {
-            float power = Mathf.Lerp(minThrowSpeed, maxThrowSpeed, attr != null ? attr.ThrowSpeed01 : 0.6f);
-            float anticipation = attr != null ? attr.Anticipation01 : 0f;
+            float power = Mathf.Lerp(minThrowSpeed, maxThrowSpeed, attr != null ? attr.EffectiveThrowSpeed01 : 0.6f);
+            float anticipation = attr != null ? attr.EffectiveAnticipation01 : 0f;
             var targetRb = target.GetComponent<Rigidbody2D>();
             Vector2 targetVel = targetRb != null ? targetRb.linearVelocity : Vector2.zero;
 
@@ -805,7 +805,7 @@ namespace Sportland.Sports.Dodgeball
             float targetHeight = -1f;   // ThrowAt default = carryHeight
             if (!movement.IsGrounded)
             {
-                float acc01 = attr != null ? attr.ThrowAccuracy01 : 0.6f;
+                float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
                 float dist = Vector2.Distance(transform.position, target.transform.position);
                 float vErr = (1f - acc01) * jumpThrowVerticalScatter * dist;
                 targetHeight = jumpThrowAimHeight + Random.Range(-vErr, vErr);
@@ -817,7 +817,7 @@ namespace Sportland.Sports.Dodgeball
         // 100 the thrower's accuracy rating is.
         private Vector2 ApplyAccuracy(Vector2 aimPoint)
         {
-            float acc01 = attr != null ? attr.ThrowAccuracy01 : 0.6f;
+            float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
             float dist = Vector2.Distance(transform.position, aimPoint);
             float maxError = (1f - acc01) * accuracyErrorPerUnit * dist;
             return aimPoint + Random.insideUnitCircle * maxError;

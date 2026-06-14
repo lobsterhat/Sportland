@@ -28,6 +28,23 @@ namespace Sportland.Sports.Dodgeball
         public float Anticipation01 => Mathf.Clamp01(anticipation / 100f);
         public float Catching01 => Mathf.Clamp01(catching / 100f);
 
+        // ── Effective ratings (base × active Special Ability multipliers) ──
+        // Gameplay reads these, never the raw *01 getters above, so a Special
+        // Ability that modifies a stat is felt everywhere with no call-site
+        // changes. Today Effective() is an identity passthrough — no abilities
+        // are authored — so each Effective*01 equals its base. When the ability
+        // system lands, Effective() consults the player's ability aggregator
+        // for the multiplier on `stat` and returns Clamp01(base01 × mult).
+        public float EffectiveThrowSpeed01    => Effective(ThrowSpeed01,    AbilityStat.ThrowSpeed);
+        public float EffectiveThrowAccuracy01 => Effective(ThrowAccuracy01, AbilityStat.ThrowAccuracy);
+        public float EffectiveAnticipation01  => Effective(Anticipation01,  AbilityStat.Anticipation);
+        public float EffectiveCatching01      => Effective(Catching01,      AbilityStat.Catching);
+
+        // Special Ability hook point. Identity until the ability system exists;
+        // the `stat` key is already threaded through so the future change is
+        // entirely inside this method.
+        private float Effective(float base01, AbilityStat stat) => base01;
+
         /// <summary>
         /// Composite "how well will this player convert a possession into
         /// points?" score, 0..1. Used by the AI to route the ball to the best
@@ -35,8 +52,8 @@ namespace Sportland.Sports.Dodgeball
         /// score regardless of speed), then speed (faster ball is harder to
         /// catch), then anticipation (better lead on a moving target).
         /// </summary>
-        public float ScorePotential01 => 0.55f * ThrowAccuracy01
-                                       + 0.35f * ThrowSpeed01
-                                       + 0.10f * Anticipation01;
+        public float ScorePotential01 => 0.55f * EffectiveThrowAccuracy01
+                                       + 0.35f * EffectiveThrowSpeed01
+                                       + 0.10f * EffectiveAnticipation01;
     }
 }
