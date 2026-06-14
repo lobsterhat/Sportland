@@ -1,40 +1,93 @@
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Sportland.Sports.Dodgeball
 {
     /// <summary>
-    /// Per-player Special Ability aggregator. Holds the player's active
-    /// abilities and reports the combined multiplier for a given stat, which
-    /// the *Attributes Effective*01 getters fold into the base rating.
+    /// Per-player Special Ability aggregator + runtime host. Holds the player's
+    /// abilities (on = present in the list), ticks each one's trigger logic
+    /// every frame, and reports the combined multiplier for a stat — which the
+    /// *Attributes Effective*01 getters fold into the base rating.
     ///
     /// Composition is multiplicative: MultiplierFor(stat) is the product of
-    /// every currently-active ability's multiplier on that stat (an ability
-    /// that doesn't touch the stat contributes 1). Per-ability stacking is
-    /// baseMult^stacks, kept inside SpecialAbility so explicit per-level
-    /// tables can replace that formula later without touching this class.
-    ///
-    /// Skeleton stage: the ability list and per-frame rule evaluation
-    /// (Activate / Deactivate / Increase, durations, stacks) arrive with the
-    /// SpecialAbility ScriptableObject and the rules engine. Until then — and
-    /// whenever a player simply has no abilities — MultiplierFor returns 1 for
-    /// every stat, so wiring this into Effective() changes no behavior.
+    /// every active ability's StackedMultiplier on that stat. With no abilities
+    /// assigned the component is inert and returns 1 for every stat, so adding
+    /// it to a player changes nothing until an ability is dropped in.
     /// </summary>
     public class PlayerAbilities : MonoBehaviour
     {
+        [Tooltip("Special Abilities this player has. Each is a SpecialAbility asset (e.g. Hot Head); its trigger logic runs every frame while present.")]
+        [SerializeField] private List<SpecialAbility> abilities = new List<SpecialAbility>();
+
+        private readonly List<AbilityRuntime> runtimes = new List<AbilityRuntime>();
+        private PlayerZoneTracker tracker;
+        private Ball ball;
+        private bool subscribed;
+
+        // Damage signal: stamped when this player is the victim of a hit. The
+        // timestamp lets event-latched abilities (Hot Head) spot a fresh hit by
+        // comparing it against their own lastHandledDamageTime; the speed is
+        // available for magnitude-scaled reactions later.
+        public float LastDamageTime { get; private set; } = -1f;
+        public float LastDamageSpeed { get; private set; }
+
+        public PlayerZoneTracker Tracker => tracker;
+
+        private void Awake()
+        {
+            tracker = GetComponent<PlayerZoneTracker>();
+            for (int i = 0; i < abilities.Count; i++)
+            {
+                if (abilities[i] == null) continue;
+                runtimes.Add(new AbilityRuntime(abilities[i]));
+            }
+        }
+
+        private void OnDestroy()
+        {
+            if (ball != null && subscribed) ball.OnHit -= OnBallHit;
+        }
+
+        private void Update()
+        {
+            if (runtimes.Count == 0) return;   // inert player: no abilities assigned
+            EnsureSubscribed();
+            for (int i = 0; i < runtimes.Count; i++)
+                runtimes[i].ability.Tick(this, runtimes[i]);
+        }
+
+        // The ball may not exist at Awake, so subscription is retried from
+        // Update until it takes (same pattern as DodgeballPlayerInput).
+        private void EnsureSubscribed()
+        {
+            if (subscribed) return;
+            if (ball == null) ball = FindAnyObjectByType<Ball>();
+            if (ball == null) return;
+            ball.OnHit += OnBallHit;
+            subscribed = true;
+        }
+
+        private void OnBallHit(PlayerZoneTracker victim, Ball.HitZone zone, float ballSpeed)
+        {
+            if (victim != tracker) return;
+            LastDamageTime = Time.time;
+            LastDamageSpeed = ballSpeed;
+        }
+
         /// <summary>
         /// Combined multiplier for <paramref name="stat"/> across all active
         /// abilities (1 = no net effect). Consumed by
-        /// DodgeballAttributes.Effective() to produce the effective rating.
+        /// DodgeballAttributes.Effective().
         /// </summary>
         public float MultiplierFor(AbilityStat stat)
         {
-            // No abilities authored yet → identity. When the engine lands this
-            // becomes:
-            //     float m = 1f;
-            //     for (int i = 0; i < active.Count; i++)
-            //         m *= active[i].StackedMultiplier(stat);
-            //     return m;
-            return 1f;
+            float m = 1f;
+            for (int i = 0; i < runtimes.Count; i++)
+            {
+                var rt = runtimes[i];
+                if (rt.active) m *= rt.ability.StackedMultiplier(stat, rt.stacks);
+            }
+            return m;
         }
     }
 }
