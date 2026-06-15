@@ -84,11 +84,14 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private bool showMatchControls = true;
         [SerializeField] private bool showTuningPanel = true;
 
-        [Header("Oblique view (3/4 spike — toggle live with Q)")]
-        [Tooltip("THROWAWAY SPIKE / reference: fake a 3/4 oblique view by foreshortening the court depth + exaggerating jump height. Toggle live in-game with the Q key. Kept as a reference for the perspective-distortion tradeoff; the shipping view is the flat field with side-view sprites + depth sorting + shadows. Sets the INITIAL state; Q flips it at runtime.")]
+        [Header("3/4 perspective view — toggle live with Q")]
+        [Tooltip("Render the court as a receding trapezoid (3/4 perspective) and project players/ball onto it. Toggle live in-game with the Q key. Sets the INITIAL state; Q flips it at runtime. Note: perspective brings back the top/bottom spacing difference a flat field avoids.")]
         [SerializeField] private bool obliqueViewSpike = false;
-        [Range(0.2f, 1f)] [SerializeField] private float obliqueDepthFactor = 0.6f;
-        [Range(1f, 3f)] [SerializeField] private float obliqueHeightExaggeration = 1.5f;
+        [Tooltip("Far (top) edge scale vs the near (bottom) edge. Lower = stronger perspective.")]
+        [Range(0.2f, 1f)] [SerializeField] private float obliqueFarScale = 0.5f;
+        [Tooltip("How much depth bunches toward the far edge. 1 = flat oblique; higher = stronger perspective.")]
+        [Range(1f, 3f)] [SerializeField] private float obliqueDepthBunch = 1.6f;
+        [Range(1f, 3f)] [SerializeField] private float obliqueHeightExaggeration = 1.4f;
 
         [Header("Match")]
         [Tooltip("Scoring rules asset. Leave null to use Start Mode below (built in code).")]
@@ -190,8 +193,12 @@ namespace Sportland.Sports.Dodgeball
             // OnDisable restores the court and its projection stops, so the
             // movement/ball scripts revert the visuals next frame).
             obliqueView = gameObject.AddComponent<DodgeballObliqueView>();
-            obliqueView.depthFactor = obliqueDepthFactor;
+            obliqueView.farScale = obliqueFarScale;
+            obliqueView.depthBunch = obliqueDepthBunch;
             obliqueView.heightExaggeration = obliqueHeightExaggeration;
+            // Re-toggle so OnEnable (which builds the floor) runs with the params
+            // set above, not the defaults AddComponent's auto-enable used.
+            obliqueView.enabled = false;
             obliqueView.enabled = obliqueViewSpike;
         }
 

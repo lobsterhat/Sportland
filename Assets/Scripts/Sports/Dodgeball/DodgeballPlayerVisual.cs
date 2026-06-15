@@ -381,6 +381,10 @@ namespace Sportland.Sports.Dodgeball
             float h = movement != null ? movement.CurrentJumpHeight : 0f;
             float t = shadowFalloffHeight > 0f ? Mathf.Clamp01(h / shadowFalloffHeight) : 0f;
             float s = Mathf.Lerp(1f, shadowMinScale, t);
+            // Re-anchor to the foot every frame (flat view). The oblique view
+            // overrides this in LateUpdate while active; resetting here means it
+            // snaps back cleanly when the oblique view is toggled off.
+            shadowTransform.localPosition = new Vector3(0f, shadowFootY, 0.01f);
             shadowTransform.localScale = new Vector3(s, s, 1f);
         }
 
