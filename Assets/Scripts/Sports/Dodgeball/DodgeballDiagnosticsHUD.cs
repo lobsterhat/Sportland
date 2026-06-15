@@ -19,6 +19,7 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private bool showHud = true;
         [Header("Panels (declutter: enable only what you're inspecting)")]
         [SerializeField] private bool showAIDecision = true;
+        [SerializeField] private bool showDecisionLog = true;
         [SerializeField] private bool showStatus = false;
         [SerializeField] private bool showThrow = false;
         [SerializeField] private bool showCatch = false;
@@ -29,39 +30,115 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private Color textColor = Color.white;
         [Tooltip("Translucent background drawn behind the text for legibility.")]
         [SerializeField] private Color backgroundColor = new Color(0f, 0f, 0f, 0.55f);
+        [Tooltip("Max possession-log entries kept; oldest dropped past this.")]
+        [SerializeField] private int decisionLogMax = 80;
+        [Tooltip("How many of the most recent log entries the panel shows (copy gets the full log).")]
+        [SerializeField] private int decisionLogShown = 16;
 
         private GUIStyle textStyle;
         private Texture2D bgTexture;
         private Ball cachedBall;
 
+        // Possession log: appended on ball events; reviewable + click-to-copy.
+        private readonly List<string> decisionLog = new List<string>();
+        private PlayerZoneTracker lastCarrier;
+        private bool subscribed;
+        private float copiedFlashUntil;
+
         private void OnGUI()
         {
             if (!showHud) return;
             EnsureStyles();
+            EnsureSubscribed();
 
             float y = anchor.y;
             if (showAIDecision) { y = DrawPanel(BuildAIDecisionLines(), anchor.x, y); y += 6f; }
+            if (showDecisionLog) { y = DrawPanel(BuildDecisionLogLines(), anchor.x, y, string.Join("\n", decisionLog)); y += 6f; }
             if (showStatus)     { y = DrawPanel(BuildStatusLines(),     anchor.x, y); y += 6f; }
             if (showThrow)      { y = DrawPanel(BuildThrowLines(),      anchor.x, y); y += 6f; }
             if (showCatch)      { y = DrawPanel(BuildCatchLines(),      anchor.x, y); y += 6f; }
             if (showAbilities)  { y = DrawPanel(BuildAbilityLines(),    anchor.x, y); y += 6f; }
+
+            if (Time.realtimeSinceStartup < copiedFlashUntil)
+                GUI.Label(new Rect(anchor.x + 8f, y, panelWidth, fontSize + 4f), "✓ copied to clipboard", textStyle);
         }
 
-        private float DrawPanel(string[] lines, float x, float y)
+        // Draws a panel and, on a left click anywhere inside it, copies its text
+        // to the system clipboard (copyText overrides what gets copied — used by
+        // the possession log to copy the FULL log, not just the shown lines).
+        private float DrawPanel(string[] lines, float x, float y, string copyText = null)
         {
             float lineHeight = fontSize + 4f;
             float padding = 8f;
             float height = lines.Length * lineHeight + padding * 2f;
+            var panelRect = new Rect(x, y, panelWidth, height);
 
-            GUI.DrawTexture(new Rect(x, y, panelWidth, height), bgTexture);
+            GUI.DrawTexture(panelRect, bgTexture);
             for (int i = 0; i < lines.Length; i++)
             {
                 Rect r = new Rect(x + padding, y + padding + i * lineHeight,
                                   panelWidth - padding * 2f, lineHeight);
                 GUI.Label(r, lines[i], textStyle);
             }
+
+            var e = Event.current;
+            if (e != null && e.type == EventType.MouseDown && e.button == 0 && panelRect.Contains(e.mousePosition))
+            {
+                GUIUtility.systemCopyBuffer = copyText ?? string.Join("\n", lines);
+                copiedFlashUntil = Time.realtimeSinceStartup + 1.2f;
+                e.Use();
+            }
             return y + height;
         }
+
+        // ── Possession log ──
+
+        private void EnsureSubscribed()
+        {
+            if (subscribed) return;
+            EnsureBall();
+            if (cachedBall == null) return;
+            cachedBall.OnAttached += OnBallAttached;
+            cachedBall.OnReleased += OnBallReleased;
+            cachedBall.OnBecameLoose += OnBallLoose;
+            subscribed = true;
+        }
+
+        private void OnBallAttached(PlayerZoneTracker p)
+        {
+            if (p == null || p == lastCarrier) return;
+            lastCarrier = p;
+            LogDecision($"{Short(p)} ({p.Spawn.role}) gains");
+        }
+
+        private void OnBallReleased(PlayerZoneTracker thrower, PlayerZoneTracker target, bool isThrow)
+        {
+            string detail = isThrow ? "throw" : "pass";
+            var ai = thrower != null ? thrower.GetComponent<DodgeballAI>() : null;
+            if (ai != null && !string.IsNullOrEmpty(ai.DbgBranch)) detail = ai.DbgBranch;
+            LogDecision($"  {Short(thrower)} {detail} -> {Short(target)}");
+        }
+
+        private void OnBallLoose() => LogDecision("  ball loose");
+
+        private void LogDecision(string s)
+        {
+            decisionLog.Add($"{Time.timeSinceLevelLoad,6:F1}  {s}");
+            int cap = Mathf.Max(1, decisionLogMax);
+            while (decisionLog.Count > cap) decisionLog.RemoveAt(0);
+        }
+
+        private string[] BuildDecisionLogLines()
+        {
+            var lines = new List<string> { "== POSSESSION LOG (click = copy all) ==" };
+            if (decisionLog.Count == 0) { lines.Add("(waiting for first possession)"); return lines.ToArray(); }
+            int show = Mathf.Min(Mathf.Max(1, decisionLogShown), decisionLog.Count);
+            for (int i = decisionLog.Count - show; i < decisionLog.Count; i++)
+                lines.Add(decisionLog[i]);
+            return lines.ToArray();
+        }
+
+        private static string Short(PlayerZoneTracker t) => t != null ? $"{t.Spawn.team}{t.Number}" : "?";
 
         private string[] BuildStatusLines()
         {
@@ -291,6 +368,12 @@ namespace Sportland.Sports.Dodgeball
 
         private void OnDestroy()
         {
+            if (cachedBall != null && subscribed)
+            {
+                cachedBall.OnAttached -= OnBallAttached;
+                cachedBall.OnReleased -= OnBallReleased;
+                cachedBall.OnBecameLoose -= OnBallLoose;
+            }
             if (bgTexture != null) Destroy(bgTexture);
         }
     }
