@@ -114,6 +114,12 @@ namespace Sportland.Sports.Dodgeball
             public SpecialAbility ability;
         }
 
+        [Header("Oblique view (3/4 spike)")]
+        [Tooltip("THROWAWAY SPIKE: fake a 3/4 / oblique view — foreshorten the court depth + exaggerate jump height. Placeholder sprites stay top-down blobs; this is only to feel the camera angle before investing in front-facing art.")]
+        [SerializeField] private bool obliqueViewSpike = false;
+        [Range(0.2f, 1f)] [SerializeField] private float obliqueDepthFactor = 0.6f;
+        [Range(1f, 3f)] [SerializeField] private float obliqueHeightExaggeration = 1.5f;
+
         [Header("Runtime")]
         [SerializeField] private List<GameObject> spawnedPlayers = new List<GameObject>();
 
@@ -178,6 +184,30 @@ namespace Sportland.Sports.Dodgeball
                 currentPreset = startMode;
                 match.Configure(gameMode != null ? gameMode : GameMode.Create(startMode));
             }
+            if (obliqueViewSpike) EnableObliqueViewSpike();
+        }
+
+        // THROWAWAY SPIKE: fake a 3/4 view. Adds the per-frame visual projector
+        // and compresses the court visual's depth to match. Sim is untouched.
+        private void EnableObliqueViewSpike()
+        {
+            var ov = gameObject.AddComponent<DodgeballObliqueView>();
+            ov.depthFactor = obliqueDepthFactor;
+            ov.heightExaggeration = obliqueHeightExaggeration;
+
+            // Compress the court + center-line visuals on the depth (Y) axis so
+            // they recede consistently with the projected players/ball. Only the
+            // optional prefab visuals exist to scale; no-op if they weren't set.
+            ScaleChildDepth("Court", obliqueDepthFactor);
+            ScaleChildDepth("CenterLine", obliqueDepthFactor);
+        }
+
+        private void ScaleChildDepth(string childName, float factor)
+        {
+            var c = transform.Find(childName);
+            if (c == null) return;
+            var s = c.localScale;
+            c.localScale = new Vector3(s.x, s.y * factor, s.z);
         }
 
         private void Update()
