@@ -156,6 +156,15 @@ namespace Sportland.Sports.Dodgeball
         /// </summary>
         public string CurrentDecision { get; private set; } = "";
 
+        // Offense decision instrumentation (read by the diagnostics HUD's AI
+        // panel). Updated each frame while this player carries the ball.
+        public string DbgBranch { get; private set; } = "";   // chosen offense branch
+        public string DbgTarget { get; private set; } = "";   // throw target jersey
+        public string DbgPass   { get; private set; } = "";   // pass-vs-throw numbers
+        public string DbgAttack { get; private set; } = "";   // attack-roll breakdown
+
+        private static string Short(PlayerZoneTracker t) => t != null ? $"{t.Spawn.team}{t.Number}" : "?";
+
         private void Awake()
         {
             movement = GetComponent<PlayerMovement>();
@@ -617,6 +626,7 @@ namespace Sportland.Sports.Dodgeball
             // Grabbed the ball out of our area — carry it home before we can throw.
             if (!tracker.IsInZone)
             {
+                DbgBranch = "carry home (out of zone)";
                 movement.IsRunning = true;
                 Vector2 back = tracker.Spawn.position;
                 movement.SetFacing(back - (Vector2)transform.position);
@@ -625,17 +635,19 @@ namespace Sportland.Sports.Dodgeball
                 return;
             }
 
-            // Outfielders never shoot (no scoring credit). Carrier-infielders
-            // shoot UNLESS a teammate is substantially better positioned for
-            // the kill — then route the ball there first.
-            bool wantsToPass = tracker.Spawn.role != PlayerRole.Infielder
-                            || ShouldPassToBetterTeammate();
+            // Outfielders never shoot (no scoring credit) → always pass. Carrier-
+            // infielders shoot UNLESS a teammate is substantially better
+            // positioned for the kill — then route the ball there first.
+            bool wantsToPass;
+            if (tracker.Spawn.role != PlayerRole.Infielder) { wantsToPass = true; DbgPass = "outfielder -> pass"; }
+            else wantsToPass = ShouldPassToBetterTeammate();   // sets DbgPass
             if (wantsToPass)
             {
+                DbgBranch = "pass";
                 ResetAttack();
                 movement.IsRunning = false;
                 movement.ApplyMove(Vector2.zero);
-                PassToInfielder();
+                PassToInfielder();   // may overwrite DbgBranch = "HOLD (no pass target)"
                 return;
             }
 
@@ -645,15 +657,17 @@ namespace Sportland.Sports.Dodgeball
                 throwTarget = PickThrowTarget();
                 attackChosen = false;
             }
-            if (throwTarget == null) return;
+            if (throwTarget == null) { DbgBranch = "no opposing target"; return; }
+            DbgTarget = Short(throwTarget);
 
             if (!attackChosen)
             {
-                currentAttack = SelectAttack();
+                currentAttack = SelectAttack();   // sets DbgAttack
                 attackChosen = true;
                 BeginAttack();
             }
 
+            DbgBranch = currentAttack == AttackType.Stationary ? "windup (stationary)" : $"attack: {currentAttack}";
             if (currentAttack == AttackType.Stationary) DoStationaryThrow();
             else DoMovingAttack(throwTarget);
         }
@@ -675,14 +689,26 @@ namespace Sportland.Sports.Dodgeball
                 if (match != null) strategy = match.TeamAggression(tracker.Spawn.team);
             }
             float chance = Mathf.Clamp01(attackChance * (0.5f + agg) * teamAggressionMul * strategy);
-            if (UnityEngine.Random.value > chance) return AttackType.Stationary;
-
-            float total = runningWeight + jumpWeight + runJumpWeight;
-            if (total <= 0.0001f) return AttackType.Stationary;
-            float r = UnityEngine.Random.value * total;
-            if (r < runningWeight) return AttackType.Running;
-            if (r < runningWeight + jumpWeight) return AttackType.Jump;
-            return AttackType.RunJump;
+            float roll = UnityEngine.Random.value;
+            AttackType result;
+            if (roll > chance)
+            {
+                result = AttackType.Stationary;
+            }
+            else
+            {
+                float total = runningWeight + jumpWeight + runJumpWeight;
+                if (total <= 0.0001f) result = AttackType.Stationary;
+                else
+                {
+                    float r = UnityEngine.Random.value * total;
+                    result = r < runningWeight ? AttackType.Running
+                           : r < runningWeight + jumpWeight ? AttackType.Jump
+                           : AttackType.RunJump;
+                }
+            }
+            DbgAttack = $"p{chance:F2}(c{attackChance:F2} a{(0.5f + agg):F2} t{teamAggressionMul:F2} s{strategy:F2}) roll{roll:F2} -> {result}";
+            return result;
         }
 
         // Set the initial phase for the chosen attack. Jump launches immediately
@@ -816,15 +842,17 @@ namespace Sportland.Sports.Dodgeball
         // as positions shift slightly.
         private bool ShouldPassToBetterTeammate()
         {
-            if (attr == null) return false;
+            if (attr == null) { DbgPass = "no attr"; return false; }
             var best = BestTeammateInfielderToPass();
-            if (best == null) return false;
+            if (best == null) { DbgPass = "no better teammate -> throw"; return false; }
             var bestAttr = best.GetComponent<DodgeballAttributes>();
-            if (bestAttr == null) return false;
+            if (bestAttr == null) { DbgPass = "teammate no attr -> throw"; return false; }
             float myScore = attr.ScorePotential01;
             float dist = Vector2.Distance(transform.position, best.transform.position);
             float theirEffective = bestAttr.ScorePotential01 - passDistancePenalty01 * dist;
-            return theirEffective > myScore + passOverThrowBias;
+            bool pass = theirEffective > myScore + passOverThrowBias;
+            DbgPass = $"mine {myScore:F2} vs {Short(best)} {theirEffective:F2} (+{passOverThrowBias:F2}) -> {(pass ? "PASS" : "THROW")}";
+            return pass;
         }
 
         // Nearest opposing infielder. Outfielders can't be eliminated, so they
@@ -1007,7 +1035,7 @@ namespace Sportland.Sports.Dodgeball
                 if (rotation != null) target = rotation;
             }
 
-            if (target == null) return;   // nobody to feed — just hold
+            if (target == null) { DbgBranch = "HOLD (no pass target)"; return; }   // nobody to feed — just hold
 
             movement.SetFacing((Vector2)target.transform.position - (Vector2)transform.position);
 

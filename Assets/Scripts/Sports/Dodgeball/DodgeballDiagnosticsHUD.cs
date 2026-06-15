@@ -17,8 +17,14 @@ namespace Sportland.Sports.Dodgeball
     public class DodgeballDiagnosticsHUD : MonoBehaviour
     {
         [SerializeField] private bool showHud = true;
+        [Header("Panels (declutter: enable only what you're inspecting)")]
+        [SerializeField] private bool showAIDecision = true;
+        [SerializeField] private bool showStatus = false;
+        [SerializeField] private bool showThrow = false;
+        [SerializeField] private bool showCatch = false;
+        [SerializeField] private bool showAbilities = false;
         [SerializeField] private Vector2 anchor = new Vector2(12f, 12f);
-        [SerializeField] private float panelWidth = 320f;
+        [SerializeField] private float panelWidth = 400f;
         [SerializeField] private int fontSize = 15;
         [SerializeField] private Color textColor = Color.white;
         [Tooltip("Translucent background drawn behind the text for legibility.")]
@@ -34,13 +40,11 @@ namespace Sportland.Sports.Dodgeball
             EnsureStyles();
 
             float y = anchor.y;
-            y = DrawPanel(BuildStatusLines(), anchor.x, y);
-            y += 6f;
-            y = DrawPanel(BuildThrowLines(), anchor.x, y);
-            y += 6f;
-            y = DrawPanel(BuildCatchLines(), anchor.x, y);
-            y += 6f;
-            DrawPanel(BuildAbilityLines(), anchor.x, y);
+            if (showAIDecision) { y = DrawPanel(BuildAIDecisionLines(), anchor.x, y); y += 6f; }
+            if (showStatus)     { y = DrawPanel(BuildStatusLines(),     anchor.x, y); y += 6f; }
+            if (showThrow)      { y = DrawPanel(BuildThrowLines(),      anchor.x, y); y += 6f; }
+            if (showCatch)      { y = DrawPanel(BuildCatchLines(),      anchor.x, y); y += 6f; }
+            if (showAbilities)  { y = DrawPanel(BuildAbilityLines(),    anchor.x, y); y += 6f; }
         }
 
         private float DrawPanel(string[] lines, float x, float y)
@@ -217,6 +221,35 @@ namespace Sportland.Sports.Dodgeball
                 }
                 if (m.Length > 0) lines.Add("  " + m.TrimEnd());
             }
+            return lines.ToArray();
+        }
+
+        // The ball carrier's decision process — what determined pass-vs-attack
+        // and the attack dice roll. Follows whoever currently holds the ball,
+        // i.e. the player actually making an offense decision right now.
+        private string[] BuildAIDecisionLines()
+        {
+            EnsureBall();
+            var lines = new List<string> { "== AI DECISION (carrier) ==" };
+
+            var carrier = cachedBall != null ? cachedBall.Carrier : null;
+            if (carrier == null)
+            {
+                string st = cachedBall != null ? cachedBall.StateLabel : "?";
+                lines.Add($"(no carrier — ball: {st})");
+                return lines.ToArray();
+            }
+
+            lines.Add($"{carrier.Spawn.team}{carrier.Number}   {carrier.Spawn.role}");
+
+            var ai = carrier.GetComponent<DodgeballAI>();
+            if (ai == null) { lines.Add("(human-controlled)"); return lines.ToArray(); }
+
+            lines.Add($"chain:  {ai.CurrentDecision}");
+            if (!string.IsNullOrEmpty(ai.DbgBranch)) lines.Add($"branch: {ai.DbgBranch}");
+            if (!string.IsNullOrEmpty(ai.DbgPass))   lines.Add($"pass?   {ai.DbgPass}");
+            if (!string.IsNullOrEmpty(ai.DbgTarget)) lines.Add($"target: {ai.DbgTarget}");
+            if (!string.IsNullOrEmpty(ai.DbgAttack)) lines.Add($"roll:   {ai.DbgAttack}");
             return lines.ToArray();
         }
 
