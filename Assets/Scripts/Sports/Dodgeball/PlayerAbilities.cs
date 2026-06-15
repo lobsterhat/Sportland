@@ -115,5 +115,30 @@ namespace Sportland.Sports.Dodgeball
             }
             return m;
         }
+
+        /// <summary>
+        /// Runtime ability assignment (used by CourtSetup's roster wiring).
+        /// Replaces the current abilities and rebuilds the runtimes. Needed
+        /// because AddComponent runs Awake before the caller can populate the
+        /// serialized list, so the list is set through here instead.
+        /// </summary>
+        public void SetAbilities(IList<SpecialAbility> list)
+        {
+            abilities.Clear();
+            runtimes.Clear();
+            if (list == null) return;
+            for (int i = 0; i < list.Count; i++)
+            {
+                if (list[i] == null) continue;
+                abilities.Add(list[i]);
+                runtimes.Add(new AbilityRuntime(list[i]));
+            }
+        }
+
+        /// <summary>Clear every ability's active/stack state — call on a match reset.</summary>
+        public void ResetRuntimes()
+        {
+            for (int i = 0; i < runtimes.Count; i++) runtimes[i].Deactivate();
+        }
     }
 }

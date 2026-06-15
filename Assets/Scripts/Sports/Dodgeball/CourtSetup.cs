@@ -94,6 +94,26 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Switch modes at runtime for testing: M cycles; F1-F4 pick Running Hits / Elimination / Energy / Hybrid. Resets the match.")]
         [SerializeField] private bool allowRuntimeModeSwitch = true;
 
+        [Header("Abilities")]
+        [Tooltip("Special Abilities that can be randomly assigned to players at spawn. Leave empty to disable random ability assignment.")]
+        [SerializeField] private SpecialAbility[] abilityPool;
+        [Tooltip("Per-player chance (0..1) to roll an ability from the pool. Each additional ability up to the cap is rolled again at this chance, so multiples get progressively rarer.")]
+        [Range(0f, 1f)] [SerializeField] private float abilityChance = 0.35f;
+        [Tooltip("Max Special Abilities a single player can have (random + forced combined).")]
+        [Min(0)] [SerializeField] private int maxAbilitiesPerPlayer = 1;
+        [Tooltip("Star players (A_In_1 / B_In_1) are guaranteed at least one rolled ability.")]
+        [SerializeField] private bool guaranteeStarAbility = true;
+        [Tooltip("Debug override: force a specific ability onto a specific player by spawn id (e.g. A_In_2). Always assigned, on top of the random roll, up to the cap.")]
+        [SerializeField] private List<ForcedAbility> debugForcedAbilities = new List<ForcedAbility>();
+
+        /// <summary>Inspector entry forcing one ability onto one player (debug / scripted scenarios).</summary>
+        [System.Serializable]
+        public struct ForcedAbility
+        {
+            public string spawnId;
+            public SpecialAbility ability;
+        }
+
         [Header("Runtime")]
         [SerializeField] private List<GameObject> spawnedPlayers = new List<GameObject>();
 
@@ -209,6 +229,8 @@ namespace Sportland.Sports.Dodgeball
                 var body = go.GetComponent<Rigidbody2D>();
                 if (body != null) body.linearVelocity = Vector2.zero;
                 if (!go.activeSelf) go.SetActive(true);   // re-adds to PlayerZoneTracker.All
+                var pa = go.GetComponent<PlayerAbilities>();
+                if (pa != null) pa.ResetRuntimes();        // fresh match → all abilities inactive
             }
             if (ball != null) ball.ResetLoose(Vector2.zero);
             if (match != null) match.Configure(mode);
@@ -294,7 +316,71 @@ namespace Sportland.Sports.Dodgeball
                 go.AddComponent<DodgeballPlayerInput>();
             }
 
+            AssignAbilities(go, spawn);
+
             spawnedPlayers.Add(go);
+        }
+
+        // Roster wiring: give the player its Special Abilities at spawn. Debug
+        // forced assignments always apply; the rest are rolled from abilityPool,
+        // deterministically per spawn.id (stable across restarts, like the stat
+        // rolls) and capped at maxAbilitiesPerPlayer. Star infielders are
+        // guaranteed at least one when guaranteeStarAbility is set. Players who
+        // roll nothing get no PlayerAbilities component at all (stays inert).
+        private const int AbilitySeedSalt = 0x5A17;
+
+        private void AssignAbilities(GameObject go, PlayerSpawn spawn)
+        {
+            bool havePool = abilityPool != null && abilityPool.Length > 0;
+            bool haveForced = debugForcedAbilities != null && debugForcedAbilities.Count > 0;
+            if (!havePool && !haveForced) return;
+
+            var chosen = new List<SpecialAbility>();
+
+            // Debug forced assignments for this player (always applied, capped).
+            if (haveForced)
+                for (int i = 0; i < debugForcedAbilities.Count; i++)
+                {
+                    var f = debugForcedAbilities[i];
+                    if (f.ability != null && f.spawnId == spawn.id
+                        && !chosen.Contains(f.ability) && chosen.Count < maxAbilitiesPerPlayer)
+                        chosen.Add(f.ability);
+                }
+
+            // Random roll filling the remaining slots, deterministic per player.
+            int slots = Mathf.Max(0, maxAbilitiesPerPlayer - chosen.Count);
+            if (havePool && slots > 0)
+            {
+                bool isStar = spawn.id == "A_In_1" || spawn.id == "B_In_1";
+                var rng = new System.Random(spawn.id.GetHashCode() ^ AbilitySeedSalt);
+
+                int rollCount = (isStar && guaranteeStarAbility && chosen.Count == 0) ? 1 : 0;
+                for (int s = rollCount; s < slots; s++)
+                {
+                    if (rng.NextDouble() < abilityChance) rollCount++;
+                    else break;   // geometric — each extra ability is rarer; stop at first miss
+                }
+
+                if (rollCount > 0)
+                {
+                    var candidates = new List<SpecialAbility>();
+                    for (int i = 0; i < abilityPool.Length; i++)
+                        if (abilityPool[i] != null && !chosen.Contains(abilityPool[i]))
+                            candidates.Add(abilityPool[i]);
+
+                    for (int i = candidates.Count - 1; i > 0; i--)   // Fisher-Yates, same rng
+                    {
+                        int j = rng.Next(i + 1);
+                        (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
+                    }
+
+                    int take = Mathf.Min(rollCount, candidates.Count);
+                    for (int i = 0; i < take; i++) chosen.Add(candidates[i]);
+                }
+            }
+
+            if (chosen.Count == 0) return;
+            go.AddComponent<PlayerAbilities>().SetAbilities(chosen);
         }
 
         // Per-player stat differentiation. Deterministic RNG keyed off spawn.id
