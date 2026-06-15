@@ -36,16 +36,21 @@ namespace Sportland.Sports.Dodgeball
         private static readonly float YFar  =  CourtSetup.PlayAreaHalfHeight;  // top (far)
 
         private Ball ball;
-        private Transform flatCourt, flatLine;
+        private DodgeballCourtRenderer courtRenderer;
         private GameObject floor;
 
         private void OnEnable()
         {
-            CacheFlatCourt();
-            if (flatCourt != null) flatCourt.gameObject.SetActive(false);
-            if (flatLine != null) flatLine.gameObject.SetActive(false);
+            SetFlatCourt(false);
             SetDebugOverlays(false);
             RebuildFloor();   // rebuild with current params (they may have changed since last enable)
+        }
+
+        private void OnDisable()
+        {
+            SetFlatCourt(true);
+            SetDebugOverlays(true);
+            if (floor != null) floor.SetActive(false);
         }
 
         private void RebuildFloor()
@@ -55,18 +60,21 @@ namespace Sportland.Sports.Dodgeball
             floor.SetActive(true);
         }
 
-        private void OnDisable()
+        // Show/hide the flat top-down playfield (the red/blue half fills + strip
+        // outlines + boundary / center lines drawn by DodgeballCourtRenderer) by
+        // toggling its child renderers. Skips our own ObliqueFloor in case the
+        // renderer happens to share this GameObject.
+        private void SetFlatCourt(bool visible)
         {
-            if (flatCourt != null) flatCourt.gameObject.SetActive(true);
-            if (flatLine != null) flatLine.gameObject.SetActive(true);
-            SetDebugOverlays(true);
-            if (floor != null) floor.SetActive(false);
-        }
-
-        private void CacheFlatCourt()
-        {
-            if (flatCourt == null) flatCourt = transform.Find("Court");
-            if (flatLine == null) flatLine = transform.Find("CenterLine");
+            if (courtRenderer == null) courtRenderer = FindFirstObjectByType<DodgeballCourtRenderer>();
+            if (courtRenderer == null) return;
+            var t = courtRenderer.transform;
+            for (int i = 0; i < t.childCount; i++)
+            {
+                var c = t.GetChild(i);
+                if (floor != null && c == floor.transform) continue;
+                c.gameObject.SetActive(visible);
+            }
         }
 
         // Hide/show the top-down debug aids (arrows + control ring) on every
@@ -157,18 +165,20 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
-        // ---- procedural perspective floor (built once) ----
+        // ---- procedural perspective floor (built on each enable) ----
         private void BuildFloor()
         {
             floor = new GameObject("ObliqueFloor");
             floor.transform.SetParent(transform, false);
 
-            // Court corners (±HalfWidth x, ±HalfHeight y), projected.
-            float hw = CourtSetup.HalfWidth, hh = CourtSetup.HalfHeight;
-            Vector3 nl = P(-hw, -hh), nr = P(hw, -hh);   // near (bottom) edge
-            Vector3 fl = P(-hw,  hh), fr = P(hw,  hh);   // far (top) edge
+            float hw = CourtSetup.HalfWidth, hh = CourtSetup.HalfHeight;          // court
+            float pw = CourtSetup.PlayAreaHalfWidth, ph = CourtSetup.PlayAreaHalfHeight; // play area (incl. outfield)
 
-            // Filled trapezoid (2 triangles): nl, nr, fr, fl.
+            // Fill the whole PLAY AREA (court + outfield strips) so every player,
+            // including the outfielders, sits on a visible surface.
+            Vector3 nl = P(-pw, -ph), nr = P(pw, -ph);   // near (bottom) edge
+            Vector3 fl = P(-pw,  ph), fr = P(pw,  ph);   // far (top) edge
+
             var go = new GameObject("Fill");
             go.transform.SetParent(floor.transform, false);
             var mf = go.AddComponent<MeshFilter>();
@@ -185,8 +195,10 @@ namespace Sportland.Sports.Dodgeball
             };
             mf.mesh.RecalculateNormals();
 
-            // Boundary outline + center line + a few depth lines (bunch toward top).
-            Line("Boundary", new[] { nl, nr, fr, fl, nl });
+            // Outer play-area edge, inner court boundary, center divider, and a
+            // few depth lines across the court (they bunch toward the top).
+            Line("OuterBoundary", new[] { nl, nr, fr, fl, nl });
+            Line("CourtBoundary", new[] { P(-hw, -hh), P(hw, -hh), P(hw, hh), P(-hw, hh), P(-hw, -hh) });
             Line("Center", new[] { P(0f, -hh), P(0f, hh) });
             for (int i = 1; i <= 3; i++)
             {
