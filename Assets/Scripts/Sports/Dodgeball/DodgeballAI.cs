@@ -84,8 +84,10 @@ namespace Sportland.Sports.Dodgeball
         [Header("Attacks")]
         [Tooltip("Base chance (0..1) that a carrier-infielder commits to a NON-stationary attack (running / jump / run-jump) on a possession, instead of the cautious stationary windup throw. Scaled by the player's aggression (accuracy+speed) and teamAggressionMul.")]
         [Range(0f, 1f)] public float attackChance = 0.5f;
-        [Tooltip("Team aggression multiplier on attackChance. 1 = neutral. The game-state strategy layer (score / time remaining) drives this: <1 cautious (protecting a lead), >1 aggressive (chasing).")]
+        [Tooltip("Manual team aggression multiplier on attackChance. 1 = neutral. Multiplies with the automatic game-state strategy (below) — leave at 1 to let strategy drive it alone, or bias the whole team.")]
         [Range(0.2f, 2f)] public float teamAggressionMul = 1f;
+        [Tooltip("Drive aggression automatically from match state (score + time, or bodies remaining in elimination): behind → aggressive, ahead → cautious, amplified late. Off = manual teamAggressionMul only.")]
+        public bool useGameStateStrategy = true;
         [Tooltip("Relative weight of the RUNNING attack: advance toward the line, throw grounded with running momentum (faster ball, closer, exposed near the midline).")]
         public float runningWeight = 0.5f;
         [Tooltip("Relative weight of the JUMP attack: jump in place, release at apex — a different (descending) angle that can disrupt catch timing; exposed on landing.")]
@@ -119,6 +121,7 @@ namespace Sportland.Sports.Dodgeball
         private PlayerZoneTracker tracker;
         private DodgeballAttributes attr;
         private Ball ball;
+        private DodgeballMatch match;
 
         private enum Reaction { None, Catch, Duck, Jump, Sidestep }
         private Reaction reaction;
@@ -665,7 +668,13 @@ namespace Sportland.Sports.Dodgeball
             float agg = attr != null
                 ? (attr.EffectiveThrowAccuracy01 + attr.EffectiveThrowSpeed01) * 0.5f
                 : 0.5f;
-            float chance = Mathf.Clamp01(attackChance * (0.5f + agg) * teamAggressionMul);
+            float strategy = 1f;
+            if (useGameStateStrategy)
+            {
+                if (match == null) match = FindFirstObjectByType<DodgeballMatch>();
+                if (match != null) strategy = match.TeamAggression(tracker.Spawn.team);
+            }
+            float chance = Mathf.Clamp01(attackChance * (0.5f + agg) * teamAggressionMul * strategy);
             if (UnityEngine.Random.value > chance) return AttackType.Stationary;
 
             float total = runningWeight + jumpWeight + runJumpWeight;

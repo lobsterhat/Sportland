@@ -34,6 +34,16 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Seconds the game pauses while the referee transfers the ball to a player on the OTHER team after any clock expiry. Match clock, shot clock, and delay-of-game all halt during this window. AI bails out of loose-ball chase so no scramble happens.")]
         [SerializeField] private float refTransferDuration = 1.5f;
 
+        [Header("AI offense strategy (team aggression)")]
+        [Tooltip("Score/body margin at which a team's aggression hits full swing: behind by this much → maximally aggressive, ahead by this much → maximally cautious.")]
+        [SerializeField] private float aggressionMarginScale = 4f;
+        [Tooltip("Aggression swing early in a timed match (or at full strength in elimination). 0.25 → multiplier ~0.75..1.25.")]
+        [SerializeField] private float aggressionBaseSwing = 0.25f;
+        [Tooltip("Aggression swing late in a timed match (or as bodies dwindle in elimination). 0.8 → ~0.2..1.8 before clamping — protect a lead hard / chase hard.")]
+        [SerializeField] private float aggressionMaxSwing = 0.8f;
+        [Tooltip("Clamp on the team aggression multiplier.")]
+        [SerializeField] private float aggressionMin = 0.5f, aggressionMax = 1.8f;
+
         // Live shot clock state — keyed off the OFFENSIVE TEAM, not a single
         // carrier. Continues through teammate passes / pickups; the carrier
         // reference is just a UI hint for which jersey to render the countdown
@@ -823,6 +833,44 @@ namespace Sportland.Sports.Dodgeball
         private void AddScore(Team team, int points)
         {
             if (team == Team.A) scoreA += points; else scoreB += points;
+        }
+
+        /// <summary>Current score for a team.</summary>
+        public int Score(Team team) => team == Team.A ? scoreA : scoreB;
+
+        /// <summary>
+        /// AI offense strategy: how aggressive <paramref name="team"/> should be
+        /// right now, as a multiplier on attack chance. Behind → &gt;1 (chase),
+        /// ahead → &lt;1 (protect the lead), tied → ~1. The swing is amplified
+        /// late in timed modes, and as bodies dwindle in elimination modes.
+        /// Read per-possession by DodgeballAI.SelectAttack.
+        /// </summary>
+        public float TeamAggression(Team team)
+        {
+            if (matchOver || mode == null) return 1f;
+            Team opp = team == Team.A ? Team.B : Team.A;
+
+            float margin;    // + = this team is ahead
+            float urgency;   // 0..1 amplifier on the swing
+
+            if (mode.isTimed)
+            {
+                margin = Score(team) - Score(opp);
+                float frac = mode.secondsPerPeriod > 0f
+                    ? Mathf.Clamp01(timeRemaining / mode.secondsPerPeriod) : 1f;
+                urgency = 1f - frac;   // late game → more urgent
+            }
+            else   // elimination / energy: margin is bodies, urgency rises as bodies thin out
+            {
+                margin = CountActiveInfielders(team) - CountActiveInfielders(opp);
+                int minAlive = Mathf.Min(CountActiveInfielders(team), CountActiveInfielders(opp));
+                urgency = mode.infieldersPerTeam > 0
+                    ? 1f - Mathf.Clamp01((float)minAlive / mode.infieldersPerTeam) : 0f;
+            }
+
+            float normalized = Mathf.Clamp(-margin / Mathf.Max(0.01f, aggressionMarginScale), -1f, 1f); // behind → +1
+            float swing = Mathf.Lerp(aggressionBaseSwing, aggressionMaxSwing, urgency);
+            return Mathf.Clamp(1f + normalized * swing, aggressionMin, aggressionMax);
         }
 
         private void EndMatch(Team? forcedWinner = null)
