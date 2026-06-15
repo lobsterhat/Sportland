@@ -39,6 +39,41 @@ namespace Sportland.Sports.Dodgeball
         public float courtCenterY = 0f;
 
         private Ball ball;
+        private Vector3 courtBaseScale, lineBaseScale;
+        private bool courtCaptured, courtCompressed;
+
+        // Compress the court visual's depth on enable, restore on disable, so the
+        // Q toggle flips the whole effect on/off live. (Player/ball projection
+        // reverts on its own when this component stops running — the movement/ball
+        // scripts reassign their Visual localY every frame without the offset.)
+        private void OnEnable() => CompressCourt();
+        private void OnDisable() => RestoreCourt();
+
+        private void CompressCourt()
+        {
+            if (courtCompressed) return;
+            var court = transform.Find("Court");
+            var line = transform.Find("CenterLine");
+            if (!courtCaptured)
+            {
+                if (court != null) courtBaseScale = court.localScale;
+                if (line != null) lineBaseScale = line.localScale;
+                courtCaptured = true;
+            }
+            if (court != null) court.localScale = new Vector3(courtBaseScale.x, courtBaseScale.y * depthFactor, courtBaseScale.z);
+            if (line != null) line.localScale = new Vector3(lineBaseScale.x, lineBaseScale.y * depthFactor, lineBaseScale.z);
+            courtCompressed = true;
+        }
+
+        private void RestoreCourt()
+        {
+            if (!courtCompressed || !courtCaptured) { courtCompressed = false; return; }
+            var court = transform.Find("Court");
+            var line = transform.Find("CenterLine");
+            if (court != null) court.localScale = courtBaseScale;
+            if (line != null) line.localScale = lineBaseScale;
+            courtCompressed = false;
+        }
 
         private void LateUpdate()
         {

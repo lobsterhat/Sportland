@@ -53,6 +53,17 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Below the player sprite (order 0) but above the court (center line -2) so it sits under the player.")]
         [SerializeField] private int ringSortingOrder = -1;
 
+        [Header("Ground shadow")]
+        [Tooltip("Flat ellipse at the feet (root-parented, so it stays on the floor while the sprite bobs). Grounds the side-view character and sells the jump height.")]
+        [SerializeField] private float shadowRadiusX = 0.42f;
+        [SerializeField] private float shadowRadiusY = 0.16f;
+        [SerializeField] private Color shadowColor = new Color(0f, 0f, 0f, 0.45f);
+        [Tooltip("Bottom layer of the player (under body/role/arrows) within its depth-sort group.")]
+        [SerializeField] private int shadowSortingOrder = -10;
+        [Tooltip("Jump height (u) at which the shadow shrinks to shadowMinScale, selling the lift.")]
+        [SerializeField] private float shadowFalloffHeight = 1.5f;
+        [Range(0f, 1f)] [SerializeField] private float shadowMinScale = 0.5f;
+
         private Material bodyMaterial;
         private SpriteRenderer spriteRenderer;
         private PlayerZoneTracker tracker;
@@ -61,6 +72,8 @@ namespace Sportland.Sports.Dodgeball
         private Transform movementArrowTransform;
         private Transform facingArrowTransform;
         private Transform ringTransform;
+        private Transform shadowTransform;
+        private float shadowFootY;
 
         public void Configure(Team team, PlayerRole role, PlayerZoneTracker zoneTracker)
         {
@@ -82,6 +95,7 @@ namespace Sportland.Sports.Dodgeball
             BuildMovementArrow();
             BuildFacingArrow();
             BuildControlRing();
+            BuildShadow();
         }
 
         private void Update()
@@ -90,6 +104,7 @@ namespace Sportland.Sports.Dodgeball
             UpdateMovementArrow();
             UpdateFacingArrow();
             UpdateSpriteFacing();
+            UpdateShadow();
 
             if (tracker == null) return;
             Color target = tracker.IsInZone ? baseColor : outOfZoneTint;
@@ -316,6 +331,57 @@ namespace Sportland.Sports.Dodgeball
             bool controlled = movement != null && movement.GetComponent<DodgeballPlayerInput>() != null;
             if (ringTransform != null && ringTransform.gameObject.activeSelf != controlled)
                 ringTransform.gameObject.SetActive(controlled);
+        }
+
+        // A flat dark ellipse at the feet. Parented to the root (not the bobbing
+        // Visual) so it stays on the floor as the player jumps; the depth-sort
+        // group's low order keeps it under the character. UpdateShadow shrinks it
+        // with jump height to sell the lift.
+        private void BuildShadow()
+        {
+            if (shadowTransform != null) return;
+
+            Transform parent = transform.parent != null ? transform.parent : transform;
+            var go = new GameObject("Shadow");
+            go.transform.SetParent(parent, false);
+            shadowFootY = movement != null ? movement.FootOffset : -0.79f;
+            go.transform.localPosition = new Vector3(0f, shadowFootY, 0.01f);
+
+            var mf = go.AddComponent<MeshFilter>();
+            var mr = go.AddComponent<MeshRenderer>();
+            mr.sharedMaterial = CreateMat(shadowColor);
+            mr.sortingOrder = shadowSortingOrder;
+            mr.shadowCastingMode = UnityEngine.Rendering.ShadowCastingMode.Off;
+            mr.receiveShadows = false;
+
+            const int segs = 24;
+            var verts = new Vector3[segs + 1];
+            var tris = new int[segs * 3];
+            verts[0] = Vector3.zero;
+            for (int i = 0; i < segs; i++)
+            {
+                float a = i * Mathf.PI * 2f / segs;
+                verts[i + 1] = new Vector3(Mathf.Cos(a) * shadowRadiusX, Mathf.Sin(a) * shadowRadiusY, 0f);
+                tris[i * 3]     = 0;
+                tris[i * 3 + 1] = i + 1;
+                tris[i * 3 + 2] = (i + 1) % segs + 1;
+            }
+            var mesh = new Mesh { name = "PlayerShadow", vertices = verts, triangles = tris };
+            mesh.RecalculateNormals();
+            mf.mesh = mesh;
+
+            shadowTransform = go.transform;
+        }
+
+        private void UpdateShadow()
+        {
+            if (shadowTransform == null) return;
+            if (movement == null) movement = GetComponentInParent<PlayerMovement>();
+
+            float h = movement != null ? movement.CurrentJumpHeight : 0f;
+            float t = shadowFalloffHeight > 0f ? Mathf.Clamp01(h / shadowFalloffHeight) : 0f;
+            float s = Mathf.Lerp(1f, shadowMinScale, t);
+            shadowTransform.localScale = new Vector3(s, s, 1f);
         }
 
         private static Material CreateMat(Color c)

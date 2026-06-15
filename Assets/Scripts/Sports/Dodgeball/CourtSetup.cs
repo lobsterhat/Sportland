@@ -84,6 +84,12 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private bool showMatchControls = true;
         [SerializeField] private bool showTuningPanel = true;
 
+        [Header("Oblique view (3/4 spike — toggle live with Q)")]
+        [Tooltip("THROWAWAY SPIKE / reference: fake a 3/4 oblique view by foreshortening the court depth + exaggerating jump height. Toggle live in-game with the Q key. Kept as a reference for the perspective-distortion tradeoff; the shipping view is the flat field with side-view sprites + depth sorting + shadows. Sets the INITIAL state; Q flips it at runtime.")]
+        [SerializeField] private bool obliqueViewSpike = false;
+        [Range(0.2f, 1f)] [SerializeField] private float obliqueDepthFactor = 0.6f;
+        [Range(1f, 3f)] [SerializeField] private float obliqueHeightExaggeration = 1.5f;
+
         [Header("Match")]
         [Tooltip("Scoring rules asset. Leave null to use Start Mode below (built in code).")]
         [SerializeField] private GameMode gameMode;
@@ -114,17 +120,12 @@ namespace Sportland.Sports.Dodgeball
             public SpecialAbility ability;
         }
 
-        [Header("Oblique view (3/4 spike)")]
-        [Tooltip("THROWAWAY SPIKE: fake a 3/4 / oblique view — foreshorten the court depth + exaggerate jump height. Placeholder sprites stay top-down blobs; this is only to feel the camera angle before investing in front-facing art.")]
-        [SerializeField] private bool obliqueViewSpike = false;
-        [Range(0.2f, 1f)] [SerializeField] private float obliqueDepthFactor = 0.6f;
-        [Range(1f, 3f)] [SerializeField] private float obliqueHeightExaggeration = 1.5f;
-
         [Header("Runtime")]
         [SerializeField] private List<GameObject> spawnedPlayers = new List<GameObject>();
 
         private DodgeballMatch match;
         private Ball ball;
+        private DodgeballObliqueView obliqueView;
         private GameMode.Preset currentPreset;
 
         /// <summary>The mode the match is currently running in (read by the controls panel).</summary>
@@ -184,37 +185,30 @@ namespace Sportland.Sports.Dodgeball
                 currentPreset = startMode;
                 match.Configure(gameMode != null ? gameMode : GameMode.Create(startMode));
             }
-            if (obliqueViewSpike) EnableObliqueViewSpike();
-        }
-
-        // THROWAWAY SPIKE: fake a 3/4 view. Adds the per-frame visual projector
-        // and compresses the court visual's depth to match. Sim is untouched.
-        private void EnableObliqueViewSpike()
-        {
-            var ov = gameObject.AddComponent<DodgeballObliqueView>();
-            ov.depthFactor = obliqueDepthFactor;
-            ov.heightExaggeration = obliqueHeightExaggeration;
-
-            // Compress the court + center-line visuals on the depth (Y) axis so
-            // they recede consistently with the projected players/ball. Only the
-            // optional prefab visuals exist to scale; no-op if they weren't set.
-            ScaleChildDepth("Court", obliqueDepthFactor);
-            ScaleChildDepth("CenterLine", obliqueDepthFactor);
-        }
-
-        private void ScaleChildDepth(string childName, float factor)
-        {
-            var c = transform.Find(childName);
-            if (c == null) return;
-            var s = c.localScale;
-            c.localScale = new Vector3(s.x, s.y * factor, s.z);
+            // Oblique view: always present, toggled live with Q. Starts in the
+            // state of the inspector bool. Disabled = zero effect (the component's
+            // OnDisable restores the court and its projection stops, so the
+            // movement/ball scripts revert the visuals next frame).
+            obliqueView = gameObject.AddComponent<DodgeballObliqueView>();
+            obliqueView.depthFactor = obliqueDepthFactor;
+            obliqueView.heightExaggeration = obliqueHeightExaggeration;
+            obliqueView.enabled = obliqueViewSpike;
         }
 
         private void Update()
         {
-            if (!allowRuntimeModeSwitch || match == null) return;
             var kb = Keyboard.current;
             if (kb == null) return;
+
+            // Q toggles the oblique-view spike live (works regardless of the
+            // mode-switch gating below).
+            if (kb.qKey.wasPressedThisFrame && obliqueView != null)
+            {
+                obliqueView.enabled = !obliqueView.enabled;
+                Debug.Log($"[Dodgeball] Oblique view {(obliqueView.enabled ? "ON" : "off")}");
+            }
+
+            if (!allowRuntimeModeSwitch || match == null) return;
 
             if (kb.f1Key.wasPressedThisFrame)      SwitchMode(GameMode.Preset.RunningHits);
             else if (kb.f2Key.wasPressedThisFrame) SwitchMode(GameMode.Preset.Elimination);
@@ -283,6 +277,11 @@ namespace Sportland.Sports.Dodgeball
             }
             ballGO.transform.localPosition = Vector3.zero;
             ball = ballGO.GetComponent<Ball>();
+
+            // Depth sorting in the same band as players, so the ball interleaves
+            // correctly front/back against them.
+            if (ballGO.GetComponent<DodgeballDepthSort>() == null)
+                ballGO.AddComponent<DodgeballDepthSort>();
         }
 
         private void BuildCourt()
@@ -347,6 +346,9 @@ namespace Sportland.Sports.Dodgeball
             }
 
             AssignAbilities(go, spawn);
+
+            // Depth sorting: lower on screen (front) draws over higher up (back).
+            go.AddComponent<DodgeballDepthSort>();
 
             spawnedPlayers.Add(go);
         }
