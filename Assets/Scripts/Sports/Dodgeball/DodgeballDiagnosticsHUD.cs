@@ -101,6 +101,8 @@ namespace Sportland.Sports.Dodgeball
             cachedBall.OnAttached += OnBallAttached;
             cachedBall.OnReleased += OnBallReleased;
             cachedBall.OnBecameLoose += OnBallLoose;
+            cachedBall.OnHit += OnBallHit;
+            cachedBall.OnCaught += OnBallCaught;
             subscribed = true;
         }
 
@@ -119,7 +121,13 @@ namespace Sportland.Sports.Dodgeball
             LogDecision($"  {Short(thrower)} {detail} -> {Short(target)}");
         }
 
-        private void OnBallLoose() => LogDecision("  ball loose");
+        private void OnBallLoose() => LogDecision("  ball loose (miss)");
+
+        private void OnBallHit(PlayerZoneTracker victim, Ball.HitZone zone, float speed)
+            => LogDecision($"  >> HIT {Short(victim)} ({zone}, {speed:F0}u/s)");
+
+        private void OnBallCaught(PlayerZoneTracker catcher)
+            => LogDecision($"  >> {Short(catcher)} CAUGHT");
 
         private void LogDecision(string s)
         {
@@ -373,6 +381,8 @@ namespace Sportland.Sports.Dodgeball
                 cachedBall.OnAttached -= OnBallAttached;
                 cachedBall.OnReleased -= OnBallReleased;
                 cachedBall.OnBecameLoose -= OnBallLoose;
+                cachedBall.OnHit -= OnBallHit;
+                cachedBall.OnCaught -= OnBallCaught;
             }
             if (bgTexture != null) Destroy(bgTexture);
         }
