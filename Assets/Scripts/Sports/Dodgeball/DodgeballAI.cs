@@ -81,12 +81,22 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("How much higher (in 0..1 score-potential space) a teammate's effective shot must be before a carrier-infielder passes instead of shooting themselves.")]
         public float passOverThrowBias = 0.10f;
 
-        [Header("Run-jump attack")]
-        [Tooltip("Base probability (0..1) that a carrier-infielder commits to a running-jump throw on a given possession. The actual chance scales with the player's accuracy + speed — an aggressive specialist run-jumps more often than a cautious one.")]
-        [Range(0f, 1f)] public float runJumpProbability = 0f;
-        [Tooltip("Distance (u) to my zone's forward edge at which the run-up commits to the jump + release. Smaller = release closer to the line — more momentum but riskier (if I jump too late I cross the line on release and Phase D neuters the shot).")]
+        [Header("Attacks")]
+        [Tooltip("Base chance (0..1) that a carrier-infielder commits to a NON-stationary attack (running / jump / run-jump) on a possession, instead of the cautious stationary windup throw. Scaled by the player's aggression (accuracy+speed) and teamAggressionMul.")]
+        [Range(0f, 1f)] public float attackChance = 0.5f;
+        [Tooltip("Team aggression multiplier on attackChance. 1 = neutral. The game-state strategy layer (score / time remaining) drives this: <1 cautious (protecting a lead), >1 aggressive (chasing).")]
+        [Range(0.2f, 2f)] public float teamAggressionMul = 1f;
+        [Tooltip("Relative weight of the RUNNING attack: advance toward the line, throw grounded with running momentum (faster ball, closer, exposed near the midline).")]
+        public float runningWeight = 0.5f;
+        [Tooltip("Relative weight of the JUMP attack: jump in place, release at apex — a different (descending) angle that can disrupt catch timing; exposed on landing.")]
+        public float jumpWeight = 0.3f;
+        [Tooltip("Relative weight of the RUN-JUMP attack: run up + jump + release deep into the opposing zone — most power, most committal, most exposed.")]
+        public float runJumpWeight = 0.2f;
+        [Tooltip("Distance (u) to my zone's forward edge at which a RUNNING attack releases the grounded throw. Smaller = closer to the line (more momentum, more exposed).")]
+        public float runningReleaseDistance = 1.0f;
+        [Tooltip("Distance (u) to my zone's forward edge at which the RUN-JUMP commits to the jump + release. Smaller = release closer to the line — more momentum but riskier (jump too late and you cross the line on release, neutering the shot).")]
         public float runJumpEdgeDistance = 1.2f;
-        [Tooltip("Movement-input magnitude during the run-up. 1 = full run; lower values are less committal but build less momentum.")]
+        [Tooltip("Movement-input magnitude during a running approach. 1 = full run; lower is less committal but builds less momentum.")]
         [SerializeField, Range(0.4f, 1f)] private float runJumpInputSpeed = 1f;
 
         [Header("Loose-ball retrieval")]
@@ -119,16 +129,21 @@ namespace Sportland.Sports.Dodgeball
         private float holdStartTime = -1f;       // when we picked up the ball (wind-up clock)
         private PlayerZoneTracker throwTarget;
 
-        // Run-jump attack phase. Decided once per possession when we lock on
-        // a target; committed until release. Reset on carry-home / pass /
-        // release.
-        //   RunUp                — running toward the zone edge, ball held.
-        //   AirborneAwaitingApex — jumped, mid-air, holding the throw until
-        //                          the apex of the jump. Releasing earlier
-        //                          forfeits power and accuracy (timing skill).
-        private enum RunJumpPhase { None, RunUp, AirborneAwaitingApex }
-        private RunJumpPhase runJumpPhase = RunJumpPhase.None;
-        private float runJumpJumpStartTime = -1f;
+        // Attack selection. Chosen once per possession when we lock a target;
+        // committed until release. Reset on carry-home / pass / release.
+        //   Stationary — windup throw from where we stand (default, cautious).
+        //   Running    — advance toward the line, throw grounded with momentum.
+        //   Jump       — jump in place, release at apex (different angle).
+        //   RunJump    — run up + jump + release deep (most committal/exposed).
+        private enum AttackType { Stationary, Running, Jump, RunJump }
+        // Phase within a moving attack:
+        //   Approach — running toward the forward edge (Running / RunJump).
+        //   Airborne — mid-air, holding the throw until the jump apex (Jump / RunJump).
+        private enum AttackPhase { None, Approach, Airborne }
+        private AttackType currentAttack = AttackType.Stationary;
+        private AttackPhase attackPhase = AttackPhase.None;
+        private bool attackChosen;
+        private float jumpStartTime = -1f;
 
         /// <summary>
         /// Short label of the chain node driving this AI this frame ("Offense",
@@ -585,15 +600,14 @@ namespace Sportland.Sports.Dodgeball
         {
             movement.SetStance(false);
 
-            // Airborne: don't re-decide anything. The launch velocity is the
-            // throw's momentum bonus, and the player's trajectory shouldn't be
-            // re-routed mid-jump (carry-home would fire when their position
-            // crosses the line and turn them back). Just complete the run-jump
-            // if one is in progress.
+            // Airborne: don't re-decide anything. Continue an in-progress jump /
+            // run-jump attack (awaiting apex); otherwise just preserve the
+            // trajectory — the launch velocity is the throw's momentum bonus and
+            // re-routing mid-jump would turn the player back at the line.
             if (!movement.IsGrounded)
             {
-                if (runJumpPhase != RunJumpPhase.None && throwTarget != null)
-                    DoRunJumpAttack(throwTarget);
+                if (attackPhase == AttackPhase.Airborne && throwTarget != null)
+                    DoMovingAttack(throwTarget);
                 return;
             }
 
@@ -604,9 +618,7 @@ namespace Sportland.Sports.Dodgeball
                 Vector2 back = tracker.Spawn.position;
                 movement.SetFacing(back - (Vector2)transform.position);
                 MoveToward(back);
-                holdStartTime = -1f;   // wind-up only starts once we're set in our area
-                runJumpPhase = RunJumpPhase.None;
-                runJumpJumpStartTime = -1f;
+                ResetAttack();   // attack choice + wind-up only once we're set in our area
                 return;
             }
 
@@ -617,38 +629,82 @@ namespace Sportland.Sports.Dodgeball
                             || ShouldPassToBetterTeammate();
             if (wantsToPass)
             {
-                throwTarget = null;
-                runJumpPhase = RunJumpPhase.None;
-                runJumpJumpStartTime = -1f;
+                ResetAttack();
                 movement.IsRunning = false;
                 movement.ApplyMove(Vector2.zero);
                 PassToInfielder();
                 return;
             }
 
-            // Lock the target on first frame; roll for run-jump at the same time.
+            // Lock the target and choose an attack type once per possession.
             if (throwTarget == null || throwTarget.Spawn.team == tracker.Spawn.team)
             {
                 throwTarget = PickThrowTarget();
-                if (throwTarget != null && holdStartTime < 0f && runJumpPhase == RunJumpPhase.None)
-                {
-                    if (UnityEngine.Random.value < EffectiveRunJumpProb())
-                        runJumpPhase = RunJumpPhase.RunUp;
-                }
+                attackChosen = false;
             }
             if (throwTarget == null) return;
 
-            // Both run-jump phases (running up AND mid-air awaiting apex) route
-            // through DoRunJumpAttack; otherwise the airborne phase falls
-            // through to the stationary windup and the AI ends up throwing
-            // AFTER landing.
-            if (runJumpPhase != RunJumpPhase.None)
+            if (!attackChosen)
             {
-                DoRunJumpAttack(throwTarget);
-                return;
+                currentAttack = SelectAttack();
+                attackChosen = true;
+                BeginAttack();
             }
 
-            // Stationary windup throw (default).
+            if (currentAttack == AttackType.Stationary) DoStationaryThrow();
+            else DoMovingAttack(throwTarget);
+        }
+
+        // Pick an attack for this possession. Usually Stationary, but with
+        // probability attackChance — scaled by the player's aggression
+        // (accuracy+speed, 0.5×..1.5×) and the team aggression multiplier —
+        // commit to a moving attack, split among Running / Jump / RunJump by
+        // their relative weights.
+        private AttackType SelectAttack()
+        {
+            float agg = attr != null
+                ? (attr.EffectiveThrowAccuracy01 + attr.EffectiveThrowSpeed01) * 0.5f
+                : 0.5f;
+            float chance = Mathf.Clamp01(attackChance * (0.5f + agg) * teamAggressionMul);
+            if (UnityEngine.Random.value > chance) return AttackType.Stationary;
+
+            float total = runningWeight + jumpWeight + runJumpWeight;
+            if (total <= 0.0001f) return AttackType.Stationary;
+            float r = UnityEngine.Random.value * total;
+            if (r < runningWeight) return AttackType.Running;
+            if (r < runningWeight + jumpWeight) return AttackType.Jump;
+            return AttackType.RunJump;
+        }
+
+        // Set the initial phase for the chosen attack. Jump launches immediately
+        // in place; Running / RunJump start their approach run; Stationary just
+        // resets the wind-up clock.
+        private void BeginAttack()
+        {
+            attackPhase = AttackPhase.None;
+            jumpStartTime = -1f;
+            holdStartTime = -1f;
+            switch (currentAttack)
+            {
+                case AttackType.Running:
+                case AttackType.RunJump:
+                    attackPhase = AttackPhase.Approach;
+                    break;
+                case AttackType.Jump:
+                    if (movement.IsGrounded)
+                    {
+                        movement.TryJump();
+                        attackPhase = AttackPhase.Airborne;
+                        jumpStartTime = Time.time;
+                    }
+                    break;
+            }
+        }
+
+        // Stationary windup throw (default, cautious): stand, face, telegraph
+        // for windupTime, release from where we stand.
+        private void DoStationaryThrow()
+        {
             movement.IsRunning = false;
             movement.ApplyMove(Vector2.zero);
             movement.SetFacing((Vector2)throwTarget.transform.position - (Vector2)transform.position);
@@ -657,73 +713,68 @@ namespace Sportland.Sports.Dodgeball
             if (Time.time - holdStartTime >= windupTime)
             {
                 ThrowAtTarget(throwTarget);
-                holdStartTime = -1f;
-                throwTarget = null;
+                ResetAttack();
             }
         }
 
-        // Per-player run-jump aggression: base probability scaled by the
-        // thrower's accuracy + speed. A 0/0 player rolls 0 (never), a 100/100
-        // player rolls up to 2× the base.
-        private float EffectiveRunJumpProb()
+        // Running / Jump / RunJump execution.
+        //   Approach: run toward the target. At the forward edge, a Running
+        //     attack releases the grounded throw (momentum from the run); a
+        //     RunJump jumps and switches to Airborne.
+        //   Airborne: hold the throw until the jump apex (max power/accuracy —
+        //     the timing skill tax), then release. Lateral velocity is preserved
+        //     through the jump, so the run momentum still feeds a RunJump's throw.
+        private void DoMovingAttack(PlayerZoneTracker target)
         {
-            if (attr == null) return runJumpProbability;
-            float aggression = (attr.EffectiveThrowAccuracy01 + attr.EffectiveThrowSpeed01) * 0.5f;   // 0..1
-            return Mathf.Clamp01(runJumpProbability * aggression * 2f);
-        }
-
-        // Two-phase run-jump attack:
-        //   RunUp: run toward the target until within runJumpEdgeDistance of
-        //   my zone's forward edge, then TryJump and switch to AirborneAwaitingApex.
-        //   AirborneAwaitingApex: hold the throw mid-air until JumpApexTime
-        //   has elapsed since the jump, then release. Releasing at apex (or
-        //   shortly after, on descent) is the maximum-power timing — that's
-        //   the skill tax on this attack. The carrier-velocity bonus is the
-        //   running lateral speed (preserved through the jump since vertical
-        //   motion is decoupled from rb.linearVelocity).
-        private void DoRunJumpAttack(PlayerZoneTracker target)
-        {
-            if (runJumpPhase == RunJumpPhase.RunUp)
+            if (attackPhase == AttackPhase.Approach)
             {
                 movement.IsRunning = true;
                 Vector2 me = transform.position;
-                Vector2 dir = ((Vector2)target.transform.position - me);
+                Vector2 dir = (Vector2)target.transform.position - me;
                 if (dir.sqrMagnitude < 0.0001f) dir = Vector2.right;
                 dir.Normalize();
-
                 movement.SetFacing(dir);
                 movement.ApplyMove(dir * runJumpInputSpeed);
 
                 float edgeDist = DistanceToZoneEdgeAlong(dir);
-                if (edgeDist <= runJumpEdgeDistance && movement.IsGrounded)
+                float release = currentAttack == AttackType.RunJump ? runJumpEdgeDistance : runningReleaseDistance;
+                if (edgeDist <= release && movement.IsGrounded)
                 {
-                    movement.TryJump();
-                    runJumpPhase = RunJumpPhase.AirborneAwaitingApex;
-                    runJumpJumpStartTime = Time.time;
+                    if (currentAttack == AttackType.RunJump)
+                    {
+                        movement.TryJump();
+                        attackPhase = AttackPhase.Airborne;
+                        jumpStartTime = Time.time;
+                    }
+                    else   // Running — release grounded, carrying the run momentum
+                    {
+                        ThrowAtTarget(target);
+                        ResetAttack();
+                    }
                 }
                 return;
             }
 
-            if (runJumpPhase == RunJumpPhase.AirborneAwaitingApex)
+            if (attackPhase == AttackPhase.Airborne)
             {
-                // Lateral velocity is preserved during the jump (Height is
-                // decoupled), so we keep facing the target and hold input
-                // direction — Ball.Throw will capture the running velocity
-                // as the momentum bonus at release.
                 movement.SetFacing((Vector2)target.transform.position - (Vector2)transform.position);
-
-                float airTime = Time.time - runJumpJumpStartTime;
+                float airTime = Time.time - jumpStartTime;
                 if (airTime >= movement.JumpApexTime)
                 {
                     ThrowAtTarget(target);
-                    holdStartTime = -1f;
-                    throwTarget = null;
-                    runJumpPhase = RunJumpPhase.None;
-                    runJumpJumpStartTime = -1f;
+                    ResetAttack();
                 }
-                // else: still rising — hold the throw. (Releasing early would
-                // forfeit power; the AI plays the optimal release timing.)
             }
+        }
+
+        private void ResetAttack()
+        {
+            holdStartTime = -1f;
+            throwTarget = null;
+            currentAttack = AttackType.Stationary;
+            attackPhase = AttackPhase.None;
+            attackChosen = false;
+            jumpStartTime = -1f;
         }
 
         // Distance (u) from my current position to the AssignedZone boundary

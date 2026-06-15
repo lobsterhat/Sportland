@@ -308,11 +308,17 @@ namespace Sportland.Sports.Dodgeball
                 GUILayout.Label("(pick a thrower to edit stats)");
             }
 
-            // Run-jump (applies to all AI, but most relevant here since the
-            // tested thrower will use the run-jump path once AI resumes).
-            Section("RUN-JUMP");
-            SliderForAllAI("runJumpProbability",  0f,   1f,    ai => ai.runJumpProbability,  (ai, v) => ai.runJumpProbability  = v);
-            SliderForAllAI("runJumpEdgeDistance", 0.5f, 3f,    ai => ai.runJumpEdgeDistance, (ai, v) => ai.runJumpEdgeDistance = v);
+            // Attacks (applies to all AI). attackChance × teamAggressionMul ×
+            // player aggression decides how often a carrier commits to a moving
+            // attack; the weights split it among running / jump / run-jump.
+            Section("ATTACKS");
+            SliderForAllAI("attackChance",        0f,   1f,  ai => ai.attackChance,          (ai, v) => ai.attackChance          = v);
+            SliderForAllAI("teamAggressionMul",   0.2f, 2f,  ai => ai.teamAggressionMul,     (ai, v) => ai.teamAggressionMul     = v);
+            SliderForAllAI("runningWeight",       0f,   2f,  ai => ai.runningWeight,         (ai, v) => ai.runningWeight         = v);
+            SliderForAllAI("jumpWeight",          0f,   2f,  ai => ai.jumpWeight,            (ai, v) => ai.jumpWeight            = v);
+            SliderForAllAI("runJumpWeight",       0f,   2f,  ai => ai.runJumpWeight,         (ai, v) => ai.runJumpWeight         = v);
+            SliderForAllAI("runningReleaseDist",  0.5f, 3f,  ai => ai.runningReleaseDistance,(ai, v) => ai.runningReleaseDistance = v);
+            SliderForAllAI("runJumpEdgeDistance", 0.5f, 3f,  ai => ai.runJumpEdgeDistance,   (ai, v) => ai.runJumpEdgeDistance   = v);
 
             // Movement (jump / pivot / landing recovery).
             Section("MOVEMENT");
