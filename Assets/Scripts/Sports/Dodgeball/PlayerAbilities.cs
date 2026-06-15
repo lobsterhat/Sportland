@@ -36,6 +36,29 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Read-only view of the per-ability runtime state (for HUD / debug).</summary>
         public IReadOnlyList<AbilityRuntime> Runtimes => runtimes;
 
+        /// <summary>
+        /// Count of this player's still-in-play teammates, including self.
+        /// PlayerZoneTracker.All holds only active players (TakeOut disables an
+        /// eliminated one, dropping it from the registry), so this is the live
+        /// "remaining on my team" count. <paramref name="infieldersOnly"/>
+        /// matches the elimination wipeout rule, which counts infielders.
+        /// </summary>
+        public int ActiveTeammates(bool infieldersOnly)
+        {
+            if (tracker == null) return 0;
+            var team = tracker.Spawn.team;
+            var all = PlayerZoneTracker.All;
+            int n = 0;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var t = all[i];
+                if (t == null || t.Spawn.team != team) continue;
+                if (infieldersOnly && t.Spawn.role != PlayerRole.Infielder) continue;
+                n++;
+            }
+            return n;
+        }
+
         private void Awake()
         {
             tracker = GetComponent<PlayerZoneTracker>();
