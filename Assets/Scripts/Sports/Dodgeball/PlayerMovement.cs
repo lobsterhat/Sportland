@@ -74,7 +74,7 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("How long a duck holds after the last Duck() call (seconds).")]
         [SerializeField] private float duckDuration = 0.5f;
         [Tooltip("Settle after catching the ball — the catcher can't move or act for this long, so play doesn't ping-pong catch→throw→catch instantly. Keep small.")]
-        [SerializeField] private float catchRecoverDuration = 0.4f;
+        [SerializeField] private float catchRecoverDuration = 0.5f;
         [Tooltip("Vertical sprite squash while ducking (visual only).")]
         [SerializeField] private float duckSquash = 0.6f;
 

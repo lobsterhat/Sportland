@@ -48,8 +48,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float lowBallThreshold = 0.6f;
 
         [Header("Offense (throwing)")]
-        [Tooltip("Seconds the AI holds the ball (winds up) before throwing.")]
-        [SerializeField] private float windupTime = 0.7f;
+        [Tooltip("Seconds the AI holds the ball (winds up) before a PASS releases. (Stationary attacks use the charge throw instead; see maxChargeTime.)")]
+        [SerializeField] private float windupTime = 0.9f;
         [Tooltip("Release speed (u/s) at throwSpeed rating 0 and 100; the rating lerps between them.")]
         [SerializeField] private float minThrowSpeed = 12f;
         [SerializeField] private float maxThrowSpeed = 36f;
@@ -108,10 +108,12 @@ namespace Sportland.Sports.Dodgeball
         public float exposedRecoverBonus = 50f;
         [Tooltip("Priority bonus for an opposing infielder who has wandered out of their own zone (off-position).")]
         public float outOfZoneTargetBonus = 20f;
+        [Tooltip("Seconds a player who over-commits across the line (grounded, no ball, stranded in the opposing infield) stays frozen and exposed — can't dodge or catch — before running home. This is the window for the other team to punish the attack, so it should comfortably exceed catchRecoverDuration + a quick throw, or the attacker escapes first.")]
+        public float strandedDuration = 0.9f;
 
         [Header("Charge throw (stationary attack)")]
         [Tooltip("Full-charge wind-up time (s) for a STATIONARY attack: charge this long for full power; release earlier (a 'tap') for a weaker, wilder throw. Running/jump attacks aren't charged — their power comes from momentum.")]
-        public float maxChargeTime = 0.9f;
+        public float maxChargeTime = 1.1f;
         [Tooltip("Charge fraction (0..1) the AI quick-releases at when pressured (a defender is close or it's exposed) — snappier but weaker.")]
         [Range(0.05f, 1f)] public float tapCharge01 = 0.25f;
         [Tooltip("Throw power at minimum charge, as a fraction of the player's full power.")]
@@ -153,6 +155,7 @@ namespace Sportland.Sports.Dodgeball
         private PlayerZoneTracker throwTarget;
         private bool targetExposed;              // last-picked target was out of position / can't dodge
         private float desiredCharge01 = 1f;      // chosen charge for the current stationary throw
+        private float strandedUntil = -1f;       // frozen-exposed deadline after over-committing across the line
 
         // Attack selection. Chosen once per possession when we lock a target;
         // committed until release. Reset on carry-home / pass / release.
@@ -206,6 +209,7 @@ namespace Sportland.Sports.Dodgeball
 
             if (TryActWithBall())               return;
             holdStartTime = -1f;                // not holding — reset wind-up
+            if (TryStranded())                  return;
             if (TryAnticipateOutfielderCatch()) return;
             if (TryReactToOpposingPass())       return;
             if (TryReactToIncomingThrow())      return;
@@ -230,6 +234,28 @@ namespace Sportland.Sports.Dodgeball
             EndThreat();
             CurrentDecision = "Offense";
             Offense();
+            return true;
+        }
+
+        // Over-committed across the line: grounded, no ball, stranded in the
+        // opposing infield (a run / jump attack carried me over). Freeze —
+        // exposed, can't dodge or catch — for strandedDuration, THEN fall
+        // through to Idle (run home). This is the punish window that makes the
+        // aggressive attacks risky: the other team gets a free shot.
+        private bool TryStranded()
+        {
+            if (tracker.HasBall || !movement.IsGrounded || !tracker.IsInOpposingInfield)
+            {
+                strandedUntil = -1f;
+                return false;
+            }
+            if (strandedUntil < 0f) strandedUntil = Time.time + strandedDuration;
+            if (Time.time >= strandedUntil) return false;   // strand over → Idle runs me home
+
+            EndThreat();
+            CurrentDecision = "Stranded";
+            movement.SetStance(false);
+            movement.ApplyMove(Vector2.zero);
             return true;
         }
 
@@ -668,9 +694,14 @@ namespace Sportland.Sports.Dodgeball
 
             // Outfielders never shoot (no scoring credit) → always pass. Carrier-
             // infielders shoot UNLESS a teammate is substantially better
-            // positioned for the kill — then route the ball there first.
+            // positioned — then route the ball there first. EXCEPTION: if an
+            // opponent is exposed (stranded in our infield / can't dodge), an
+            // infielder takes the free shot instead of passing — don't waste the
+            // window.
+            bool exposedKill = tracker.Spawn.role == PlayerRole.Infielder && HasExposedTarget();
             bool wantsToPass;
-            if (tracker.Spawn.role != PlayerRole.Infielder) { wantsToPass = true; DbgPass = "outfielder -> pass"; }
+            if (exposedKill) { wantsToPass = false; DbgPass = "EXPOSED kill -> shoot"; }
+            else if (tracker.Spawn.role != PlayerRole.Infielder) { wantsToPass = true; DbgPass = "outfielder -> pass"; }
             else wantsToPass = ShouldPassToBetterTeammate();   // sets DbgPass
             if (wantsToPass)
             {
@@ -710,6 +741,10 @@ namespace Sportland.Sports.Dodgeball
         // their relative weights.
         private AttackType SelectAttack()
         {
+            // Exposed target (stranded / can't dodge) → snap a quick stationary
+            // tap, don't run-jump; they'll have fled by the time a run-up lands.
+            if (targetExposed) return AttackType.Stationary;
+
             float agg = attr != null
                 ? (attr.EffectiveThrowAccuracy01 + attr.EffectiveThrowSpeed01) * 0.5f
                 : 0.5f;
@@ -781,7 +816,9 @@ namespace Sportland.Sports.Dodgeball
             if (holdStartTime < 0f)
             {
                 holdStartTime = Time.time;
-                desiredCharge01 = IsPressured() ? tapCharge01 : 1f;
+                // Quick tap when pressured OR firing at an exposed/can't-dodge
+                // target (snap it off before they flee); full charge with room.
+                desiredCharge01 = (IsPressured() || targetExposed) ? tapCharge01 : 1f;
             }
 
             float held = Time.time - holdStartTime;
@@ -973,6 +1010,21 @@ namespace Sportland.Sports.Dodgeball
         {
             var m = t.GetComponent<PlayerMovement>();
             return m != null && (m.IsJumpRecovering || m.IsRecovering || m.IsCatchRecovering);
+        }
+
+        // True if any opponent is exposed right now — stranded in our infield or
+        // frozen in a recovery state — i.e. a free shot worth not passing up.
+        private bool HasExposedTarget()
+        {
+            var team = tracker.Spawn.team;
+            var all = PlayerZoneTracker.All;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var t = all[i];
+                if (t == null || t.Spawn.team == team) continue;
+                if (t.IsInOpposingInfield || TargetIsRecovering(t)) return true;
+            }
+            return false;
         }
 
         // charge01 (1 = full) scales the stationary attack's power + accuracy;
