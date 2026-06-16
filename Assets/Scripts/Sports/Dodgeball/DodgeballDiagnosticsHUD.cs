@@ -51,8 +51,9 @@ namespace Sportland.Sports.Dodgeball
         {
             var kb = Keyboard.current;
             if (kb == null) return;
-            // P toggles the possession log; A toggles the user-attack panel.
+            // I = AI-decision panel, P = possession log, A = user-attack panel.
             // NOTE: A is also Move-Left (WASD) — it'll fire while strafing left.
+            if (kb.iKey.wasPressedThisFrame) showAIDecision = !showAIDecision;
             if (kb.pKey.wasPressedThisFrame) showDecisionLog = !showDecisionLog;
             if (kb.aKey.wasPressedThisFrame) showUserAttack = !showUserAttack;
         }
