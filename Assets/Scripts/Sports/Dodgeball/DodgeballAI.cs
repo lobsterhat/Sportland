@@ -623,6 +623,15 @@ namespace Sportland.Sports.Dodgeball
                 return;
             }
 
+            // Just caught the ball — settle before doing anything (no instant
+            // catch→counter-attack; movement is already frozen by PlayerMovement).
+            if (movement.IsCatchRecovering)
+            {
+                DbgBranch = "catch recovery";
+                ClearAttackChoice();
+                return;
+            }
+
             // Grabbed the ball out of our area — carry it home before we can throw.
             if (!tracker.IsInZone)
             {

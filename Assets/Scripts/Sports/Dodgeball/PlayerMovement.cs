@@ -73,6 +73,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float duckBodyTop = 0.8f;
         [Tooltip("How long a duck holds after the last Duck() call (seconds).")]
         [SerializeField] private float duckDuration = 0.5f;
+        [Tooltip("Settle after catching the ball — the catcher can't move or act for this long, so play doesn't ping-pong catch→throw→catch instantly. Keep small.")]
+        [SerializeField] private float catchRecoverDuration = 0.4f;
         [Tooltip("Vertical sprite squash while ducking (visual only).")]
         [SerializeField] private float duckSquash = 0.6f;
 
@@ -100,6 +102,7 @@ namespace Sportland.Sports.Dodgeball
         private float dashActiveSpeed;
         private float diveTimer = -1f;
         private float recoverTimer = -1f;
+        private float catchRecoverTimer = -1f;
         private Vector2 diveDir = Vector2.right;
         private bool facingOverriddenThisFrame;
         private float spriteBaseY;
@@ -113,6 +116,10 @@ namespace Sportland.Sports.Dodgeball
         public bool IsDiving => diveTimer >= 0f;
         /// <summary>Prone after a dive — can't move or act until back on feet.</summary>
         public bool IsRecovering => recoverTimer >= 0f;
+        /// <summary>Brief settle right after catching the ball — can't move or act.</summary>
+        public bool IsCatchRecovering => catchRecoverTimer >= 0f;
+        /// <summary>Begin the post-catch settle (called by Ball on a successful catch).</summary>
+        public void BeginCatchRecovery() => catchRecoverTimer = 0f;
         /// <summary>
         /// Feet on the floor: not mid-jump and not mid-dive (a dive is a low
         /// airborne lunge). Prone recovery counts as grounded — you've landed.
@@ -192,6 +199,10 @@ namespace Sportland.Sports.Dodgeball
             // damping bleeds off momentum until we're slow enough to commit
             // to the new direction.
             if (IsPivoting) return;
+            // Ducking commits to a crouch and the post-catch settle is a brief
+            // hold — no movement during either (a ducker shouldn't run at full
+            // speed; a fresh catcher shouldn't instantly counter-attack).
+            if (IsDucking || IsCatchRecovering) return;
 
             Vector2 clamped = input.sqrMagnitude > 1f ? input.normalized : input;
 
@@ -338,6 +349,12 @@ namespace Sportland.Sports.Dodgeball
             {
                 duckTimer += Time.deltaTime;
                 if (duckTimer >= duckDuration) duckTimer = -1f;
+            }
+
+            if (IsCatchRecovering)
+            {
+                catchRecoverTimer += Time.deltaTime;
+                if (catchRecoverTimer >= catchRecoverDuration) catchRecoverTimer = -1f;
             }
 
             if (IsDashing)

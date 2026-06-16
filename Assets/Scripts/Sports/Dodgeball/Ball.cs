@@ -988,7 +988,11 @@ namespace Sportland.Sports.Dodgeball
             if (!airborneCatch) ConfirmPendingHits();
 
             AttachTo(t);
-            if (countsAsCatch) OnCaught?.Invoke(t);
+            if (countsAsCatch)
+            {
+                t.GetComponent<PlayerMovement>()?.BeginCatchRecovery();
+                OnCaught?.Invoke(t);
+            }
         }
 
         private void AttachTo(PlayerZoneTracker t)
