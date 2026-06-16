@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Sportland.Sports.Dodgeball
 {
@@ -45,6 +46,16 @@ namespace Sportland.Sports.Dodgeball
         private PlayerZoneTracker lastCarrier;
         private bool subscribed;
         private float copiedFlashUntil;
+
+        private void Update()
+        {
+            var kb = Keyboard.current;
+            if (kb == null) return;
+            // P toggles the possession log; A toggles the user-attack panel.
+            // NOTE: A is also Move-Left (WASD) — it'll fire while strafing left.
+            if (kb.pKey.wasPressedThisFrame) showDecisionLog = !showDecisionLog;
+            if (kb.aKey.wasPressedThisFrame) showUserAttack = !showUserAttack;
+        }
 
         private void OnGUI()
         {
