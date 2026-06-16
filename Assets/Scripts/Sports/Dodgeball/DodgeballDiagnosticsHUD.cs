@@ -325,7 +325,9 @@ namespace Sportland.Sports.Dodgeball
                 return lines.ToArray();
             }
 
-            lines.Add($"{carrier.Spawn.team}{carrier.Number}   {carrier.Spawn.role}");
+            var sta = carrier.GetComponent<PlayerStamina>();
+            string staStr = sta != null ? $"   stamina {sta.Stamina01:F2}" : "";
+            lines.Add($"{carrier.Spawn.team}{carrier.Number}   {carrier.Spawn.role}{staStr}");
 
             var ai = carrier.GetComponent<DodgeballAI>();
             if (ai == null) { lines.Add("(human-controlled)"); return lines.ToArray(); }

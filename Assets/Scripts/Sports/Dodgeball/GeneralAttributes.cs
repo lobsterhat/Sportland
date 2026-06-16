@@ -32,7 +32,7 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>ChangeOfDirection on a 0..1 scale.</summary>
         public float ChangeOfDirection01 => Mathf.Clamp01(changeOfDirection / 100f);
 
-        [Tooltip("0..100. How long the player can sustain top-tier exertion before slowing down. Stubbed for future stamina/fatigue work; not wired into movement yet.")]
+        [Tooltip("0..100. Fatigue resistance: higher = stamina drains slower and recovers faster (see PlayerStamina). Tired players throw weaker/wilder and catch worse.")]
         [Range(0f, 100f)] public float endurance = 50f;
 
         /// <summary>Endurance on a 0..1 scale.</summary>

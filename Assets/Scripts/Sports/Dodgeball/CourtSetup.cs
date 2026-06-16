@@ -123,6 +123,10 @@ namespace Sportland.Sports.Dodgeball
             public SpecialAbility ability;
         }
 
+        [Header("Stamina / fatigue")]
+        [Tooltip("Players tire from strenuous actions (throw / catch / jump / dive / sustained run), lowering throw power, accuracy, and catching until they rest; the endurance stat eases it. Off = no fatigue.")]
+        [SerializeField] private bool enableStamina = true;
+
         [Header("Runtime")]
         [SerializeField] private List<GameObject> spawnedPlayers = new List<GameObject>();
 
@@ -356,6 +360,8 @@ namespace Sportland.Sports.Dodgeball
 
             // Depth sorting: lower on screen (front) draws over higher up (back).
             go.AddComponent<DodgeballDepthSort>();
+
+            if (enableStamina) go.AddComponent<PlayerStamina>();
 
             spawnedPlayers.Add(go);
         }
