@@ -109,6 +109,18 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Priority bonus for an opposing infielder who has wandered out of their own zone (off-position).")]
         public float outOfZoneTargetBonus = 20f;
 
+        [Header("Charge throw (stationary attack)")]
+        [Tooltip("Full-charge wind-up time (s) for a STATIONARY attack: charge this long for full power; release earlier (a 'tap') for a weaker, wilder throw. Running/jump attacks aren't charged — their power comes from momentum.")]
+        public float maxChargeTime = 0.9f;
+        [Tooltip("Charge fraction (0..1) the AI quick-releases at when pressured (a defender is close or it's exposed) — snappier but weaker.")]
+        [Range(0.05f, 1f)] public float tapCharge01 = 0.25f;
+        [Tooltip("Throw power at minimum charge, as a fraction of the player's full power.")]
+        [Range(0.1f, 1f)] public float tapPowerFraction = 0.5f;
+        [Tooltip("Accuracy scatter multiplier at minimum charge. 1 = none; >1 = a tap throw is wilder.")]
+        public float tapAccuracyMul = 1.8f;
+        [Tooltip("An opponent within this distance (u) of the carrier counts as pressure → the AI taps instead of charging fully.")]
+        public float pressureRadius = 3f;
+
         [Header("Loose-ball retrieval")]
         [Tooltip("Dive for a bouncing (deflected) ball when its predicted landing is within this distance — a lunging catch with arms extended. The dive may cross the zone line (legal while airborne).")]
         [SerializeField] private float diveRange = 3f;
@@ -140,6 +152,7 @@ namespace Sportland.Sports.Dodgeball
         private float holdStartTime = -1f;       // when we picked up the ball (wind-up clock)
         private PlayerZoneTracker throwTarget;
         private bool targetExposed;              // last-picked target was out of position / can't dodge
+        private float desiredCharge01 = 1f;      // chosen charge for the current stationary throw
 
         // Attack selection. Chosen once per possession when we lock a target;
         // committed until release. Reset on carry-home / pass / release.
@@ -754,20 +767,49 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
-        // Stationary windup throw (default, cautious): stand, face, telegraph
-        // for windupTime, release from where we stand.
+        // Stationary attack — a CHARGE throw. The longer the wind-up the more
+        // power and accuracy, up to maxChargeTime for full strength. The AI
+        // charges fully when unpressured, but quick-releases a weak "tap" when a
+        // defender is close or it's exposed — getting the ball out before it
+        // gets countered beats winding up into a catch.
         private void DoStationaryThrow()
         {
             movement.IsRunning = false;
             movement.ApplyMove(Vector2.zero);
             movement.SetFacing((Vector2)throwTarget.transform.position - (Vector2)transform.position);
 
-            if (holdStartTime < 0f) holdStartTime = Time.time;
-            if (Time.time - holdStartTime >= windupTime)
+            if (holdStartTime < 0f)
             {
-                ThrowAtTarget(throwTarget);
+                holdStartTime = Time.time;
+                desiredCharge01 = IsPressured() ? tapCharge01 : 1f;
+            }
+
+            float held = Time.time - holdStartTime;
+            float dur = Mathf.Max(0.01f, maxChargeTime);
+            DbgBranch = $"charge {desiredCharge01:F2} ({Mathf.Clamp01(held / dur):F2})";
+            if (held >= desiredCharge01 * maxChargeTime)
+            {
+                ThrowAtTarget(throwTarget, Mathf.Clamp01(held / dur));
                 ResetAttack();
             }
+        }
+
+        // Quick-release is wiser than a full charge when an opponent is close or
+        // we're out of position (out of zone / in opp infield).
+        private bool IsPressured()
+        {
+            if (!tracker.IsInZone || tracker.IsInOpposingInfield) return true;
+            Vector2 me = transform.position;
+            var team = tracker.Spawn.team;
+            var all = PlayerZoneTracker.All;
+            float r2 = pressureRadius * pressureRadius;
+            for (int i = 0; i < all.Count; i++)
+            {
+                var t = all[i];
+                if (t == null || t.Spawn.team == team) continue;
+                if (((Vector2)t.transform.position - me).sqrMagnitude < r2) return true;
+            }
+            return false;
         }
 
         // Running / Jump / RunJump execution.
@@ -933,9 +975,12 @@ namespace Sportland.Sports.Dodgeball
             return m != null && (m.IsJumpRecovering || m.IsRecovering || m.IsCatchRecovering);
         }
 
-        private void ThrowAtTarget(PlayerZoneTracker target)
+        // charge01 (1 = full) scales the stationary attack's power + accuracy;
+        // moving attacks pass the default 1 (their power comes from momentum).
+        private void ThrowAtTarget(PlayerZoneTracker target, float charge01 = 1f)
         {
-            float power = Mathf.Lerp(minThrowSpeed, maxThrowSpeed, attr != null ? attr.EffectiveThrowSpeed01 : 0.6f);
+            float basePower = Mathf.Lerp(minThrowSpeed, maxThrowSpeed, attr != null ? attr.EffectiveThrowSpeed01 : 0.6f);
+            float power = basePower * Mathf.Lerp(tapPowerFraction, 1f, charge01);
             float anticipation = attr != null ? attr.EffectiveAnticipation01 : 0f;
             var targetRb = target.GetComponent<Rigidbody2D>();
             Vector2 targetVel = targetRb != null ? targetRb.linearVelocity : Vector2.zero;
@@ -956,16 +1001,18 @@ namespace Sportland.Sports.Dodgeball
                 float vErr = (1f - acc01) * jumpThrowVerticalScatter * dist;
                 targetHeight = jumpThrowAimHeight + Random.Range(-vErr, vErr);
             }
-            ball.ThrowAt(ApplyAccuracy(aim), power, targetHeight);
+            ball.ThrowAt(ApplyAccuracy(aim, charge01), power, targetHeight);
         }
 
-        // Scatter the aim; the miss grows with distance and with how far below
-        // 100 the thrower's accuracy rating is.
-        private Vector2 ApplyAccuracy(Vector2 aimPoint)
+        // Scatter the aim; the miss grows with distance, with how far below 100
+        // the thrower's accuracy rating is, and (for stationary throws) with a
+        // low charge — a quick tap is wilder.
+        private Vector2 ApplyAccuracy(Vector2 aimPoint, float charge01 = 1f)
         {
             float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
             float dist = Vector2.Distance(transform.position, aimPoint);
-            float maxError = (1f - acc01) * accuracyErrorPerUnit * dist;
+            float chargeScatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01);   // low charge = wider miss
+            float maxError = (1f - acc01) * accuracyErrorPerUnit * dist * chargeScatter;
             return aimPoint + Random.insideUnitCircle * maxError;
         }
 
