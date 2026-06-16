@@ -101,6 +101,14 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Movement-input magnitude during a running approach. 1 = full run; lower is less committal but builds less momentum.")]
         [SerializeField, Range(0.4f, 1f)] private float runJumpInputSpeed = 1f;
 
+        [Header("Target selection (punish exposure)")]
+        [Tooltip("Priority bonus for an opponent caught in OUR infield — they crossed the line to attack and are a sitting duck (and an outfielder there scores the out-of-position bonus). Large so it overrides distance.")]
+        public float exposedInZoneBonus = 100f;
+        [Tooltip("Priority bonus for an opponent in a recovery state (jump-landing / dive / catch settle) — they can't dodge.")]
+        public float exposedRecoverBonus = 50f;
+        [Tooltip("Priority bonus for an opposing infielder who has wandered out of their own zone (off-position).")]
+        public float outOfZoneTargetBonus = 20f;
+
         [Header("Loose-ball retrieval")]
         [Tooltip("Dive for a bouncing (deflected) ball when its predicted landing is within this distance — a lunging catch with arms extended. The dive may cross the zone line (legal while airborne).")]
         [SerializeField] private float diveRange = 3f;
@@ -131,6 +139,7 @@ namespace Sportland.Sports.Dodgeball
 
         private float holdStartTime = -1f;       // when we picked up the ball (wind-up clock)
         private PlayerZoneTracker throwTarget;
+        private bool targetExposed;              // last-picked target was out of position / can't dodge
 
         // Attack selection. Chosen once per possession when we lock a target;
         // committed until release. Reset on carry-home / pass / release.
@@ -667,7 +676,7 @@ namespace Sportland.Sports.Dodgeball
                 attackChosen = false;
             }
             if (throwTarget == null) { DbgBranch = "no opposing target"; return; }
-            DbgTarget = Short(throwTarget);
+            DbgTarget = Short(throwTarget) + (targetExposed ? "  EXPOSED!" : "");
 
             if (!attackChosen)
             {
@@ -873,12 +882,19 @@ namespace Sportland.Sports.Dodgeball
             return pass;
         }
 
-        // Nearest opposing infielder. Outfielders can't be eliminated, so they
-        // aren't worth targeting.
+        // Pick the throw target, scoring opponents by exposure: nearer is better
+        // (less reaction time), but an opponent in OUR infield, in a recovery
+        // state, or off their own zone gets a big priority bonus — so the AI
+        // punishes a player who crossed the line to attack (or is frozen in
+        // landing/catch recovery) instead of always throwing at the nearest one.
+        // Targetable = opposing infielders, plus ANY opponent exposed in our
+        // infield (so an out-of-position outfielder there is fair game — and
+        // worth the bonus point).
         private PlayerZoneTracker PickThrowTarget()
         {
             PlayerZoneTracker best = null;
-            float bestDistSq = float.MaxValue;
+            float bestScore = float.NegativeInfinity;
+            bool bestExposed = false;
             Vector2 me = transform.position;
             var team = tracker.Spawn.team;
 
@@ -886,11 +902,35 @@ namespace Sportland.Sports.Dodgeball
             for (int i = 0; i < trackers.Count; i++)
             {
                 var t = trackers[i];
-                if (t == null || t.Spawn.team == team || t.Spawn.role != PlayerRole.Infielder) continue;
-                float d = ((Vector2)t.transform.position - me).sqrMagnitude;
-                if (d < bestDistSq) { bestDistSq = d; best = t; }
+                if (t == null || t.Spawn.team == team) continue;
+
+                bool isInfielder = t.Spawn.role == PlayerRole.Infielder;
+                bool inOurInfield = t.IsInOpposingInfield;   // standing in their opposing zone = our zone
+                if (!isInfielder && !inOurInfield) continue;
+
+                bool recovering = TargetIsRecovering(t);
+                float score = -Vector2.Distance(me, t.transform.position);
+                if (inOurInfield) score += exposedInZoneBonus;
+                if (recovering)   score += exposedRecoverBonus;
+                if (isInfielder && !t.IsInZone) score += outOfZoneTargetBonus;
+
+                if (score > bestScore)
+                {
+                    bestScore = score;
+                    best = t;
+                    bestExposed = inOurInfield || recovering;
+                }
             }
+            targetExposed = bestExposed;
             return best;
+        }
+
+        // States where a target can't dodge: landing pause, dive-prone, or the
+        // post-catch settle.
+        private static bool TargetIsRecovering(PlayerZoneTracker t)
+        {
+            var m = t.GetComponent<PlayerMovement>();
+            return m != null && (m.IsJumpRecovering || m.IsRecovering || m.IsCatchRecovering);
         }
 
         private void ThrowAtTarget(PlayerZoneTracker target)
