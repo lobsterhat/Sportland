@@ -127,6 +127,18 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Accuracy scatter multiplier right after a catch (unsettled), fading to 1 as secured. A rushed counter is wilder.")]
         public float settleScatterMul = 1.6f;
 
+        [Header("Crow hop (skill-timed running attack)")]
+        [Tooltip("Relative weight of the CROW HOP attack in the mix — a running attack with a skip-step whose well-timed release boosts power + accuracy.")]
+        public float crowHopWeight = 0.3f;
+        [Tooltip("Max throw-power bonus at PERFECT crow-hop timing (0.3 = +30%); scales with timing quality.")]
+        public float crowHopPowerBonus = 0.3f;
+        [Tooltip("Accuracy scatter multiplier at PERFECT crow-hop timing (<1 = tighter); fades to 1 at zero timing.")]
+        public float crowHopAccuracyMul = 0.5f;
+        [Tooltip("AI release-timing error (s) at zero skill — it aims for the plant but is off by up to this, scaled by (1 - anticipation). Better players nail the window more often.")]
+        public float crowHopMaxTimingError = 0.13f;
+        [Tooltip("Distance (u) to the forward edge at which a CROW HOP starts the skip. Larger than the plain running release so the timed plant (the throw) happens before the run carries the player over the line.")]
+        public float crowHopReleaseDistance = 2.5f;
+
         [Header("Loose-ball retrieval")]
         [Tooltip("Dive for a bouncing (deflected) ball when its predicted landing is within this distance — a lunging catch with arms extended. The dive may cross the zone line (legal while airborne).")]
         [SerializeField] private float diveRange = 3f;
@@ -167,15 +179,17 @@ namespace Sportland.Sports.Dodgeball
         //   Running    — advance toward the line, throw grounded with momentum.
         //   Jump       — jump in place, release at apex (different angle).
         //   RunJump    — run up + jump + release deep (most committal/exposed).
-        private enum AttackType { Stationary, Running, Jump, RunJump }
+        private enum AttackType { Stationary, Running, Jump, RunJump, CrowHop }
         // Phase within a moving attack:
-        //   Approach — running toward the forward edge (Running / RunJump).
-        //   Airborne — mid-air, holding the throw until the jump apex (Jump / RunJump).
-        private enum AttackPhase { None, Approach, Airborne }
+        //   Approach        — running toward the forward edge (Running / RunJump / CrowHop).
+        //   Airborne        — mid-air, holding the throw until the jump apex (Jump / RunJump).
+        //   CrowHopRelease  — mid skip-step, holding for the timed plant release (CrowHop).
+        private enum AttackPhase { None, Approach, Airborne, CrowHopRelease }
         private AttackType currentAttack = AttackType.Stationary;
         private AttackPhase attackPhase = AttackPhase.None;
         private bool attackChosen;
         private float jumpStartTime = -1f;
+        private float aiCrowReleaseAt = -1f;     // AI's skill-timed crow-hop throw release time
 
         /// <summary>
         /// Short label of the chain node driving this AI this frame ("Offense",
@@ -675,6 +689,15 @@ namespace Sportland.Sports.Dodgeball
                 return;
             }
 
+            // Mid crow-hop release: finish the timed skip-step without
+            // re-deciding / carrying home, even if momentum drifts us over the
+            // line (the release fires at the plant, then ResetAttack runs).
+            if (attackPhase == AttackPhase.CrowHopRelease && throwTarget != null)
+            {
+                DoMovingAttack(throwTarget);
+                return;
+            }
+
             // Just caught the ball — settle before doing anything (no instant
             // catch→counter-attack; movement is already frozen by PlayerMovement).
             if (movement.IsCatchRecovering)
@@ -767,14 +790,15 @@ namespace Sportland.Sports.Dodgeball
             }
             else
             {
-                float total = runningWeight + jumpWeight + runJumpWeight;
+                float total = runningWeight + jumpWeight + runJumpWeight + crowHopWeight;
                 if (total <= 0.0001f) result = AttackType.Stationary;
                 else
                 {
                     float r = UnityEngine.Random.value * total;
-                    result = r < runningWeight ? AttackType.Running
-                           : r < runningWeight + jumpWeight ? AttackType.Jump
-                           : AttackType.RunJump;
+                    if (r < runningWeight) result = AttackType.Running;
+                    else if (r < runningWeight + jumpWeight) result = AttackType.Jump;
+                    else if (r < runningWeight + jumpWeight + runJumpWeight) result = AttackType.RunJump;
+                    else result = AttackType.CrowHop;
                 }
             }
             DbgAttack = $"p{chance:F2}(c{attackChance:F2} a{(0.5f + agg):F2} t{teamAggressionMul:F2} s{strategy:F2}) roll{roll:F2} -> {result}";
@@ -793,6 +817,7 @@ namespace Sportland.Sports.Dodgeball
             {
                 case AttackType.Running:
                 case AttackType.RunJump:
+                case AttackType.CrowHop:
                     attackPhase = AttackPhase.Approach;
                     break;
                 case AttackType.Jump:
@@ -873,7 +898,9 @@ namespace Sportland.Sports.Dodgeball
                 movement.ApplyMove(dir * runJumpInputSpeed);
 
                 float edgeDist = DistanceToZoneEdgeAlong(dir);
-                float release = currentAttack == AttackType.RunJump ? runJumpEdgeDistance : runningReleaseDistance;
+                float release = currentAttack == AttackType.RunJump ? runJumpEdgeDistance
+                              : currentAttack == AttackType.CrowHop ? crowHopReleaseDistance
+                              : runningReleaseDistance;
                 if (edgeDist <= release && movement.IsGrounded)
                 {
                     if (currentAttack == AttackType.RunJump)
@@ -882,11 +909,39 @@ namespace Sportland.Sports.Dodgeball
                         attackPhase = AttackPhase.Airborne;
                         jumpStartTime = Time.time;
                     }
+                    else if (currentAttack == AttackType.CrowHop)
+                    {
+                        movement.CrowHop();
+                        attackPhase = AttackPhase.CrowHopRelease;
+                        // Aim the release at the plant, off by a skill-scaled error.
+                        float err = (1f - TimingSkill01()) * crowHopMaxTimingError;
+                        aiCrowReleaseAt = Time.time + movement.CrowHopPlantTime + UnityEngine.Random.Range(-err, err);
+                    }
                     else   // Running — release grounded, carrying the run momentum
                     {
                         ThrowAtTarget(target);
                         ResetAttack();
                     }
+                }
+                return;
+            }
+
+            if (attackPhase == AttackPhase.CrowHopRelease)
+            {
+                // Keep running through the skip-step (momentum), release at the
+                // timed plant — ThrowAtTarget reads CrowHopTiming01 for the bonus.
+                movement.IsRunning = true;
+                Vector2 dir = (Vector2)target.transform.position - (Vector2)transform.position;
+                if (dir.sqrMagnitude > 0.0001f)
+                {
+                    dir.Normalize();
+                    movement.SetFacing(dir);
+                    movement.ApplyMove(dir * runJumpInputSpeed);
+                }
+                if (Time.time >= aiCrowReleaseAt)
+                {
+                    ThrowAtTarget(target);
+                    ResetAttack();
                 }
                 return;
             }
@@ -914,6 +969,7 @@ namespace Sportland.Sports.Dodgeball
             attackPhase = AttackPhase.None;
             attackChosen = false;
             jumpStartTime = -1f;
+            aiCrowReleaseAt = -1f;
         }
 
         private void ResetAttack()
@@ -1036,9 +1092,14 @@ namespace Sportland.Sports.Dodgeball
         private void ThrowAtTarget(PlayerZoneTracker target, float charge01 = 1f)
         {
             float basePower = Mathf.Lerp(minThrowSpeed, maxThrowSpeed, attr != null ? attr.EffectiveThrowSpeed01 : 0.6f);
-            // Charge scales power; a rushed counter off a fresh catch (low settle) also weakens it.
+            // Charge scales power; a rushed counter off a fresh catch (low settle)
+            // weakens it; a well-timed crow hop (high timing) boosts it.
             float settle = movement != null ? movement.CatchSettle01 : 1f;
-            float power = basePower * Mathf.Lerp(tapPowerFraction, 1f, charge01) * Mathf.Lerp(settlePowerFloor, 1f, settle);
+            float crow = movement != null ? movement.CrowHopTiming01 : 0f;   // 0 unless mid crow hop
+            float power = basePower
+                        * Mathf.Lerp(tapPowerFraction, 1f, charge01)
+                        * Mathf.Lerp(settlePowerFloor, 1f, settle)
+                        * (1f + crowHopPowerBonus * crow);
             float anticipation = attr != null ? attr.EffectiveAnticipation01 : 0f;
             var targetRb = target.GetComponent<Rigidbody2D>();
             Vector2 targetVel = targetRb != null ? targetRb.linearVelocity : Vector2.zero;
@@ -1059,19 +1120,25 @@ namespace Sportland.Sports.Dodgeball
                 float vErr = (1f - acc01) * jumpThrowVerticalScatter * dist;
                 targetHeight = jumpThrowAimHeight + Random.Range(-vErr, vErr);
             }
-            ball.ThrowAt(ApplyAccuracy(aim, charge01, settle), power, targetHeight);
+            ball.ThrowAt(ApplyAccuracy(aim, charge01, settle, crow), power, targetHeight);
         }
+
+        // Anticipation gauges the crow-hop release timing — better players nail
+        // the plant window more often.
+        private float TimingSkill01() => attr != null ? attr.EffectiveAnticipation01 : 0.5f;
 
         // Scatter the aim; the miss grows with distance, with how far below 100
         // the thrower's accuracy rating is, with a low charge (a quick tap is
-        // wilder), and with a low settle (a rushed counter off a fresh catch).
-        private Vector2 ApplyAccuracy(Vector2 aimPoint, float charge01 = 1f, float settle01 = 1f)
+        // wilder), with a low settle (a rushed counter off a fresh catch), and
+        // SHRINKS with a well-timed crow hop.
+        private Vector2 ApplyAccuracy(Vector2 aimPoint, float charge01 = 1f, float settle01 = 1f, float crow01 = 0f)
         {
             float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
             float dist = Vector2.Distance(transform.position, aimPoint);
             float chargeScatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01);    // low charge = wider miss
             float settleScatter = Mathf.Lerp(settleScatterMul, 1f, settle01);  // rushed counter = wider miss
-            float maxError = (1f - acc01) * accuracyErrorPerUnit * dist * chargeScatter * settleScatter;
+            float crowScatter   = Mathf.Lerp(1f, crowHopAccuracyMul, crow01);  // good crow-hop timing = tighter
+            float maxError = (1f - acc01) * accuracyErrorPerUnit * dist * chargeScatter * settleScatter * crowScatter;
             return aimPoint + Random.insideUnitCircle * maxError;
         }
 

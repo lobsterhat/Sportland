@@ -329,7 +329,8 @@ namespace Sportland.Sports.Dodgeball
             var mv = carrier.GetComponent<PlayerMovement>();
             string staStr = sta != null ? $"  sta {sta.Stamina01:F2}" : "";
             string setStr = (mv != null && mv.CatchSettle01 < 0.999f) ? $"  settle {mv.CatchSettle01:F2}" : "";
-            lines.Add($"{carrier.Spawn.team}{carrier.Number}  {carrier.Spawn.role}{staStr}{setStr}");
+            string crowStr = (mv != null && mv.IsCrowHopping) ? $"  crow {mv.CrowHopTiming01:F2}" : "";
+            lines.Add($"{carrier.Spawn.team}{carrier.Number}  {carrier.Spawn.role}{staStr}{setStr}{crowStr}");
 
             var ai = carrier.GetComponent<DodgeballAI>();
             if (ai == null) { lines.Add("(human-controlled)"); return lines.ToArray(); }

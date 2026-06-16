@@ -48,6 +48,10 @@ namespace Sportland.Sports.Dodgeball
         [Range(0.1f, 1f)] [SerializeField] private float settlePowerFloor = 0.7f;
         [Tooltip("Accuracy scatter multiplier right after a catch (unsettled), fading to 1.")]
         [SerializeField] private float settleScatterMul = 1.6f;
+        [Tooltip("Max throw-power bonus at a perfectly-timed crow hop (0.3 = +30%).")]
+        [SerializeField] private float crowHopPowerBonus = 0.3f;
+        [Tooltip("Accuracy scatter multiplier at a perfectly-timed crow hop (<1 = tighter).")]
+        [SerializeField] private float crowHopAccuracyMul = 0.5f;
 
         [Header("Pass timing")]
         [Tooltip("Hold longer than this (seconds) for chest pass; release sooner for lob.")]
@@ -207,7 +211,15 @@ namespace Sportland.Sports.Dodgeball
         // stick reads the incoming throw and ducks a high ball / jumps a low one.
         private void OnEvadePressed(InputAction.CallbackContext _)
         {
-            if (tracker.HasBall) { movement.TryJump(attackJump: true); return; }
+            if (tracker.HasBall)
+            {
+                // Running with the ball → crow hop (skip-step; time the throw
+                // release to the plant for a power/accuracy bonus). Otherwise
+                // the full jump attack.
+                if (movement.IsRunning) movement.CrowHop();
+                else movement.TryJump(attackJump: true);
+                return;
+            }
 
             if (TryDiveForBall()) return;   // near a loose/deflected ball → lunge for it
 
@@ -301,13 +313,16 @@ namespace Sportland.Sports.Dodgeball
 
             var ball = tracker.HeldBall;
             if (ball == null) return;
-            if (!tracker.IsInZone && !movement.IsAirborne) { ball.Drop(); return; }   // throw while ineligible -> drop
+            // A crow hop releases at/over the line (like a jump), so it's eligible too.
+            if (!tracker.IsInZone && !movement.IsAirborne && !movement.IsCrowHopping) { ball.Drop(); return; }
 
             float charge01 = Mathf.Clamp01(held / Mathf.Max(0.01f, maxChargeTime));
             float settle01 = movement.CatchSettle01;
+            float crow01 = movement.CrowHopTiming01;   // 0 unless mid crow hop
             float power = ThrowReleaseSpeed()
                         * Mathf.Lerp(tapPowerFraction, 1f, charge01)
-                        * Mathf.Lerp(settlePowerFloor, 1f, settle01);
+                        * Mathf.Lerp(settlePowerFloor, 1f, settle01)
+                        * (1f + crowHopPowerBonus * crow01);
 
             var target = FindThrowTargetInCone(lastMoveDirection);
             ball.IntendedTarget = target;   // for the play-by-play log (may be null)
@@ -316,14 +331,14 @@ namespace Sportland.Sports.Dodgeball
                 // Anticipation leads the target; accuracy then scatters the aim.
                 Vector2 lead = ball.LeadAim(transform.position, target.transform.position,
                                             TargetVelocity(target), power, OwnAnticipation01());
-                ball.ThrowAt(ApplyAccuracyToAim(lead, charge01, settle01), power);
+                ball.ThrowAt(ApplyAccuracyToAim(lead, charge01, settle01, crow01), power);
             }
             else
             {
                 Vector2 dir = lastMoveDirection.sqrMagnitude > 0.0001f
                     ? lastMoveDirection.normalized
                     : Vector2.right;
-                ball.Throw(ApplyAccuracyToDirection(dir, charge01, settle01), power);
+                ball.Throw(ApplyAccuracyToDirection(dir, charge01, settle01, crow01), power);
             }
         }
 
@@ -350,22 +365,24 @@ namespace Sportland.Sports.Dodgeball
         // Accuracy scatters the aim point; the miss grows with distance, with how
         // far below 100 the thrower's accuracy is, with a low charge (a quick tap
         // is wilder), and with a low settle (a rushed counter off a fresh catch).
-        private Vector2 ApplyAccuracyToAim(Vector2 aimPoint, float charge01 = 1f, float settle01 = 1f)
+        private Vector2 ApplyAccuracyToAim(Vector2 aimPoint, float charge01 = 1f, float settle01 = 1f, float crow01 = 0f)
         {
             var attr = GetComponent<DodgeballAttributes>();
             float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
             float dist = Vector2.Distance(transform.position, aimPoint);
-            float scatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01) * Mathf.Lerp(settleScatterMul, 1f, settle01);
+            float scatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01) * Mathf.Lerp(settleScatterMul, 1f, settle01)
+                          * Mathf.Lerp(1f, crowHopAccuracyMul, crow01);
             float maxError = (1f - acc01) * accuracyErrorPerUnit * dist * scatter;
             return aimPoint + Random.insideUnitCircle * maxError;
         }
 
         // Untargeted throws scatter on angle instead of a point.
-        private Vector2 ApplyAccuracyToDirection(Vector2 dir, float charge01 = 1f, float settle01 = 1f)
+        private Vector2 ApplyAccuracyToDirection(Vector2 dir, float charge01 = 1f, float settle01 = 1f, float crow01 = 0f)
         {
             var attr = GetComponent<DodgeballAttributes>();
             float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
-            float scatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01) * Mathf.Lerp(settleScatterMul, 1f, settle01);
+            float scatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01) * Mathf.Lerp(settleScatterMul, 1f, settle01)
+                          * Mathf.Lerp(1f, crowHopAccuracyMul, crow01);
             float maxAngle = (1f - acc01) * maxInaccuracyAngleDeg * scatter;
             float angle = Random.Range(-maxAngle, maxAngle);
             Vector2 rotated = Quaternion.Euler(0f, 0f, angle) * (Vector3)dir;
