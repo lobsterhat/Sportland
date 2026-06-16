@@ -19,6 +19,7 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private bool showHud = true;
         [Header("Panels (declutter: enable only what you're inspecting)")]
         [SerializeField] private bool showAIDecision = true;
+        [SerializeField] private bool showUserAttack = true;
         [SerializeField] private bool showDecisionLog = true;
         [SerializeField] private bool showStatus = false;
         [SerializeField] private bool showThrow = false;
@@ -53,6 +54,7 @@ namespace Sportland.Sports.Dodgeball
 
             float y = anchor.y;
             if (showAIDecision) { y = DrawPanel(BuildAIDecisionLines(), anchor.x, y); y += 6f; }
+            if (showUserAttack) { y = DrawPanel(BuildUserAttackLines(), anchor.x, y); y += 6f; }
             if (showDecisionLog) { y = DrawPanel(BuildDecisionLogLines(), anchor.x, y, string.Join("\n", decisionLog)); y += 6f; }
             if (showStatus)     { y = DrawPanel(BuildStatusLines(),     anchor.x, y); y += 6f; }
             if (showThrow)      { y = DrawPanel(BuildThrowLines(),      anchor.x, y); y += 6f; }
@@ -306,6 +308,21 @@ namespace Sportland.Sports.Dodgeball
                 }
                 if (m.Length > 0) lines.Add("  " + m.TrimEnd());
             }
+            return lines.ToArray();
+        }
+
+        // Feedback on the user-controlled player's last crow-hop attack: how
+        // well the throw was timed to the plant (early / late / perfect). The
+        // live "crow" readout on the carrier line shows the window during the
+        // hop; this shows the verdict after the release, held a few seconds.
+        private string[] BuildUserAttackLines()
+        {
+            var lines = new List<string> { "== USER ATTACK (crow hop) ==" };
+            float age = Time.realtimeSinceStartup - DodgeballPlayerInput.LastCrowFeedbackTime;
+            if (string.IsNullOrEmpty(DodgeballPlayerInput.LastCrowFeedback) || age > 4f)
+                lines.Add("(run + tap jump, release on the plant)");
+            else
+                lines.Add(DodgeballPlayerInput.LastCrowFeedback);
             return lines.ToArray();
         }
 

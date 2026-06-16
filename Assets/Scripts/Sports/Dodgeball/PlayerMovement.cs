@@ -149,6 +149,8 @@ namespace Sportland.Sports.Dodgeball
                 return Mathf.Clamp01(1f - off / Mathf.Max(0.01f, crowHopWindow));
             }
         }
+        /// <summary>Signed timing vs the plant right now: negative = early, positive = late (s); 0 when not hopping.</summary>
+        public float CrowHopSignedOffset => IsCrowHopping ? crowHopTimer - CrowHopPlantTime : 0f;
         public bool IsDucking => duckTimer >= 0f;
         public bool IsDashing => dashTimer >= 0f;
         /// <summary>Lunging for a diving catch (drives velocity, extended catch reach).</summary>

@@ -87,6 +87,10 @@ namespace Sportland.Sports.Dodgeball
         private float passPressTime = -1f;
         private float throwChargeStart = -1f;   // when Square/Q was pressed (charge clock)
 
+        /// <summary>Last user crow-hop release verdict (early/late/perfect), for the diagnostics HUD. Static so it survives control transfer.</summary>
+        public static string LastCrowFeedback { get; private set; } = "";
+        public static float LastCrowFeedbackTime { get; private set; } = -999f;
+
         private bool isRunning;
         private float idleTime;
 
@@ -319,6 +323,18 @@ namespace Sportland.Sports.Dodgeball
             float charge01 = Mathf.Clamp01(held / Mathf.Max(0.01f, maxChargeTime));
             float settle01 = movement.CatchSettle01;
             float crow01 = movement.CrowHopTiming01;   // 0 unless mid crow hop
+
+            // Crow-hop timing verdict for the HUD (only when releasing mid-hop).
+            if (movement.IsCrowHopping)
+            {
+                float signed = movement.CrowHopSignedOffset;   // - early, + late
+                string verdict = crow01 >= 0.85f ? "PERFECT!"
+                               : signed < 0f ? $"EARLY {(-signed) * 1000f:F0}ms"
+                               : $"LATE {signed * 1000f:F0}ms";
+                LastCrowFeedback = $"crow hop {verdict}   timing {crow01:F2}  (+{crowHopPowerBonus * crow01 * 100f:F0}% power)";
+                LastCrowFeedbackTime = Time.realtimeSinceStartup;
+            }
+
             float power = ThrowReleaseSpeed()
                         * Mathf.Lerp(tapPowerFraction, 1f, charge01)
                         * Mathf.Lerp(settlePowerFloor, 1f, settle01)
