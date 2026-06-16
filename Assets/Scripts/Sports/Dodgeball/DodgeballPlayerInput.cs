@@ -37,6 +37,18 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("At accuracy 0, an untargeted throw's direction can be off by up to this many degrees.")]
         [SerializeField] private float maxInaccuracyAngleDeg = 25f;
 
+        [Header("Charge throw (hold Square/Q to load up)")]
+        [Tooltip("Hold the throw button this long (s) for full power; a quick tap is weak and wild.")]
+        [SerializeField] private float maxChargeTime = 1.1f;
+        [Tooltip("Throw power at minimum charge (tap), as a fraction of full.")]
+        [Range(0.1f, 1f)] [SerializeField] private float tapPowerFraction = 0.5f;
+        [Tooltip("Accuracy scatter multiplier at minimum charge (tap). >1 = wilder.")]
+        [SerializeField] private float tapAccuracyMul = 1.8f;
+        [Tooltip("Throw power right after a catch (unsettled), fraction of full; ramps up as the ball is secured (a rushed counter is weaker).")]
+        [Range(0.1f, 1f)] [SerializeField] private float settlePowerFloor = 0.7f;
+        [Tooltip("Accuracy scatter multiplier right after a catch (unsettled), fading to 1.")]
+        [SerializeField] private float settleScatterMul = 1.6f;
+
         [Header("Pass timing")]
         [Tooltip("Hold longer than this (seconds) for chest pass; release sooner for lob.")]
         [SerializeField] private float passTapThreshold = 0.18f;
@@ -69,6 +81,7 @@ namespace Sportland.Sports.Dodgeball
 
         private Vector2 lastMoveDirection = Vector2.right;
         private float passPressTime = -1f;
+        private float throwChargeStart = -1f;   // when Square/Q was pressed (charge clock)
 
         private bool isRunning;
         private float idleTime;
@@ -96,7 +109,8 @@ namespace Sportland.Sports.Dodgeball
 
             actions = new DodgeballInputActions();
             actions.Evade.performed      += OnEvadePressed;
-            actions.Throw.performed      += OnThrowPressed;
+            actions.Throw.started        += OnThrowStarted;
+            actions.Throw.canceled       += OnThrowReleased;
             actions.Pass.started         += OnPassStarted;
             actions.Pass.canceled        += OnPassCanceled;
             actions.Catch.performed      += OnCatchPressed;
@@ -119,7 +133,8 @@ namespace Sportland.Sports.Dodgeball
             if (actions != null)
             {
                 actions.Evade.performed      -= OnEvadePressed;
-                actions.Throw.performed      -= OnThrowPressed;
+                actions.Throw.started        -= OnThrowStarted;
+                actions.Throw.canceled       -= OnThrowReleased;
                 actions.Pass.started         -= OnPassStarted;
                 actions.Pass.canceled        -= OnPassCanceled;
                 actions.Catch.performed      -= OnCatchPressed;
@@ -267,13 +282,33 @@ namespace Sportland.Sports.Dodgeball
             lastMovementActiveTime = Time.unscaledTime;
         }
 
-        private void OnThrowPressed(InputAction.CallbackContext _)
+        // Square/Q pressed: empty-handed, hand control to the teammate nearest a
+        // loose ball; holding the ball, START charging the throw.
+        private void OnThrowStarted(InputAction.CallbackContext _)
         {
+            if (!tracker.HasBall) { SwitchToClosestLooseBallTeammate(); return; }
+            throwChargeStart = Time.unscaledTime;
+        }
+
+        // Released: fire with power + accuracy scaled by how long it was charged
+        // (tap = weak/wild, hold to maxChargeTime = hard/accurate), minus the
+        // rushed-counter settle penalty if we just caught.
+        private void OnThrowReleased(InputAction.CallbackContext _)
+        {
+            if (throwChargeStart < 0f) return;   // wasn't charging (pressed with no ball)
+            float held = Time.unscaledTime - throwChargeStart;
+            throwChargeStart = -1f;
+
             var ball = tracker.HeldBall;
-            if (ball == null) { SwitchToClosestLooseBallTeammate(); return; }
+            if (ball == null) return;
             if (!tracker.IsInZone && !movement.IsAirborne) { ball.Drop(); return; }   // throw while ineligible -> drop
 
-            float power = ThrowReleaseSpeed();
+            float charge01 = Mathf.Clamp01(held / Mathf.Max(0.01f, maxChargeTime));
+            float settle01 = movement.CatchSettle01;
+            float power = ThrowReleaseSpeed()
+                        * Mathf.Lerp(tapPowerFraction, 1f, charge01)
+                        * Mathf.Lerp(settlePowerFloor, 1f, settle01);
+
             var target = FindThrowTargetInCone(lastMoveDirection);
             ball.IntendedTarget = target;   // for the play-by-play log (may be null)
             if (target != null)
@@ -281,15 +316,14 @@ namespace Sportland.Sports.Dodgeball
                 // Anticipation leads the target; accuracy then scatters the aim.
                 Vector2 lead = ball.LeadAim(transform.position, target.transform.position,
                                             TargetVelocity(target), power, OwnAnticipation01());
-                Vector2 aim = ApplyAccuracyToAim(lead);
-                ball.ThrowAt(aim, power);
+                ball.ThrowAt(ApplyAccuracyToAim(lead, charge01, settle01), power);
             }
             else
             {
                 Vector2 dir = lastMoveDirection.sqrMagnitude > 0.0001f
                     ? lastMoveDirection.normalized
                     : Vector2.right;
-                ball.Throw(ApplyAccuracyToDirection(dir), power);
+                ball.Throw(ApplyAccuracyToDirection(dir, charge01, settle01), power);
             }
         }
 
@@ -313,23 +347,26 @@ namespace Sportland.Sports.Dodgeball
             return rb != null ? rb.linearVelocity : Vector2.zero;
         }
 
-        // Accuracy scatters the aim point; the miss grows with distance and with
-        // how far below 100 the thrower's accuracy is.
-        private Vector2 ApplyAccuracyToAim(Vector2 aimPoint)
+        // Accuracy scatters the aim point; the miss grows with distance, with how
+        // far below 100 the thrower's accuracy is, with a low charge (a quick tap
+        // is wilder), and with a low settle (a rushed counter off a fresh catch).
+        private Vector2 ApplyAccuracyToAim(Vector2 aimPoint, float charge01 = 1f, float settle01 = 1f)
         {
             var attr = GetComponent<DodgeballAttributes>();
             float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
             float dist = Vector2.Distance(transform.position, aimPoint);
-            float maxError = (1f - acc01) * accuracyErrorPerUnit * dist;
+            float scatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01) * Mathf.Lerp(settleScatterMul, 1f, settle01);
+            float maxError = (1f - acc01) * accuracyErrorPerUnit * dist * scatter;
             return aimPoint + Random.insideUnitCircle * maxError;
         }
 
         // Untargeted throws scatter on angle instead of a point.
-        private Vector2 ApplyAccuracyToDirection(Vector2 dir)
+        private Vector2 ApplyAccuracyToDirection(Vector2 dir, float charge01 = 1f, float settle01 = 1f)
         {
             var attr = GetComponent<DodgeballAttributes>();
             float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
-            float maxAngle = (1f - acc01) * maxInaccuracyAngleDeg;
+            float scatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01) * Mathf.Lerp(settleScatterMul, 1f, settle01);
+            float maxAngle = (1f - acc01) * maxInaccuracyAngleDeg * scatter;
             float angle = Random.Range(-maxAngle, maxAngle);
             Vector2 rotated = Quaternion.Euler(0f, 0f, angle) * (Vector3)dir;
             return rotated.normalized;
