@@ -990,7 +990,11 @@ namespace Sportland.Sports.Dodgeball
             AttachTo(t);
             if (countsAsCatch)
             {
-                t.GetComponent<PlayerMovement>()?.BeginCatchRecovery();
+                // 1 - finalChance = how hard this catch was (already factors the
+                // catcher's skill — a great catcher's tough grab still has a
+                // higher chance). Harder grab → longer fumble/settle.
+                float difficulty = 1f - Mathf.Clamp01(LastCatchFactors.finalChance);
+                t.GetComponent<PlayerMovement>()?.BeginCatchRecovery(difficulty);
                 OnCaught?.Invoke(t);
             }
         }

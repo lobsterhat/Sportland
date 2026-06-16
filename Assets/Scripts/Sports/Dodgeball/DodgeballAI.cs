@@ -122,6 +122,10 @@ namespace Sportland.Sports.Dodgeball
         public float tapAccuracyMul = 1.8f;
         [Tooltip("An opponent within this distance (u) of the carrier counts as pressure → the AI taps instead of charging fully.")]
         public float pressureRadius = 3f;
+        [Tooltip("Throw power right after a catch (unsettled), as a fraction of normal; ramps to full as the ball is secured (PlayerMovement.CatchSettle01). A rushed counter off a fresh catch is weaker.")]
+        [Range(0.1f, 1f)] public float settlePowerFloor = 0.7f;
+        [Tooltip("Accuracy scatter multiplier right after a catch (unsettled), fading to 1 as secured. A rushed counter is wilder.")]
+        public float settleScatterMul = 1.6f;
 
         [Header("Loose-ball retrieval")]
         [Tooltip("Dive for a bouncing (deflected) ball when its predicted landing is within this distance — a lunging catch with arms extended. The dive may cross the zone line (legal while airborne).")]
@@ -1032,7 +1036,9 @@ namespace Sportland.Sports.Dodgeball
         private void ThrowAtTarget(PlayerZoneTracker target, float charge01 = 1f)
         {
             float basePower = Mathf.Lerp(minThrowSpeed, maxThrowSpeed, attr != null ? attr.EffectiveThrowSpeed01 : 0.6f);
-            float power = basePower * Mathf.Lerp(tapPowerFraction, 1f, charge01);
+            // Charge scales power; a rushed counter off a fresh catch (low settle) also weakens it.
+            float settle = movement != null ? movement.CatchSettle01 : 1f;
+            float power = basePower * Mathf.Lerp(tapPowerFraction, 1f, charge01) * Mathf.Lerp(settlePowerFloor, 1f, settle);
             float anticipation = attr != null ? attr.EffectiveAnticipation01 : 0f;
             var targetRb = target.GetComponent<Rigidbody2D>();
             Vector2 targetVel = targetRb != null ? targetRb.linearVelocity : Vector2.zero;
@@ -1053,18 +1059,19 @@ namespace Sportland.Sports.Dodgeball
                 float vErr = (1f - acc01) * jumpThrowVerticalScatter * dist;
                 targetHeight = jumpThrowAimHeight + Random.Range(-vErr, vErr);
             }
-            ball.ThrowAt(ApplyAccuracy(aim, charge01), power, targetHeight);
+            ball.ThrowAt(ApplyAccuracy(aim, charge01, settle), power, targetHeight);
         }
 
         // Scatter the aim; the miss grows with distance, with how far below 100
-        // the thrower's accuracy rating is, and (for stationary throws) with a
-        // low charge — a quick tap is wilder.
-        private Vector2 ApplyAccuracy(Vector2 aimPoint, float charge01 = 1f)
+        // the thrower's accuracy rating is, with a low charge (a quick tap is
+        // wilder), and with a low settle (a rushed counter off a fresh catch).
+        private Vector2 ApplyAccuracy(Vector2 aimPoint, float charge01 = 1f, float settle01 = 1f)
         {
             float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
             float dist = Vector2.Distance(transform.position, aimPoint);
-            float chargeScatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01);   // low charge = wider miss
-            float maxError = (1f - acc01) * accuracyErrorPerUnit * dist * chargeScatter;
+            float chargeScatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01);    // low charge = wider miss
+            float settleScatter = Mathf.Lerp(settleScatterMul, 1f, settle01);  // rushed counter = wider miss
+            float maxError = (1f - acc01) * accuracyErrorPerUnit * dist * chargeScatter * settleScatter;
             return aimPoint + Random.insideUnitCircle * maxError;
         }
 

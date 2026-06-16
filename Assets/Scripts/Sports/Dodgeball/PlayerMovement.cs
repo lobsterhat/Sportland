@@ -73,8 +73,12 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float duckBodyTop = 0.8f;
         [Tooltip("How long a duck holds after the last Duck() call (seconds).")]
         [SerializeField] private float duckDuration = 0.5f;
-        [Tooltip("Settle after catching the ball — the catcher can't move or act for this long, so play doesn't ping-pong catch→throw→catch instantly. Keep small.")]
-        [SerializeField] private float catchRecoverDuration = 0.5f;
+        [Tooltip("Catch settle (frozen — can't move or act) after an EASY catch: high catch chance, a routine grab loaded for a fast counter.")]
+        [SerializeField] private float catchRecoverMin = 0.3f;
+        [Tooltip("Catch settle after a HARD catch (barely made it): securing a tough grab takes longer. Difficulty = 1 - catch chance, so it already accounts for the catcher's skill.")]
+        [SerializeField] private float catchRecoverMax = 0.9f;
+        [Tooltip("Extra window AFTER the freeze during which a throw is still 'unsettled' (weaker / wilder), fading to full as the ball is secured. Scales longer with catch difficulty. A rushed counter off a fresh catch pays for it.")]
+        [SerializeField] private float catchSettleDuration = 0.6f;
         [Tooltip("Vertical sprite squash while ducking (visual only).")]
         [SerializeField] private float duckSquash = 0.6f;
 
@@ -103,6 +107,9 @@ namespace Sportland.Sports.Dodgeball
         private float diveTimer = -1f;
         private float recoverTimer = -1f;
         private float catchRecoverTimer = -1f;
+        private float catchRecoverDur = 0.5f;   // freeze duration, computed per catch from difficulty
+        private float caughtAt = -999f;          // time of last catch (for the throw-settle ramp)
+        private float catchDifficulty01;         // 0 easy .. 1 barely made it
         private Vector2 diveDir = Vector2.right;
         private bool facingOverriddenThisFrame;
         private float spriteBaseY;
@@ -116,10 +123,34 @@ namespace Sportland.Sports.Dodgeball
         public bool IsDiving => diveTimer >= 0f;
         /// <summary>Prone after a dive — can't move or act until back on feet.</summary>
         public bool IsRecovering => recoverTimer >= 0f;
-        /// <summary>Brief settle right after catching the ball — can't move or act.</summary>
+        /// <summary>Frozen settle right after catching — can't move or act. Duration scales with catch difficulty.</summary>
         public bool IsCatchRecovering => catchRecoverTimer >= 0f;
-        /// <summary>Begin the post-catch settle (called by Ball on a successful catch).</summary>
-        public void BeginCatchRecovery() => catchRecoverTimer = 0f;
+        /// <summary>
+        /// 0 right after a catch, ramping to 1 as the ball is fully secured (over
+        /// the freeze + the extra settle window). A throw fired while this is
+        /// below 1 is weaker / wilder — a rushed counter. Harder catches secure
+        /// slower. 1 when there's no recent catch.
+        /// </summary>
+        public float CatchSettle01
+        {
+            get
+            {
+                float window = catchRecoverDur + catchSettleDuration * (0.5f + 0.5f * catchDifficulty01);
+                return window <= 0.0001f ? 1f : Mathf.Clamp01((Time.time - caughtAt) / window);
+            }
+        }
+        /// <summary>
+        /// Begin the post-catch settle (called by Ball on a successful catch).
+        /// difficulty01 (0 easy .. 1 barely caught) lengthens both the freeze and
+        /// the throw-settle ramp.
+        /// </summary>
+        public void BeginCatchRecovery(float difficulty01)
+        {
+            catchDifficulty01 = Mathf.Clamp01(difficulty01);
+            catchRecoverDur = Mathf.Lerp(catchRecoverMin, catchRecoverMax, catchDifficulty01);
+            catchRecoverTimer = 0f;
+            caughtAt = Time.time;
+        }
         /// <summary>
         /// Feet on the floor: not mid-jump and not mid-dive (a dive is a low
         /// airborne lunge). Prone recovery counts as grounded — you've landed.
@@ -354,7 +385,7 @@ namespace Sportland.Sports.Dodgeball
             if (IsCatchRecovering)
             {
                 catchRecoverTimer += Time.deltaTime;
-                if (catchRecoverTimer >= catchRecoverDuration) catchRecoverTimer = -1f;
+                if (catchRecoverTimer >= catchRecoverDur) catchRecoverTimer = -1f;
             }
 
             if (IsDashing)
