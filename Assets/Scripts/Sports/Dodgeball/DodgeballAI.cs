@@ -644,7 +644,7 @@ namespace Sportland.Sports.Dodgeball
             if (wantsToPass)
             {
                 DbgBranch = "pass";
-                ResetAttack();
+                ClearAttackChoice();   // NOT ResetAttack — keep holdStartTime so the pass wind-up accrues
                 movement.IsRunning = false;
                 movement.ApplyMove(Vector2.zero);
                 PassToInfielder();   // may overwrite DbgBranch = "HOLD (no pass target)"
@@ -802,14 +802,23 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
-        private void ResetAttack()
+        // Clear the attack selection but NOT holdStartTime (the wind-up clock),
+        // which the pass path also uses. Clearing it every frame — as the pass
+        // branch does each tick — would perpetually restart the pass wind-up and
+        // the carrier would never release (stands until the shot clock).
+        private void ClearAttackChoice()
         {
-            holdStartTime = -1f;
             throwTarget = null;
             currentAttack = AttackType.Stationary;
             attackPhase = AttackPhase.None;
             attackChosen = false;
             jumpStartTime = -1f;
+        }
+
+        private void ResetAttack()
+        {
+            ClearAttackChoice();
+            holdStartTime = -1f;
         }
 
         // Distance (u) from my current position to the AssignedZone boundary
