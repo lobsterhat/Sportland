@@ -207,7 +207,7 @@ namespace Sportland.Sports.Dodgeball
         // stick reads the incoming throw and ducks a high ball / jumps a low one.
         private void OnEvadePressed(InputAction.CallbackContext _)
         {
-            if (tracker.HasBall) { movement.TryJump(); return; }
+            if (tracker.HasBall) { movement.TryJump(attackJump: true); return; }
 
             if (TryDiveForBall()) return;   // near a loose/deflected ball → lunge for it
 

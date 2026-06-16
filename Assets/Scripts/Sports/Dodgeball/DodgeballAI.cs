@@ -798,7 +798,7 @@ namespace Sportland.Sports.Dodgeball
                 case AttackType.Jump:
                     if (movement.IsGrounded)
                     {
-                        movement.TryJump();
+                        movement.TryJump(attackJump: true);
                         attackPhase = AttackPhase.Airborne;
                         jumpStartTime = Time.time;
                     }
@@ -878,7 +878,7 @@ namespace Sportland.Sports.Dodgeball
                 {
                     if (currentAttack == AttackType.RunJump)
                     {
-                        movement.TryJump();
+                        movement.TryJump(attackJump: true);
                         attackPhase = AttackPhase.Airborne;
                         jumpStartTime = Time.time;
                     }

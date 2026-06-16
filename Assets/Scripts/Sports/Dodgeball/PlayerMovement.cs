@@ -33,6 +33,8 @@ namespace Sportland.Sports.Dodgeball
         [Header("Jump")]
         [SerializeField] private float jumpHeight = 1.5f;  // peak hop height
         [SerializeField] private float jumpDuration = 0.6f;
+        [Tooltip("Hang-time multiplier for ATTACK jumps (jump / run-jump throws): extends the airtime so the spike floats longer. Defensive evade hops stay at 1.")]
+        [SerializeField] private float attackJumpHangMul = 1.5f;
         [Tooltip("Brief 'gather your feet' pause (s) after landing during which movement input is ignored. Prevents instant re-aim mid-stride; lets natural damping bleed off the jump's lateral momentum.")]
         public float jumpRecoverDuration = 0.15f;
 
@@ -91,6 +93,7 @@ namespace Sportland.Sports.Dodgeball
 
         private Rigidbody2D rb;
         private float jumpTimer = -1f;
+        private float currentJumpDurationMul = 1f;   // 1 normal hop, >1 for attack jumps (more hang)
         private float jumpRecoverTimer = -1f;
         private float dampingBeforeJump = -1f;   // sentinel; >=0 means a jump is in progress and we've stashed the rb's linearDamping
         private Vector2 landingVelocity = Vector2.zero;   // captured at land; linearly tapered to zero over jumpRecoverDuration
@@ -175,7 +178,8 @@ namespace Sportland.Sports.Dodgeball
         public float BodyTop => (IsDucking ? duckBodyTop : standBodyTop) + CurrentJumpHeight;
 
         /// <summary>Time from jump start to the apex (peak height).</summary>
-        public float JumpApexTime => jumpDuration * 0.5f;
+        private float EffectiveJumpDuration => jumpDuration * currentJumpDurationMul;
+        public float JumpApexTime => EffectiveJumpDuration * 0.5f;
 
         /// <summary>True on frames where ApplyMove found a non-zero gap between current and target velocity.</summary>
         public bool IsAccelerating { get; private set; }
@@ -268,11 +272,12 @@ namespace Sportland.Sports.Dodgeball
             return pivotDuration * Mathf.Lerp(1.0f, 0.4f, generalCache.ChangeOfDirection01);
         }
 
-        public void TryJump()
+        public void TryJump(bool attackJump = false)
         {
             if (!IsAirborne && !IsDucking && !IsDashing && !IsDiving && !IsRecovering)
             {
                 jumpTimer = 0f;
+                currentJumpDurationMul = attackJump ? Mathf.Max(1f, attackJumpHangMul) : 1f;
                 // Zero the rigidbody's damping for the duration of the jump
                 // so the launch velocity persists end-to-end. Restored on
                 // landing. Sentinel -1 means "no jump in progress."
@@ -322,7 +327,7 @@ namespace Sportland.Sports.Dodgeball
             if (IsAirborne)
             {
                 jumpTimer += Time.deltaTime;
-                float t = jumpTimer / jumpDuration;
+                float t = jumpTimer / EffectiveJumpDuration;
                 if (t >= 1f)
                 {
                     jumpTimer = -1f;
