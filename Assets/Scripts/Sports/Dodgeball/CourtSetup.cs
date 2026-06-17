@@ -131,6 +131,10 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Testing mode: opposing team becomes a single stationary dummy and every user attack is logged (input, type, power, speed, accuracy, damage) — for fine-tuning abilities. Control an attacker; run a non-elimination mode so the dummy persists.")]
         [SerializeField] private bool attackLabMode = false;
 
+        [Header("UI font (IMGUI overlays)")]
+        [Tooltip("Optional font for the on-screen IMGUI text (score, debug HUDs). Drag a .ttf here (e.g. BoldPixels) to test it; empty = Unity's built-in font. Set the .ttf import to a dynamic font.")]
+        [SerializeField] private Font uiFont;
+
         [Header("Runtime")]
         [SerializeField] private List<GameObject> spawnedPlayers = new List<GameObject>();
 
@@ -181,6 +185,7 @@ namespace Sportland.Sports.Dodgeball
 
         private void Awake()
         {
+            DodgeballUI.Font = uiFont;   // shared with the runtime-added IMGUI overlays
             BuildCourt();
             SpawnAllPlayers();
             SpawnBall();

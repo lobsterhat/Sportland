@@ -118,15 +118,15 @@ namespace Sportland.Sports.Dodgeball
             if (!havePending) return;
             float tough = victim != null && victim.TryGetComponent<GeneralAttributes>(out var g) ? g.Toughness01 : 0.5f;
             float dmg = ballSpeed * damagePerSpeed * (1f - tough * toughnessReduction);
-            Finalize(victim == dummy, $"HIT ({zone}) dmg {dmg:F1}");
+            RecordRow(victim == dummy, $"HIT ({zone}) dmg {dmg:F1}");
         }
 
         private void OnLoose()
         {
-            if (havePending) Finalize(false, "miss");
+            if (havePending) RecordRow(false, "miss");
         }
 
-        private void Finalize(bool hitDummy, string outcome)
+        private void RecordRow(bool hitDummy, string outcome)
         {
             var p = pending;
             string acc = p.aimError >= 0f ? $"{p.aimError:F2}u" : "n/a";

@@ -923,6 +923,7 @@ namespace Sportland.Sports.Dodgeball
                 style = new GUIStyle(GUI.skin.label) { fontSize = 18, alignment = TextAnchor.MiddleCenter };
                 style.normal.textColor = Color.white;
             }
+            style.font = DodgeballUI.Font;   // null = built-in; drag a .ttf onto CourtSetup.uiFont to test
             if (bg == null)
             {
                 bg = new Texture2D(1, 1);
