@@ -2,6 +2,7 @@ using UnityEngine;
 using System;
 using System.Collections.Generic;
 using Sportland.Core.GameManagement;
+using Sportland.Rendering.Characters;
 
 namespace Sportland.Core.Athletes
 {
@@ -30,6 +31,10 @@ namespace Sportland.Core.Athletes
 
         [Header("Sport-Specific Stats")]
         public List<SportStats> sportStats = new List<SportStats>();
+
+        [Header("Appearance")]
+        [Tooltip("Visual configuration used by ModularCharacterRig to render this athlete.")]
+        public CharacterAppearance appearance;
 
         [Header("Flags")]
         public List<string> currentFlags = new List<string>(); // Simple string IDs for now
