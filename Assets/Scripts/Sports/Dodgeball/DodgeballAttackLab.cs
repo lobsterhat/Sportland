@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Sportland.Sports.Dodgeball
 {
@@ -27,6 +28,12 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private int rowsShown = 14;
         [SerializeField] private int fontSize = 14;
 
+        [Header("Dummy drag")]
+        [Tooltip("Click within this distance (u) of the dummy to grab it, then drag with the mouse to reposition.")]
+        [SerializeField] private float dragPickRadius = 1.5f;
+
+        private bool dragging;
+
         private Ball ball;
         private PlayerZoneTracker dummy;
         private bool subscribed;
@@ -45,6 +52,35 @@ namespace Sportland.Sports.Dodgeball
             ball = FindAnyObjectByType<Ball>();
             SetUpDummy();
             EnsureSubscribed();
+        }
+
+        // Grab the dummy by clicking near it and drag with the mouse to
+        // reposition (clamped to the play area). Lets you test attacks from
+        // different ranges/angles without restarting.
+        private void Update()
+        {
+            if (dummy == null) return;
+            var mouse = Mouse.current;
+            var cam = Camera.main;
+            if (mouse == null || cam == null) return;
+
+            Vector3 sp = mouse.position.ReadValue();
+            sp.z = -cam.transform.position.z;               // distance to the z=0 play plane
+            Vector2 wp = cam.ScreenToWorldPoint(sp);
+
+            if (mouse.leftButton.wasPressedThisFrame
+                && Vector2.Distance(wp, dummy.transform.position) <= dragPickRadius)
+                dragging = true;
+            if (mouse.leftButton.wasReleasedThisFrame)
+                dragging = false;
+
+            if (dragging)
+            {
+                float x = Mathf.Clamp(wp.x, -CourtSetup.PlayAreaHalfWidth, CourtSetup.PlayAreaHalfWidth);
+                float y = Mathf.Clamp(wp.y, -CourtSetup.PlayAreaHalfHeight, CourtSetup.PlayAreaHalfHeight);
+                var p = dummy.transform.position;
+                dummy.transform.position = new Vector3(x, y, p.z);
+            }
         }
 
         private void OnDestroy()
@@ -141,7 +177,7 @@ namespace Sportland.Sports.Dodgeball
             float x = Screen.width - panelWidth - 12f;
             var lines = new List<string> { "== ATTACK LAB (click = copy all) ==" };
             if (dummy == null) lines.Add("(no dummy — control an attacker, non-AI mode)");
-            else if (log.Count == 0) lines.Add("(attack the dummy to log throws)");
+            else if (log.Count == 0) lines.Add("(attack the dummy — drag it with the mouse to reposition)");
             else
             {
                 int show = Mathf.Min(rowsShown, log.Count);
