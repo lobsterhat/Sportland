@@ -115,7 +115,6 @@ MonoBehaviour:
   catchRadius: 0.9
   throwerPickupCooldown: 0.4
   pickupMaxHeight: 1.5
-  linearDamping: 1.4
   floorOffsetY: -0.79
   carryHeight: 1.29
   lobApex: 0.5

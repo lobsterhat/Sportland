@@ -103,7 +103,14 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private CatchTuning catchTuning = new CatchTuning();
 
         [Header("Physics")]
-        [SerializeField] private float linearDamping = 1.4f;
+        [Tooltip("Air drag while the ball is in FLIGHT (Thrown / Passing). Near-zero = " +
+                 "throws hold their speed and carry instead of petering out. Also feeds the " +
+                 "drag-aware flight-time / lead-aim math.")]
+        [SerializeField] private float flightDamping = 0.15f;
+        [Tooltip("Rolling friction once the ball is LOOSE on the floor, so it slows and " +
+                 "settles (and the delay-of-game alarm can fire). Stays firm even when " +
+                 "flight drag is ~0 — decoupled from air drag on purpose.")]
+        [SerializeField] private float groundDamping = 1.4f;
         [Tooltip("Speed kept when bouncing off a boundary wall (0 = dead stop, 1 = perfectly elastic).")]
         [SerializeField, Range(0f, 1f)] private float wallRestitution = 0.6f;
 
@@ -297,7 +304,7 @@ namespace Sportland.Sports.Dodgeball
             rb = GetComponent<Rigidbody2D>();
             if (rb == null) rb = gameObject.AddComponent<Rigidbody2D>();
             rb.gravityScale = 0f;
-            rb.linearDamping = linearDamping;
+            rb.linearDamping = groundDamping;   // starts Loose; release paths switch to flightDamping
             rb.freezeRotation = true;
 
             var col = GetComponent<CircleCollider2D>();
@@ -488,7 +495,7 @@ namespace Sportland.Sports.Dodgeball
 
         private void UpdateLoose()
         {
-            // Ball settles to the floor and rolls; linearDamping does the friction work.
+            // Ball settles to the floor and rolls; groundDamping does the friction work.
             if (Height > 0f)
                 Height = Mathf.MoveTowards(Height, 0f, looseFallRate * Time.deltaTime);
             TryPickup();
@@ -499,6 +506,7 @@ namespace Sportland.Sports.Dodgeball
             ConfirmPendingHits();   // settled without a catch — any pending hits stand
             state = State.Loose;
             rb.simulated = true;
+            rb.linearDamping = groundDamping;   // firm friction so the loose ball slows and settles
             OnBecameLoose?.Invoke();
         }
 
@@ -1111,6 +1119,7 @@ namespace Sportland.Sports.Dodgeball
             carrierMovement = null;
 
             rb.simulated = true;
+            rb.linearDamping = flightDamping;   // in flight: near-zero air drag so the throw carries
             rb.linearVelocity = direction.normalized * power + carrierVel;
             heightVelocity = verticalVelocity;
             groundedSinceRelease = false;
@@ -1165,7 +1174,7 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>
         /// Estimated lateral time-of-flight to cover <paramref name="dist"/> at
-        /// release speed <paramref name="power"/>, accounting for linearDamping
+        /// release speed <paramref name="power"/>, accounting for flightDamping
         /// (the ball decelerates, so this is longer than dist/power). Drag-free
         /// and beyond-max-range cases fall back to dist/power.
         ///
@@ -1175,7 +1184,7 @@ namespace Sportland.Sports.Dodgeball
         public float FlightTime(float dist, float power)
         {
             float v0 = Mathf.Max(0.01f, power);
-            float k = linearDamping;
+            float k = flightDamping;
             if (k <= 0.0001f) return dist / v0;          // no drag: constant speed
 
             float maxRange = v0 / k;                     // asymptotic reach under drag
@@ -1222,7 +1231,7 @@ namespace Sportland.Sports.Dodgeball
             if (t <= 0f) return pos;
 
             // Lateral distance covered in t under exponential drag.
-            float k = linearDamping;
+            float k = flightDamping;
             float dist = k > 0.0001f ? (v0 / k) * (1f - Mathf.Exp(-k * t)) : v0 * t;
             return pos + v.normalized * dist;
         }
@@ -1274,6 +1283,7 @@ namespace Sportland.Sports.Dodgeball
                                           && recentThrower.Spawn.role == PlayerRole.Outfielder
                                           && recentThrower.IsInOpposingInfield;
             rb.simulated = true;
+            rb.linearDamping = flightDamping;   // in flight: near-zero air drag so the launch carries
             rb.linearVelocity = dir * power;
             heightVelocity = vy;
             groundedSinceRelease = false;
@@ -1343,6 +1353,10 @@ namespace Sportland.Sports.Dodgeball
             LastReleaseFromOpposingInfield = false;   // passes never carry the neuter flag
             state = State.Passing;
 
+            // Pass lateral motion is parametric (rb asleep), but pre-set the flight
+            // drag so a pass later knocked airborne by a carom uses air drag, not
+            // ground friction.
+            rb.linearDamping = flightDamping;
             rb.simulated = false;
             RecordRelease(effectiveSpeed);
             OnReleased?.Invoke(recentThrower, IntendedTarget, false);
