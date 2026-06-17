@@ -50,7 +50,7 @@ namespace Sportland.Sports.Dodgeball
         [Header("Offense (throwing)")]
         [Tooltip("Seconds the AI holds the ball (winds up) before a PASS releases. (Stationary attacks use the charge throw instead; see maxChargeTime.)")]
         [SerializeField] private float windupTime = 0.9f;
-        [Tooltip("Release speed (u/s) at throwSpeed rating 0 and 100; the rating lerps between them.")]
+        [Tooltip("Release speed (u/s) at throwSpeed rating 0 and 20; the rating lerps between them.")]
         [SerializeField] private float minThrowSpeed = 12f;
         [SerializeField] private float maxThrowSpeed = 36f;
         [Tooltip("At accuracy 0, the aim scatters up to this many units per unit of distance (→0 at accuracy 100).")]

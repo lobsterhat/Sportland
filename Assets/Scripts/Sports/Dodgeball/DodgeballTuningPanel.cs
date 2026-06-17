@@ -297,7 +297,7 @@ namespace Sportland.Sports.Dodgeball
                 var attr = testThrower.GetComponent<DodgeballAttributes>();
                 if (attr != null)
                 {
-                    attr.throwSpeed    = LabeledSlider("throwSpeed",    attr.throwSpeed,    0f, 100f);
+                    attr.throwSpeed    = LabeledSlider($"throwSpeed [{attr.ThrowSpeedGrade}]", attr.throwSpeed, 0f, 20f);
                     attr.throwAccuracy = LabeledSlider("throwAccuracy", attr.throwAccuracy, 0f, 100f);
                     attr.anticipation  = LabeledSlider("anticipation",  attr.anticipation,  0f, 100f);
                     attr.catching      = LabeledSlider("catching",      attr.catching,      0f, 100f);

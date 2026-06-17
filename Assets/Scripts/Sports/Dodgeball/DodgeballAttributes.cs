@@ -8,9 +8,10 @@ namespace Sportland.Sports.Dodgeball
     /// </summary>
     public class DodgeballAttributes : MonoBehaviour
     {
-        [Tooltip("0..100. How fast the ball leaves the hand (release speed). " +
-                 "Only affects catches indirectly — a faster ball is harder to catch.")]
-        [Range(0f, 100f)] public float throwSpeed = 60f;
+        [Tooltip("Throwing Speed — RATING 0-20 (hidden; shown to players as an F-S grade). " +
+                 "How fast the ball leaves the hand; maps to the release speed (u/s). " +
+                 "The other ratings below are still 0-100 until they're converted too.")]
+        [Range(0f, 20f)] public float throwSpeed = 12f;
 
         [Tooltip("0..100. How close the ball lands to its intended target. " +
                  "Low = wild throws that may miss or hit the wrong player.")]
@@ -23,7 +24,9 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("0..100. Higher = better odds of completing a catch.")]
         [Range(0f, 100f)] public float catching = 60f;
 
-        public float ThrowSpeed01 => Mathf.Clamp01(throwSpeed / 100f);
+        public float ThrowSpeed01 => Rating.To01(throwSpeed);   // 0-20 rating scale
+        /// <summary>Player-facing F-S letter grade for Throwing Speed.</summary>
+        public string ThrowSpeedGrade => Rating.Grade(throwSpeed);
         public float ThrowAccuracy01 => Mathf.Clamp01(throwAccuracy / 100f);
         public float Anticipation01 => Mathf.Clamp01(anticipation / 100f);
         public float Catching01 => Mathf.Clamp01(catching / 100f);

@@ -452,14 +452,16 @@ namespace Sportland.Sports.Dodgeball
         {
             const float starBoost = 18f;
             var rng = new System.Random(spawn.id.GetHashCode());
-            float Roll(float mean, float spread) =>
-                Mathf.Clamp(mean + ((float)(rng.NextDouble() - 0.5) * 2f * spread), 0f, 100f);
+            float Roll(float mean, float spread, float max = 100f) =>
+                Mathf.Clamp(mean + ((float)(rng.NextDouble() - 0.5) * 2f * spread), 0f, max);
 
             bool isInfielder = spawn.role == PlayerRole.Infielder;
             bool isStar = spawn.id == "A_In_1" || spawn.id == "B_In_1";
             float boost = isStar ? starBoost : 0f;
 
-            dba.throwSpeed    = Roll((isInfielder ? 65f : 50f) + boost, 18f);
+            // throwSpeed is on the 0-20 rating scale (the rest are still 0-100):
+            // means/spread/boost are the old 0-100 values divided by 5.
+            dba.throwSpeed    = Roll((isInfielder ? 13f : 10f) + boost * 0.2f, 3.6f, 20f);
             dba.throwAccuracy = Roll((isInfielder ? 65f : 55f) + boost, 18f);
             dba.anticipation  = Roll(60f + boost, 18f);
             dba.catching      = Roll((isInfielder ? 60f : 70f) + boost, 15f);

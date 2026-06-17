@@ -24,7 +24,7 @@ namespace Sportland.Sports.Dodgeball
         public static DodgeballPlayerInput Current { get; private set; }
 
         [Header("Power")]
-        [Tooltip("Release speed (u/s) at throwSpeed rating 0 and 100; the thrower's rating lerps between them.")]
+        [Tooltip("Release speed (u/s) at throwSpeed rating 0 and 20; the thrower's rating lerps between them.")]
         [SerializeField] private float minThrowSpeed = 12f;
         [SerializeField] private float maxThrowSpeed = 36f;
         [SerializeField] private float lobPassSpeed = 10f;
