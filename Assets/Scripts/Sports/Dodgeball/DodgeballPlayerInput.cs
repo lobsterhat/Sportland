@@ -91,6 +91,19 @@ namespace Sportland.Sports.Dodgeball
         public static string LastCrowFeedback { get; private set; } = "";
         public static float LastCrowFeedbackTime { get; private set; } = -999f;
 
+        /// <summary>Telemetry of the last user attack throw, consumed by the attack-tuning lab.</summary>
+        public struct UserAttackInfo
+        {
+            public bool valid;
+            public float time;
+            public string type;     // Stationary / Running / Jump / RunJump / CrowHop
+            public string input;    // run / charge / crow / settle execution summary
+            public float power;     // computed throw power (pre-momentum)
+            public float aimError;  // distance (u) the post-scatter aim missed the target center; -1 = no target
+            public PlayerZoneTracker target;
+        }
+        public static UserAttackInfo LastUserAttack;
+
         private bool isRunning;
         private float idleTime;
 
@@ -347,15 +360,42 @@ namespace Sportland.Sports.Dodgeball
                 // Anticipation leads the target; accuracy then scatters the aim.
                 Vector2 lead = ball.LeadAim(transform.position, target.transform.position,
                                             TargetVelocity(target), power, OwnAnticipation01());
-                ball.ThrowAt(ApplyAccuracyToAim(lead, charge01, settle01, crow01), power);
+                Vector2 aim = ApplyAccuracyToAim(lead, charge01, settle01, crow01);
+                CaptureUserAttack(held, crow01, settle01, power, target, aim);
+                ball.ThrowAt(aim, power);
             }
             else
             {
                 Vector2 dir = lastMoveDirection.sqrMagnitude > 0.0001f
                     ? lastMoveDirection.normalized
                     : Vector2.right;
+                CaptureUserAttack(held, crow01, settle01, power, null, Vector2.zero);
                 ball.Throw(ApplyAccuracyToDirection(dir, charge01, settle01, crow01), power);
             }
+        }
+
+        // Snapshot the attack's execution for the tuning lab: classify the type
+        // from the movement state and summarize the input (run / charge / crow /
+        // settle), the computed power, and the aim error vs the target center.
+        private void CaptureUserAttack(float held, float crow01, float settle01, float power, PlayerZoneTracker target, Vector2 aim)
+        {
+            string type = movement.IsCrowHopping ? "CrowHop"
+                        : movement.IsAirborne ? (movement.Velocity.magnitude > 4f ? "RunJump" : "Jump")
+                        : movement.IsRunning ? "Running"
+                        : "Stationary";
+            string input = (movement.IsRunning ? "run " : "") + $"chg {held:F2}s"
+                         + (crow01 > 0f ? $" crow {crow01:F2}" : "")
+                         + (settle01 < 0.999f ? $" settle {settle01:F2}" : "");
+            LastUserAttack = new UserAttackInfo
+            {
+                valid = true,
+                time = Time.time,
+                type = type,
+                input = input,
+                power = power,
+                aimError = target != null ? Vector2.Distance(aim, (Vector2)target.transform.position) : -1f,
+                target = target,
+            };
         }
 
         // Release speed comes straight from the thrower's throwSpeed rating.

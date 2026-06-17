@@ -127,6 +127,10 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Players tire from strenuous actions (throw / catch / jump / dive / sustained run), lowering throw power, accuracy, and catching until they rest; the endurance stat eases it. Off = no fatigue.")]
         [SerializeField] private bool enableStamina = true;
 
+        [Header("Attack lab (ability tuning)")]
+        [Tooltip("Testing mode: opposing team becomes a single stationary dummy and every user attack is logged (input, type, power, speed, accuracy, damage) — for fine-tuning abilities. Control an attacker; run a non-elimination mode so the dummy persists.")]
+        [SerializeField] private bool attackLabMode = false;
+
         [Header("Runtime")]
         [SerializeField] private List<GameObject> spawnedPlayers = new List<GameObject>();
 
@@ -204,6 +208,8 @@ namespace Sportland.Sports.Dodgeball
             // set above, not the defaults AddComponent's auto-enable used.
             obliqueView.enabled = false;
             obliqueView.enabled = obliqueViewSpike;
+
+            if (attackLabMode) gameObject.AddComponent<DodgeballAttackLab>();
         }
 
         private void Update()
