@@ -32,6 +32,18 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Click within this distance (u) of the dummy to grab it, then drag with the mouse to reposition.")]
         [SerializeField] private float dragPickRadius = 1.5f;
 
+        [Header("Dummy facing / catch (T cycles)")]
+        [Tooltip("NoCatch = the dummy just takes hits (pure damage tuning). The Face* modes make it TRY to catch, oriented toward / partially off / away from the attacker — to tune the facing-based catch penalty and the damage when it fails. Cycle live with T.")]
+        [SerializeField] private DummyMode mode = DummyMode.NoCatch;
+        [Tooltip("Off-angle (deg) for FacePartial — within the side (half-penalty) facing zone.")]
+        [SerializeField] private float partialAngle = 65f;
+        [Tooltip("Distance (u) at which the dummy arms a catch on an incoming thrown ball (Face* modes).")]
+        [SerializeField] private float catchArmRange = 6f;
+        [Tooltip("After an attack resolves (caught / hit / miss), hand the ball back to the attacker for a fast test loop.")]
+        [SerializeField] private bool autoReturnBall = true;
+
+        public enum DummyMode { NoCatch, FaceToward, FacePartial, FaceAway }
+
         private bool dragging;
 
         private Ball ball;
@@ -42,6 +54,11 @@ namespace Sportland.Sports.Dodgeball
         private DodgeballPlayerInput.UserAttackInfo pending;
         private float pendingSpeed;
         private bool havePending;
+        private DummyMode pendingMode;        // dummy mode at the time of the pending throw
+        private float pendingCatchChance;     // catch chance at resolution (Face* modes)
+        private PlayerZoneTracker attacker;
+        private PlayerMovement dummyMove;
+        private bool returnPending;           // defer the ball return a frame (avoid event re-entrancy)
 
         private GUIStyle style;
         private Texture2D bg;
@@ -60,6 +77,36 @@ namespace Sportland.Sports.Dodgeball
         private void Update()
         {
             if (dummy == null) return;
+
+            // Deferred ball return (flagged in RecordRow) — done here, not inside
+            // the ball's hit/catch callback, to avoid re-entrancy.
+            if (returnPending && attacker != null && ball != null)
+            {
+                ball.ForcePickup(attacker);
+                returnPending = false;
+            }
+
+            // T cycles the dummy mode.
+            var kb = Keyboard.current;
+            if (kb != null && kb.tKey.wasPressedThisFrame)
+                mode = (DummyMode)(((int)mode + 1) % 4);
+
+            // Catching modes: orient the dummy per the mode (relative to the
+            // attacker) and arm a catch on an incoming thrown ball so the
+            // facing-penalized skill-check actually runs.
+            if (mode != DummyMode.NoCatch && dummyMove != null)
+            {
+                Vector2 toAtk = AttackerDir();
+                Vector2 face = mode == DummyMode.FaceToward ? toAtk
+                             : mode == DummyMode.FaceAway ? -toAtk
+                             : (Vector2)(Quaternion.Euler(0f, 0f, partialAngle) * toAtk);
+                dummyMove.SetFacing(face);
+
+                if (ball != null && ball.CurrentState == Ball.State.Thrown
+                    && Vector2.Distance(dummy.transform.position, ball.transform.position) < catchArmRange)
+                    dummy.ArmCatch();
+            }
+
             var mouse = Mouse.current;
             var cam = Camera.main;
             if (mouse == null || cam == null) return;
@@ -83,12 +130,23 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
+        private Vector2 AttackerDir()
+        {
+            var a = attacker;
+            if (a == null && DodgeballPlayerInput.Current != null)
+                a = DodgeballPlayerInput.Current.GetComponent<PlayerZoneTracker>();
+            if (a == null) return Vector2.left;
+            Vector2 d = (Vector2)a.transform.position - (Vector2)dummy.transform.position;
+            return d.sqrMagnitude > 0.0001f ? d.normalized : Vector2.left;
+        }
+
         private void OnDestroy()
         {
             if (ball != null && subscribed)
             {
                 ball.OnReleased -= OnReleased;
                 ball.OnHit -= OnHit;
+                ball.OnCaught -= OnCaught;
                 ball.OnBecameLoose -= OnLoose;
             }
             if (bg != null) Destroy(bg);
@@ -100,6 +158,7 @@ namespace Sportland.Sports.Dodgeball
         {
             var current = DodgeballPlayerInput.Current;
             PlayerZoneTracker controlled = current != null ? current.GetComponent<PlayerZoneTracker>() : null;
+            attacker = controlled;
             Team userTeam = controlled != null ? controlled.Spawn.team : Team.A;
             Team oppTeam = userTeam == Team.A ? Team.B : Team.A;
 
@@ -111,6 +170,7 @@ namespace Sportland.Sports.Dodgeball
                 if (dummy == null && t.Spawn.team == oppTeam && t.Spawn.role == PlayerRole.Infielder)
                 {
                     dummy = t;
+                    dummyMove = t.GetComponent<PlayerMovement>();
                     FreezeDummy(t);
                 }
                 else
@@ -133,6 +193,7 @@ namespace Sportland.Sports.Dodgeball
             if (subscribed || ball == null) return;
             ball.OnReleased += OnReleased;
             ball.OnHit += OnHit;
+            ball.OnCaught += OnCaught;
             ball.OnBecameLoose += OnLoose;
             subscribed = true;
         }
@@ -145,6 +206,7 @@ namespace Sportland.Sports.Dodgeball
             var a = DodgeballPlayerInput.LastUserAttack;
             if (!a.valid) return;
             pending = a;
+            pendingMode = mode;
             pendingSpeed = (ball != null && ball.LastThrow.releaseValid) ? ball.LastThrow.releaseSpeed : 0f;
             havePending = true;
         }
@@ -154,21 +216,45 @@ namespace Sportland.Sports.Dodgeball
             if (!havePending) return;
             float tough = victim != null && victim.TryGetComponent<GeneralAttributes>(out var g) ? g.Toughness01 : 0.5f;
             float dmg = ballSpeed * damagePerSpeed * (1f - tough * toughnessReduction);
-            RecordRow(victim == dummy, $"HIT ({zone}) dmg {dmg:F1}");
+            pendingCatchChance = (pendingMode != DummyMode.NoCatch && ball != null) ? ball.LastCatchFactors.finalChance : -1f;
+            RecordRow($"HIT ({zone}) dmg {dmg:F1}");
+        }
+
+        // The dummy caught the user's throw (Face* mode): log the facing-based
+        // catch chance and outcome — no damage.
+        private void OnCaught(PlayerZoneTracker catcher)
+        {
+            if (!havePending || catcher != dummy) return;
+            pendingCatchChance = ball != null ? ball.LastCatchFactors.finalChance : 0f;
+            RecordRow("CAUGHT");
         }
 
         private void OnLoose()
         {
-            if (havePending) RecordRow(false, "miss");
+            if (havePending) RecordRow("miss");
         }
 
-        private void RecordRow(bool hitDummy, string outcome)
+        private void RecordRow(string outcome)
         {
             var p = pending;
             string acc = p.aimError >= 0f ? $"{p.aimError:F2}u" : "n/a";
-            log.Add($"{p.type,-10} [{p.input}]  pow {p.power,4:F0}  spd {pendingSpeed,4:F0}  acc {acc,6}  {(hitDummy ? outcome : "miss")}");
+            string face = pendingMode != DummyMode.NoCatch
+                ? $"  {pendingMode} catch {Mathf.Max(0f, pendingCatchChance) * 100f:F0}%"
+                : "";
+            log.Add($"{p.type,-10} [{p.input}]  pow {p.power,4:F0}  spd {pendingSpeed,4:F0}  acc {acc,6}{face}  {outcome}");
             while (log.Count > 60) log.RemoveAt(0);
             havePending = false;
+            if (autoReturnBall) returnPending = true;
+        }
+
+        // Live (deterministic, no-luck) catch chance for the dummy vs the
+        // in-flight ball at its current facing — shows how the facing penalty
+        // moves the number before the catch even resolves.
+        private string LivePreview()
+        {
+            if (mode == DummyMode.NoCatch || ball == null || dummy == null
+                || ball.CurrentState != Ball.State.Thrown) return "";
+            return $"   live catch {ball.PreviewCatch(dummy).finalChance * 100f:F0}%";
         }
 
         private void OnGUI()
@@ -177,11 +263,18 @@ namespace Sportland.Sports.Dodgeball
             float x = Screen.width - panelWidth - 12f;
             var lines = new List<string> { "== ATTACK LAB (click = copy all) ==" };
             if (dummy == null) lines.Add("(no dummy — control an attacker, non-AI mode)");
-            else if (log.Count == 0) lines.Add("(attack the dummy — drag it with the mouse to reposition)");
             else
             {
-                int show = Mathf.Min(rowsShown, log.Count);
-                for (int i = log.Count - show; i < log.Count; i++) lines.Add(log[i]);
+                lines.Add($"dummy: {mode}{LivePreview()}   [T cycles · drag to move]");
+                if (log.Count == 0)
+                {
+                    lines.Add("(attack the dummy to log throws)");
+                }
+                else
+                {
+                    int show = Mathf.Min(rowsShown, log.Count);
+                    for (int i = log.Count - show; i < log.Count; i++) lines.Add(log[i]);
+                }
             }
 
             float lh = fontSize + 4f, pad = 8f;
