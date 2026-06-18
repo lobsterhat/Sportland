@@ -348,7 +348,7 @@ namespace Sportland.Sports.Dodgeball
             ball.IntendedTarget = testReceiver;
 
             var attr = testThrower.GetComponent<DodgeballAttributes>();
-            float power = Mathf.Lerp(12f, 36f, attr != null ? attr.ThrowSpeed01 : 0.6f);
+            float power = ball.ReleaseSpeed(attr != null ? attr.ThrowSpeed01 : 0.6f);
             float anticipation = attr != null ? attr.Anticipation01 : 0f;
 
             var targetRb = testReceiver.GetComponent<Rigidbody2D>();

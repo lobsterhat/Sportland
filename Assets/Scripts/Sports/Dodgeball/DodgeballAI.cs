@@ -50,9 +50,8 @@ namespace Sportland.Sports.Dodgeball
         [Header("Offense (throwing)")]
         [Tooltip("Seconds the AI holds the ball (winds up) before a PASS releases. (Stationary attacks use the charge throw instead; see maxChargeTime.)")]
         [SerializeField] private float windupTime = 0.9f;
-        [Tooltip("Release speed (u/s) at throwSpeed rating 0 and 20; the rating lerps between them.")]
-        [SerializeField] private float minThrowSpeed = 12f;
-        [SerializeField] private float maxThrowSpeed = 36f;
+        // Release speed comes from the shared rating→u/s curve on the Ball
+        // (Ball.ReleaseSpeed), so AI and human throws use the same mapping.
         [Tooltip("At accuracy 0, the aim scatters up to this many units per unit of distance (→0 at accuracy 100).")]
         [SerializeField] private float accuracyErrorPerUnit = 0.15f;
         [Tooltip("Base target height (u) for a jump-attack throw, instead of carryHeight (chest). 0.9 = waist; a spike lands lower than a flat throw would. Set to carryHeight (1.29) to match standing throws.")]
@@ -1091,7 +1090,7 @@ namespace Sportland.Sports.Dodgeball
         // moving attacks pass the default 1 (their power comes from momentum).
         private void ThrowAtTarget(PlayerZoneTracker target, float charge01 = 1f)
         {
-            float basePower = Mathf.Lerp(minThrowSpeed, maxThrowSpeed, attr != null ? attr.EffectiveThrowSpeed01 : 0.6f);
+            float basePower = ball.ReleaseSpeed(attr != null ? attr.EffectiveThrowSpeed01 : 0.6f);
             // Charge scales power; a rushed counter off a fresh catch (low settle)
             // weakens it; a well-timed crow hop (high timing) boosts it.
             float settle = movement != null ? movement.CatchSettle01 : 1f;

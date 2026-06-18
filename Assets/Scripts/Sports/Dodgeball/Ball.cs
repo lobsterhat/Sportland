@@ -140,6 +140,16 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Gravity multiplier applied ONLY to a throw's initial flight (before the first ground touch). <1 makes attacks float longer / travel flatter for game-feel. Lobs, chest passes, and post-bounce rolling all use full gravity — this knob only affects the airtime of a launched throw.")]
         [Range(0.1f, 1f)] [SerializeField] private float throwGravityMul = 0.5f;
 
+        [Header("Throw release speed (rating → u/s)")]
+        [Tooltip("Maps a thrower's effective Throwing Speed RATING (X axis: 0-20) to the ball's release speed " +
+                 "in u/s (Y axis). Authored as a curve so speed stays continuous across the rating — a low A and " +
+                 "a high A still differ even though both display 'A'. One shared mapping for AI and human throws. " +
+                 "If the curve is cleared (<2 keys) it falls back to a straight line between the two speeds below.")]
+        [SerializeField] private AnimationCurve releaseSpeedByRating = AnimationCurve.Linear(0f, 12f, Rating.Max, 36f);
+        [Tooltip("Fallback release speeds (u/s), used only if the curve above is empty: at rating 0 and at rating 20.")]
+        [SerializeField] private float fallbackMinReleaseSpeed = 12f;
+        [SerializeField] private float fallbackMaxReleaseSpeed = 36f;
+
         [Header("Throw bounce zones (Height above the floor)")]
         [Tooltip("Ball Height at/above this lands in the head zone.")]
         [SerializeField] private float headZoneMinHeight = 1.4f;
@@ -1097,6 +1107,21 @@ namespace Sportland.Sports.Dodgeball
         /// release velocity defaults to 0 (a flat horizontal throw); pass
         /// something positive to add a little arc.
         /// </summary>
+        /// <summary>
+        /// Release speed (u/s) for a thrower whose effective Throwing Speed is
+        /// <paramref name="throwSpeed01"/> (0..1). Samples the authorable
+        /// releaseSpeedByRating curve at the matching 0-20 rating; falls back to
+        /// a straight fallbackMin→fallbackMax line if the curve has been cleared.
+        /// One shared mapping so AI and human throws can't drift apart.
+        /// </summary>
+        public float ReleaseSpeed(float throwSpeed01)
+        {
+            float s01 = Mathf.Clamp01(throwSpeed01);
+            if (releaseSpeedByRating != null && releaseSpeedByRating.length >= 2)
+                return releaseSpeedByRating.Evaluate(s01 * Rating.Max);
+            return Mathf.Lerp(fallbackMinReleaseSpeed, fallbackMaxReleaseSpeed, s01);
+        }
+
         public void Throw(Vector2 direction, float power, float verticalVelocity = 0f)
         {
             if (carrier == null) return;

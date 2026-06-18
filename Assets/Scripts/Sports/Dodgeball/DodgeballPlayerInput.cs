@@ -24,9 +24,8 @@ namespace Sportland.Sports.Dodgeball
         public static DodgeballPlayerInput Current { get; private set; }
 
         [Header("Power")]
-        [Tooltip("Release speed (u/s) at throwSpeed rating 0 and 20; the thrower's rating lerps between them.")]
-        [SerializeField] private float minThrowSpeed = 12f;
-        [SerializeField] private float maxThrowSpeed = 36f;
+        // Release speed comes from the shared rating→u/s curve on the Ball
+        // (Ball.ReleaseSpeed), so human and AI throws use the same mapping.
         [SerializeField] private float lobPassSpeed = 10f;
         [SerializeField] private float chestPassSpeed = 18f;
 
@@ -403,7 +402,8 @@ namespace Sportland.Sports.Dodgeball
         {
             var attr = GetComponent<DodgeballAttributes>();
             float s01 = attr != null ? attr.EffectiveThrowSpeed01 : 0.6f;
-            return Mathf.Lerp(minThrowSpeed, maxThrowSpeed, s01);
+            if (cachedBall == null) cachedBall = FindAnyObjectByType<Ball>();
+            return cachedBall != null ? cachedBall.ReleaseSpeed(s01) : Mathf.Lerp(12f, 36f, s01);
         }
 
         private float OwnAnticipation01()
