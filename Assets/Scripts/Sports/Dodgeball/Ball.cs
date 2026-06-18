@@ -138,7 +138,7 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Constant downward acceleration applied to Height in the Thrown state (units/sec^2).")]
         [SerializeField] private float gravity = 12f;
         [Tooltip("Gravity multiplier applied ONLY to a throw's initial flight (before the first ground touch). <1 makes attacks float longer / travel flatter for game-feel. Lobs, chest passes, and post-bounce rolling all use full gravity — this knob only affects the airtime of a launched throw.")]
-        [Range(0.1f, 1f)] [SerializeField] private float throwGravityMul = 0.6f;
+        [Range(0.1f, 1f)] [SerializeField] private float throwGravityMul = 0.5f;
 
         [Header("Throw bounce zones (Height above the floor)")]
         [Tooltip("Ball Height at/above this lands in the head zone.")]
