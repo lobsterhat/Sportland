@@ -39,8 +39,10 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float partialAngle = 65f;
         [Tooltip("Distance (u) at which the dummy arms a catch on an incoming thrown ball (Face* modes).")]
         [SerializeField] private float catchArmRange = 6f;
-        [Tooltip("After an attack resolves (caught / hit / miss), hand the ball back to the attacker for a fast test loop.")]
-        [SerializeField] private bool autoReturnBall = true;
+        [Tooltip("After an attack resolves (caught / hit / miss), automatically hand the ball back to the attacker. " +
+                 "Off by default — it was snatching the ball back mid-carom before it settled. Press L1 to return " +
+                 "it manually when you're ready for the next rep.")]
+        [SerializeField] private bool autoReturnBall = false;
 
         public enum DummyMode { NoCatch, FaceToward, FacePartial, FaceAway }
 
@@ -78,13 +80,21 @@ namespace Sportland.Sports.Dodgeball
         {
             if (dummy == null) return;
 
-            // Deferred ball return (flagged in RecordRow) — done here, not inside
-            // the ball's hit/catch callback, to avoid re-entrancy.
+            // Deferred ball return (flagged in RecordRow when autoReturnBall is on)
+            // — done here, not inside the ball's hit/catch callback, to avoid
+            // re-entrancy.
             if (returnPending && attacker != null && ball != null)
             {
                 ball.ForcePickup(attacker);
                 returnPending = false;
             }
+
+            // L1 returns the ball to the attacker for the next rep — manual, so a
+            // hit's carom is allowed to finish and the ball settle before it's
+            // snatched back.
+            var pad = Gamepad.current;
+            if (pad != null && pad.leftShoulder.wasPressedThisFrame && attacker != null && ball != null)
+                ball.ForcePickup(attacker);
 
             // T cycles the dummy mode.
             var kb = Keyboard.current;
@@ -268,7 +278,7 @@ namespace Sportland.Sports.Dodgeball
             if (dummy == null) lines.Add("(no dummy — control an attacker, non-AI mode)");
             else
             {
-                lines.Add($"dummy: {mode}{LivePreview()}   [T cycles · drag to move]");
+                lines.Add($"dummy: {mode}{LivePreview()}   [T cycles · drag to move · L1 returns ball]");
                 if (log.Count == 0)
                 {
                     lines.Add("(attack the dummy to log throws)");
