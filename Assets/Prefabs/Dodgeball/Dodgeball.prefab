@@ -119,32 +119,6 @@ MonoBehaviour:
   carryHeight: 1.29
   lobApex: 0.5
   gravity: 12
-  releaseSpeedByRating:
-    serializedVersion: 2
-    m_Curve:
-    - serializedVersion: 3
-      time: 0
-      value: 12
-      inSlope: 1.2
-      outSlope: 1.2
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    - serializedVersion: 3
-      time: 20
-      value: 36
-      inSlope: 1.2
-      outSlope: 1.2
-      tangentMode: 0
-      weightedMode: 0
-      inWeight: 0.33333334
-      outWeight: 0.33333334
-    m_PreInfinity: 2
-    m_PostInfinity: 2
-    m_RotationOrder: 4
-  fallbackMinReleaseSpeed: 12
-  fallbackMaxReleaseSpeed: 36
   headZoneMinHeight: 1.4
   limbZoneMaxHeight: 0.6
   thrownToLooseSpeed: 4
