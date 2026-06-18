@@ -110,9 +110,9 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Rolling friction once the ball is LOOSE on the floor, so it slows and " +
                  "settles (and the delay-of-game alarm can fire). Stays firm even when " +
                  "flight drag is ~0 — decoupled from air drag on purpose.")]
-        [SerializeField] private float groundDamping = 1.4f;
+        [SerializeField] private float groundDamping = 2.8f;
         [Tooltip("Speed kept when bouncing off a boundary wall (0 = dead stop, 1 = perfectly elastic).")]
-        [SerializeField, Range(0f, 1f)] private float wallRestitution = 0.3f;
+        [SerializeField, Range(0f, 1f)] private float wallRestitution = 0.45f;
 
         [Header("Height (measured above the visible floor)")]
         [Tooltip("Local Y offset from ball.transform.position down to the visible floor. " +
@@ -165,7 +165,7 @@ namespace Sportland.Sports.Dodgeball
 
         [Header("Bounce chain")]
         [Tooltip("Apex multiplier per ground bounce (coefficient of restitution).")]
-        [SerializeField, Range(0f, 1f)] private float bounceRestitution = 0.5f;
+        [SerializeField, Range(0f, 1f)] private float bounceRestitution = 0.6f;
         [Tooltip("Lateral velocity multiplier applied at each ground bounce.")]
         [SerializeField, Range(0f, 1f)] private float bounceLateralFriction = 0.65f;
         [Tooltip("When the next bounce apex would be below this, the ball stops bouncing and rolls.")]

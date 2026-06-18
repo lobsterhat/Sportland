@@ -131,7 +131,7 @@ MonoBehaviour:
   limbBounceFactor: 0.35
   limbBounceArcApex: 0.15
   limbBounceArcDuration: 0.25
-  bounceRestitution: 0.5
+  bounceRestitution: 0.6
   bounceLateralFriction: 0.65
   minBounceApex: 0.08
   looseFallRate: 3
