@@ -397,7 +397,7 @@ namespace Sportland.Sports.Dodgeball
             };
         }
 
-        // Release speed comes straight from the thrower's throwSpeed rating.
+        // Release speed comes straight from the thrower's ThrowSpeedRating.
         private float ThrowReleaseSpeed()
         {
             var attr = GetComponent<DodgeballAttributes>();

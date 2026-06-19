@@ -7,8 +7,8 @@ namespace Sportland.Sports.Dodgeball
     /// Hot Head: taking a hit makes the player reckless for a few seconds —
     /// aggressive stats up, skill stats down. Repeated hits inside the window
     /// stack the effect (up to maxStacks) and refresh the timer. A "both"
-    /// ability: its modifier list mixes a boost (throwSpeed) with penalties
-    /// (throwAccuracy, catching).
+    /// ability: its modifier list mixes a boost (throw speed) with penalties
+    /// (throw accuracy, catching).
     ///
     /// Vertical slice for the ability engine — exercises the event-latch
     /// (damage pulse), the duration window, stacking, mixed modifiers, and the
