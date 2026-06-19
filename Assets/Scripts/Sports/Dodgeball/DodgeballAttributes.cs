@@ -13,9 +13,11 @@ namespace Sportland.Sports.Dodgeball
                  "The other ratings below are still 0-100 until they're converted too.")]
         [Range(0f, 20f)] public float throwSpeedRating = 12f;
 
-        [Tooltip("0..100. How close the ball lands to its intended target. " +
-                 "Low = wild throws that may miss or hit the wrong player.")]
-        [Range(0f, 100f)] public float throwAccuracy = 60f;
+        [Tooltip("Throwing Accuracy — RATING 0-20 (hidden; shown to players as an F-S grade). " +
+                 "How close the ball lands to its target: higher = a tighter aim-scatter envelope, " +
+                 "so the throw is on target more often AND closer when it does miss. " +
+                 "The other ratings below are still 0-100 until they're converted too.")]
+        [Range(0f, 20f)] public float throwAccuracyRating = 12f;
 
         [Tooltip("0..100. Leads a moving target: 0 aims where the target is now, " +
                  "100 aims where it will be when the ball arrives.")]
@@ -27,7 +29,9 @@ namespace Sportland.Sports.Dodgeball
         public float ThrowSpeed01 => Rating.To01(throwSpeedRating);   // 0-20 rating scale
         /// <summary>Player-facing F-S letter grade for Throwing Speed.</summary>
         public string ThrowSpeedGrade => Rating.Grade(throwSpeedRating);
-        public float ThrowAccuracy01 => Mathf.Clamp01(throwAccuracy / 100f);
+        public float ThrowAccuracy01 => Rating.To01(throwAccuracyRating);   // 0-20 rating scale
+        /// <summary>Player-facing F-S letter grade for Throwing Accuracy.</summary>
+        public string ThrowAccuracyGrade => Rating.Grade(throwAccuracyRating);
         public float Anticipation01 => Mathf.Clamp01(anticipation / 100f);
         public float Catching01 => Mathf.Clamp01(catching / 100f);
 
