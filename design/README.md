@@ -27,10 +27,14 @@ stats, and players carry their attributes + Special Abilities across sports.
 
 ## Attribute model (3 layers)
 
-1. **General attributes** — cross-sport: speed, acceleration, endurance,
-   changeOfDirection, luck, toughness.
-2. **Sport-specific attributes** — e.g. dodgeball: throwSpeed, throwAccuracy,
-   anticipation, catching.
+Rated attributes use a hidden **0–20** scale shown to players as an **F–S** grade. Full
+spec — the attribute set, code mappings, and built-vs-to-build status — in
+[attributes.md](attributes.md).
+
+1. **General attributes** — cross-sport: Stamina, Recovery, Speed, Agility,
+   Damage Capacity, Defensive Anticipation.
+2. **Sport-specific attributes** — e.g. dodgeball: Throw Power, Throw Technique,
+   Catch Technique, Offensive Anticipation.
 3. **Special Abilities** — conditional modifiers that stack on top. See
    [special_abilities.md](special_abilities.md).
 
@@ -39,6 +43,8 @@ the `Effective*` values only, so abilities are felt everywhere without per-syste
 
 ## Docs
 
+- [attributes.md](attributes.md) — the attribute set (0–20 / F–S), the cross-sport vs
+  sport-specific split, each one's mapping to current code, and conversion status.
 - [special_abilities.md](special_abilities.md) — ability architecture, a template, the
   built abilities as worked examples, and an idea backlog.
 - [game_flow.md](game_flow.md) — match structure, modes, win conditions, and the
