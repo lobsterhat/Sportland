@@ -37,8 +37,8 @@ namespace Sportland.Sports.Dodgeball
         [System.Serializable]
         public class CatchTuning
         {
-            [Range(0f, 1f)] public float minBaseChance = 0.20f;   // at catching = 0
-            [Range(0f, 1f)] public float maxBaseChance = 0.85f;   // at catching = 100
+            [Range(0f, 1f)] public float minBaseChance = 0.20f;   // at Catch Technique rating 0
+            [Range(0f, 1f)] public float maxBaseChance = 0.85f;   // at Catch Technique rating 20
             public float comfortableSpeed = 8f;                   // no speed penalty at/below this
             public float maxSpeed = 24f;                          // full speed penalty at/above this
             [Range(0f, 1f)] public float speedPenalty = 0.40f;

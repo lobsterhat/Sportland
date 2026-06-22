@@ -459,13 +459,13 @@ namespace Sportland.Sports.Dodgeball
             bool isStar = spawn.id == "A_In_1" || spawn.id == "B_In_1";
             float boost = isStar ? starBoost : 0f;
 
-            // throwSpeedRating + throwAccuracyRating are on the 0-20 rating scale
-            // (anticipation/catching still 0-100); means/spread/boost are the old
-            // 0-100 values divided by 5.
-            dba.throwSpeedRating    = Roll((isInfielder ? 13f : 10f) + boost * 0.2f, 3.6f, 20f);
-            dba.throwAccuracyRating = Roll((isInfielder ? 13f : 11f) + boost * 0.2f, 3.6f, 20f);
-            dba.anticipation        = Roll(60f + boost, 18f);
-            dba.catching            = Roll((isInfielder ? 60f : 70f) + boost, 15f);
+            // throwSpeedRating / throwAccuracyRating / catchTechniqueRating are on the
+            // 0-20 rating scale (anticipation is the last on 0-100); means/spread/boost
+            // for the rating stats are the old 0-100 values divided by 5.
+            dba.throwSpeedRating     = Roll((isInfielder ? 13f : 10f) + boost * 0.2f, 3.6f, 20f);
+            dba.throwAccuracyRating  = Roll((isInfielder ? 13f : 11f) + boost * 0.2f, 3.6f, 20f);
+            dba.anticipation         = Roll(60f + boost, 18f);
+            dba.catchTechniqueRating = Roll((isInfielder ? 12f : 14f) + boost * 0.2f, 3f, 20f);
 
             gen.luck              = Roll(50f + boost * 0.5f, 15f);
             gen.toughness         = Roll(50f + boost, 18f);

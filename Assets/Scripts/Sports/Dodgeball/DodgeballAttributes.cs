@@ -23,8 +23,10 @@ namespace Sportland.Sports.Dodgeball
                  "100 aims where it will be when the ball arrives.")]
         [Range(0f, 100f)] public float anticipation = 60f;
 
-        [Tooltip("0..100. Higher = better odds of completing a catch.")]
-        [Range(0f, 100f)] public float catching = 60f;
+        [Tooltip("Catch Technique — RATING 0-20 (hidden; shown to players as an F-S grade). " +
+                 "How well you receive the ball; sizes the catch timing window (see design/defense.md). " +
+                 "anticipation above is the last stat still on the old 0-100 scale.")]
+        [Range(0f, 20f)] public float catchTechniqueRating = 12f;
 
         public float ThrowSpeed01 => Rating.To01(throwSpeedRating);   // 0-20 rating scale
         /// <summary>Player-facing F-S letter grade for Throwing Speed.</summary>
@@ -33,7 +35,9 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Player-facing F-S letter grade for Throwing Accuracy.</summary>
         public string ThrowAccuracyGrade => Rating.Grade(throwAccuracyRating);
         public float Anticipation01 => Mathf.Clamp01(anticipation / 100f);
-        public float Catching01 => Mathf.Clamp01(catching / 100f);
+        public float Catching01 => Rating.To01(catchTechniqueRating);   // 0-20 rating scale
+        /// <summary>Player-facing F-S letter grade for Catch Technique.</summary>
+        public string CatchTechniqueGrade => Rating.Grade(catchTechniqueRating);
 
         // ── Effective ratings (base × active Special Ability multipliers) ──
         // Gameplay reads these, never the raw *01 getters above, so a Special
