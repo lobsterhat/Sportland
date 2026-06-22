@@ -45,6 +45,8 @@ the `Effective*` values only, so abilities are felt everywhere without per-syste
 
 - [attributes.md](attributes.md) — the attribute set (0–20 / F–S), the cross-sport vs
   sport-specific split, each one's mapping to current code, and conversion status.
+- [defense.md](defense.md) — the Catch / Evade / Brace model: a zoned, skill-timed catch
+  window, ramped bracing, single evade dash, and the stats that size them.
 - [special_abilities.md](special_abilities.md) — ability architecture, a template, the
   built abilities as worked examples, and an idea backlog.
 - [game_flow.md](game_flow.md) — match structure, modes, win conditions, and the

@@ -56,7 +56,7 @@ feel, not by a number.
 |-----------|-----------|-----------|--------|
 | **Throw Power** | Release speed → how hard the ball arrives (and thus damage) | `throwSpeedRating` (0–20) | ✅ built; player-name rename pending |
 | **Throw Technique** | Aim accuracy — tightness of the throw-scatter envelope | `throwAccuracyRating` (0–20) | ✅ built; player-name rename pending |
-| **Catch Technique** | Odds of completing a catch | `catching` (0–100) | convert next |
+| **Catch Technique** | Sizes the catch timing window (see [defense.md](defense.md)) | `catching` (0–100) | converting now |
 | **Offensive Anticipation** | *Leading* a moving target with your throw | `anticipation` (0–100) | exists; convert (+ maybe move to General) |
 
 ## Anticipation: offensive vs defensive
