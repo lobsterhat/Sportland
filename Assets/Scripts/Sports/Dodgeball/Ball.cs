@@ -57,6 +57,9 @@ namespace Sportland.Sports.Dodgeball
             [Range(0f, 1f)] public float aiTimingAtRating0  = 0.55f;  // a weak AI's typical timingScore
             [Range(0f, 1f)] public float aiTimingAtRating20 = 1.00f;  // an elite AI's typical timingScore
             [Range(0f, 1f)] public float aiTimingNoise      = 0.12f;  // ± wobble on the AI's timing
+
+            [Header("Bobble")]
+            public float bobbleSquirtSpeed = 5f;   // a tipped ball squirts loose this fast (u/s) — out of immediate re-grab range
         }
 
         public enum CatchZone { Miss, Bobble, Clean }
@@ -834,9 +837,13 @@ namespace Sportland.Sports.Dodgeball
                     rb.linearVelocity = v;
                     Carom(catcher, ClassifyHit(Height));
                     break;
-                case 1: // fumble — drops loose at the catcher's feet
-                    rb.linearVelocity = v * 0.1f;
+                case 1: // bobble — tipped loose: the ball squirts a short way off the
+                        // hands (out of immediate reach) and the catcher can't snatch it
+                        // straight back, so it reads as a fumble, not a clean catch.
+                    rb.linearVelocity = v.normalized * catchTuning.bobbleSquirtSpeed;
                     heightVelocity = 0f;
+                    recentThrower = catcher;                          // brief no-re-grab window
+                    throwerCooldownRemaining = throwerPickupCooldown;
                     EnterLoose();
                     break;
                 default: // deflect backward, back toward where it came from
