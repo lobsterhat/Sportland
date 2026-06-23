@@ -59,7 +59,8 @@ namespace Sportland.Sports.Dodgeball
             [Range(0f, 1f)] public float aiTimingNoise      = 0.12f;  // ± wobble on the AI's timing
 
             [Header("Bobble")]
-            public float bobbleSquirtSpeed = 5f;   // a tipped ball squirts loose this fast (u/s) — out of immediate re-grab range
+            public float bobbleSquirtSpeed = 5f;   // lateral speed (u/s) as a tipped ball pops off the hands
+            public float bobblePopUp       = 3f;   // upward pop (height velocity) — the gentle bounce off the hands
         }
 
         public enum CatchZone { Miss, Bobble, Clean }
@@ -837,14 +838,17 @@ namespace Sportland.Sports.Dodgeball
                     rb.linearVelocity = v;
                     Carom(catcher, ClassifyHit(Height));
                     break;
-                case 1: // bobble — tipped loose: the ball squirts a short way off the
-                        // hands (out of immediate reach) and the catcher can't snatch it
-                        // straight back, so it reads as a fumble, not a clean catch.
-                    rb.linearVelocity = v.normalized * catchTuning.bobbleSquirtSpeed;
-                    heightVelocity = 0f;
-                    recentThrower = catcher;                          // brief no-re-grab window
+                case 1: // bobble — tipped off the hands: a soft pop up-and-off the catcher
+                        // that drops loose nearby. Got a hand on it (no damage) but couldn't
+                        // hold it — visibly the soft cousin of a hard hit ricochet.
+                    rb.linearVelocity = (-v.normalized + Random.insideUnitCircle * 0.4f).normalized
+                                        * catchTuning.bobbleSquirtSpeed;
+                    rb.linearDamping = groundDamping;            // high drag → drops nearby, not flung far
+                    heightVelocity = catchTuning.bobblePopUp;    // gentle upward bounce off the hands
+                    groundedSinceRelease = true;                 // full (snappy) gravity + no scoring catch
+                    recentThrower = catcher;                     // no instant re-grab / re-catch
                     throwerCooldownRemaining = throwerPickupCooldown;
-                    EnterLoose();
+                    state = State.Thrown;
                     break;
                 default: // deflect backward, back toward where it came from
                     rb.linearVelocity = -v * 0.5f;
