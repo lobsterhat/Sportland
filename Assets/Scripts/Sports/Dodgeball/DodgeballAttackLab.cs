@@ -24,7 +24,7 @@ namespace Sportland.Sports.Dodgeball
         [Range(0f, 1f)] public float toughnessReduction = 0.5f;
 
         [Header("Panel")]
-        [SerializeField] private float panelWidth = 460f;
+        [SerializeField] private float panelWidth = 680f;
         [SerializeField] private int rowsShown = 14;
         [SerializeField] private int fontSize = 14;
 
@@ -322,6 +322,7 @@ namespace Sportland.Sports.Dodgeball
                 style.normal.textColor = Color.white;
             }
             style.font = DodgeballUI.Font;   // BoldPixels when assigned in CourtSetup; null = built-in font
+            style.wordWrap = false;          // keep each log row on one line (no clipped wrap)
             if (bg == null)
             {
                 bg = new Texture2D(1, 1);
