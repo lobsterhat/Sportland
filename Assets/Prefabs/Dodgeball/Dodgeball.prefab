@@ -109,16 +109,35 @@ MonoBehaviour:
   m_Enabled: 1
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 5abb7797360ddc5b959eb410876eaccb, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
+  m_Name: 
+  m_EditorClassIdentifier: 
   pickupRadius: 0.6
   catchRadius: 0.9
   throwerPickupCooldown: 0.4
   pickupMaxHeight: 1.5
+  dodgeSampleRadius: 1.5
+  catchArmWindow: 0.35
+  skillSpeedThreshold: 3
+  catchTuning:
+    comfortableSpeed: 8
+    maxSpeed: 36
+  flightDamping: 0.15
+  groundDamping: 2.8
+  wallRestitution: 0.45
   floorOffsetY: -0.79
   carryHeight: 1.29
   lobApex: 0.5
-  gravity: 12
+  passSpeedPerUnit: 0.35
+  maxPassSpeed: 24
+  lobApexPerUnit: 0.15
+  lobClearanceApex: 3.5
+  maxLobApex: 3.5
+  lobLaneRadius: 2
+  lobLateralSpeedMul: 1
+  gravity: 6
+  throwGravityMul: 0.4
+  minReleaseSpeed: 12
+  maxReleaseSpeed: 36
   headZoneMinHeight: 1.4
   limbZoneMaxHeight: 0.6
   thrownToLooseSpeed: 4

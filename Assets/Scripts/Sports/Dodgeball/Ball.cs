@@ -51,7 +51,7 @@ namespace Sportland.Sports.Dodgeball
             [Range(0f, 1f)] public float bobbleBand         = 0.30f;  // bobble zone width below the clean bar
             [Range(0f, 1f)] public float speedTighten       = 0.30f;  // a max-speed ball raises the bar this much
             [Range(0f, 1f)] public float sideFacingTighten  = 0.30f;  // catching off to the side raises the bar
-            [Range(0f, 1f)] public float stanceTighten      = 0.25f;  // flat-footed (no stance) raises the bar
+            [Range(0f, 1f)] public float stanceTighten      = 0.15f;  // flat-footed human (no stance) raises the bar
 
             [Header("AI simulated press (no real button)")]
             [Range(0f, 1f)] public float aiTimingAtRating0  = 0.45f;  // a weak AI's typical timingScore
@@ -707,7 +707,7 @@ namespace Sportland.Sports.Dodgeball
         /// catchers (no real button) get a skill-simulated timingScore. Also used as
         /// a deterministic preview for the HUD.
         /// </summary>
-        public CatchFactors BuildCatchFactors(PlayerZoneTracker catcher)
+        public CatchFactors BuildCatchFactors(PlayerZoneTracker catcher, bool preview = false)
         {
             var f = new CatchFactors { valid = catcher != null };
             if (catcher == null) return f;
@@ -743,10 +743,12 @@ namespace Sportland.Sports.Dodgeball
             f.inStance = move != null && move.InDefensiveStance;
 
             // Clean bar: Catch Technique lowers it; speed / side-facing / no-stance raise it.
+            // The flat-footed penalty is human-only — an AI defender is always "set"
+            // (it can't toggle a stance, and it deliberately armed the catch).
             f.cleanBar = Mathf.Lerp(catchTuning.cleanBarAtRating0, catchTuning.cleanBarAtRating20, f.catching01)
                        + f.speedT * catchTuning.speedTighten
                        + (side ? catchTuning.sideFacingTighten : 0f)
-                       + (f.inStance ? 0f : catchTuning.stanceTighten);
+                       + ((f.human && !f.inStance) ? catchTuning.stanceTighten : 0f);
             f.bobbleBar = Mathf.Max(0f, f.cleanBar - catchTuning.bobbleBand);
 
             // Timing precision. Human = real press (1 right at arrival, → 0 at the edge
@@ -761,7 +763,7 @@ namespace Sportland.Sports.Dodgeball
             {
                 f.timingScore = Mathf.Clamp01(
                     Mathf.Lerp(catchTuning.aiTimingAtRating0, catchTuning.aiTimingAtRating20, f.catching01)
-                    + Random.Range(-catchTuning.aiTimingNoise, catchTuning.aiTimingNoise));
+                    + (preview ? 0f : Random.Range(-catchTuning.aiTimingNoise, catchTuning.aiTimingNoise)));
             }
 
             // Resolve the zone. Facing away can never be a clean catch.
@@ -775,8 +777,8 @@ namespace Sportland.Sports.Dodgeball
             return f;
         }
 
-        /// <summary>Deterministic catch preview for HUD / debug.</summary>
-        public CatchFactors PreviewCatch(PlayerZoneTracker catcher) => BuildCatchFactors(catcher);
+        /// <summary>Deterministic catch preview for HUD / debug (no AI timing noise).</summary>
+        public CatchFactors PreviewCatch(PlayerZoneTracker catcher) => BuildCatchFactors(catcher, preview: true);
 
         private void RecordCatchAttempt(CatchFactors f)
         {
