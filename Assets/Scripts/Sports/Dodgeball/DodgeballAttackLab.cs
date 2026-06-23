@@ -296,7 +296,7 @@ namespace Sportland.Sports.Dodgeball
                 }
             }
 
-            float lh = fontSize + 4f, pad = 8f;
+            float lh = fontSize + 12f, pad = 8f;
             float h = lines.Count * lh + pad * 2f;
             var rect = new Rect(x, 12f, panelWidth, h);
             GUI.DrawTexture(rect, bg);
@@ -321,6 +321,7 @@ namespace Sportland.Sports.Dodgeball
                 style = new GUIStyle(GUI.skin.label) { fontSize = fontSize, richText = false };
                 style.normal.textColor = Color.white;
             }
+            style.font = DodgeballUI.Font;   // BoldPixels when assigned in CourtSetup; null = built-in font
             if (bg == null)
             {
                 bg = new Texture2D(1, 1);
