@@ -37,38 +37,47 @@ namespace Sportland.Sports.Dodgeball
         [System.Serializable]
         public class CatchTuning
         {
-            [Range(0f, 1f)] public float minBaseChance = 0.20f;   // at Catch Technique rating 0
-            [Range(0f, 1f)] public float maxBaseChance = 0.85f;   // at Catch Technique rating 20
-            public float comfortableSpeed = 8f;                   // no speed penalty at/below this
-            public float maxSpeed = 24f;                          // full speed penalty at/above this
-            [Range(0f, 1f)] public float speedPenalty = 0.40f;
-            [Range(0f, 1f)] public float facingBonus = 0.15f;     // facing the ball head-on
-            [Range(0f, 1f)] public float facingPenalty = 0.95f;   // facing fully away
-            [Range(0f, 1f)] public float stancePenalty = 0.35f;   // not set in a defensive stance
-            [Range(0f, 1f)] public float timingBonus = 0.20f;     // press right as the ball arrives
-            [Range(0f, 1f)] public float timingPenalty = 0.30f;   // press at the edge of the window
-            [Range(0f, 1f)] public float luckBonus = 0.15f;       // random upside scaled by luck
+            // Catch is a deterministic timing check — no RNG for a human. The press's
+            // timingScore (1 = right at arrival, → 0 at the edge of the arm window) is
+            // compared to a CLEAN bar and a BOBBLE bar. Catch Technique LOWERS the bars
+            // (softer hands = more timing slop); ball speed and bad facing/stance RAISE
+            // them; facing fully away blocks a clean catch outright.
+            public float comfortableSpeed = 8f;   // u/s at/below which speed doesn't tighten the window
+            public float maxSpeed = 24f;          // u/s at/above which speed tightening is full
+
+            [Header("Clean-catch timing bar (timingScore needed)")]
+            [Range(0f, 1f)] public float cleanBarAtRating0  = 0.85f;  // weak hands: near-perfect timing
+            [Range(0f, 1f)] public float cleanBarAtRating20 = 0.35f;  // soft hands: forgiving
+            [Range(0f, 1f)] public float bobbleBand         = 0.30f;  // bobble zone width below the clean bar
+            [Range(0f, 1f)] public float speedTighten       = 0.30f;  // a max-speed ball raises the bar this much
+            [Range(0f, 1f)] public float sideFacingTighten  = 0.30f;  // catching off to the side raises the bar
+            [Range(0f, 1f)] public float stanceTighten      = 0.25f;  // flat-footed (no stance) raises the bar
+
+            [Header("AI simulated press (no real button)")]
+            [Range(0f, 1f)] public float aiTimingAtRating0  = 0.45f;  // a weak AI's typical timingScore
+            [Range(0f, 1f)] public float aiTimingAtRating20 = 1.00f;  // an elite AI's typical timingScore
+            [Range(0f, 1f)] public float aiTimingNoise      = 0.12f;  // ± wobble on the AI's timing
         }
 
-        /// <summary>Per-term breakdown of a catch chance, for resolution + HUD/debug display.</summary>
+        public enum CatchZone { Miss, Bobble, Clean }
+
+        /// <summary>Per-term breakdown of a catch resolution, for HUD / debug display.</summary>
         public struct CatchFactors
         {
             public bool valid;
-            public float catching01;       // catcher catching rating (0..1)
-            public float luck01;           // catcher luck rating (0..1)
+            public float catching01;       // catcher Catch Technique (0..1)
             public float ballSpeed;        // u/s
-            public float baseChance;       // from catching
-            public float speedPenalty;     // subtracted (the only "throw speed" influence)
+            public float speedT;           // 0..1 speed tightening
             public float facingAlignment;  // -1..1 (+1 = head-on into the ball)
-            public float facingFactor;     // signed
+            public bool  backFacing;       // facing away → no clean catch
             public bool  inStance;         // catcher set in a defensive stance
-            public float stanceFactor;     // signed (penalty when not in stance)
             public bool  armed;            // catch press active
-            public float timingScore;      // 0..1
-            public float timingFactor;     // signed
-            public float luckContribution; // added (0 in preview)
-            public float rawChance;        // unclamped sum
-            public float finalChance;      // clamp01(rawChance)
+            public bool  human;            // human (real timing) vs AI (simulated)
+            public float timingScore;      // 0..1 press precision used in the check
+            public float cleanBar;         // timingScore needed for a clean catch
+            public float bobbleBar;        // timingScore needed for at least a bobble
+            public CatchZone zone;         // resolved outcome
+            public float finalChance;      // 0..1 catch quality (display + recovery difficulty)
         }
 
         /// <summary>Per-throw telemetry: state at release vs at the first live contact.</summary>
@@ -281,7 +290,6 @@ namespace Sportland.Sports.Dodgeball
 
         // Most recent resolved catch attempt — surfaced for the diagnostics HUD.
         public CatchFactors LastCatchFactors { get; private set; }
-        public float LastCatchRoll { get; private set; }
         public bool LastCatchSucceeded { get; private set; }
         public float LastCatchTime { get; private set; } = -999f;
 
@@ -638,11 +646,10 @@ namespace Sportland.Sports.Dodgeball
             if (deliberate && t.CanCatchBall() && t.IsCatchArmed(catchArmWindow) && Height <= PickupHeightFor(t))
             {
                 RecordArrival();
-                var f = BuildCatchFactors(t, applyLuck: true);
-                float roll = Random.value;
-                RecordCatchAttempt(f, roll);
-                if (roll < f.finalChance) { Attach(t); return true; }
-                ResolveMiss(t);
+                var f = BuildCatchFactors(t);
+                RecordCatchAttempt(f);
+                if (f.zone == CatchZone.Clean) { Attach(t); return true; }
+                ResolveMiss(t, bobble: f.zone == CatchZone.Bobble);
                 return true;
             }
 
@@ -694,97 +701,87 @@ namespace Sportland.Sports.Dodgeball
             => t.GetComponent<DodgeballAI>() != null;
 
         /// <summary>
-        /// Builds the full per-term breakdown of a catch chance for a player
-        /// against the ball right now. With applyLuck=false the luck term is
-        /// 0 (deterministic preview for the HUD); with true it rolls the luck
-        /// contribution (used at actual resolution).
+        /// Resolves a catch into Clean / Bobble / Miss from the press timing vs a
+        /// Catch-Technique-sized window (no RNG for a human). Ball speed and bad
+        /// facing/stance tighten the window; facing away blocks a clean catch. AI
+        /// catchers (no real button) get a skill-simulated timingScore. Also used as
+        /// a deterministic preview for the HUD.
         /// </summary>
-        public CatchFactors BuildCatchFactors(PlayerZoneTracker catcher, bool applyLuck)
+        public CatchFactors BuildCatchFactors(PlayerZoneTracker catcher)
         {
             var f = new CatchFactors { valid = catcher != null };
             if (catcher == null) return f;
 
             var catchAttr = catcher.GetComponent<DodgeballAttributes>();
-            var genAttr   = catcher.GetComponent<GeneralAttributes>();
             f.catching01 = catchAttr != null ? catchAttr.EffectiveCatching01 : 0.6f;
-            f.luck01     = genAttr != null ? genAttr.Luck01 : 0.5f;
+            f.human = IsHumanControlled(catcher);
             var move = catcher.GetComponent<PlayerMovement>();
 
-            // Base from catching ability.
-            f.baseChance = Mathf.Lerp(catchTuning.minBaseChance, catchTuning.maxBaseChance, f.catching01);
-
-            // Faster ball = harder. This is the only path throw speed feeds in:
-            // a harder thrower simply produces a higher ballSpeed.
+            // Ball speed tightens the window — a fast ball is inherently harder
+            // because you get less margin. (Replaces the old flat speed penalty.)
             f.ballSpeed = rb.linearVelocity.magnitude;
-            float speedT = Mathf.Clamp01(
+            f.speedT = Mathf.Clamp01(
                 (f.ballSpeed - catchTuning.comfortableSpeed) /
                 Mathf.Max(0.01f, catchTuning.maxSpeed - catchTuning.comfortableSpeed));
-            f.speedPenalty = speedT * catchTuning.speedPenalty;
 
-            // Facing: catcher's Facing vs the ball's incoming direction.
-            // facingAlignment = cos(angle between facing and where the ball
-            // is coming FROM); +1 = looking directly at the incoming ball,
-            // -1 = looking directly away.
-            //
-            // Three-zone stepped penalty (no head-on bonus):
-            //   front 90° cone  (alignment ≥ cos45° ≈ 0.707) → 0 penalty
-            //   side 45° wedges (0 ≤ alignment < 0.707)      → half penalty
-            //   back 180°       (alignment < 0)              → full penalty
-            //
-            // Total wedge coverage: 1/4 front + 1/8 + 1/8 sides + 1/2 back.
+            // Facing: catcher's Facing vs the incoming ball direction. facingAlignment
+            // = +1 looking straight at it, -1 away. Front 90° cone is fine; the side
+            // wedges tighten the bar; the back half blocks a clean catch entirely.
             Vector2 vel = rb.linearVelocity;
             if (vel.sqrMagnitude < 0.0001f && state == State.Passing) vel = passEnd - passStart;
-            if (vel.sqrMagnitude < 0.0001f)
-            {
-                f.facingAlignment = 0f;
-                f.facingFactor = 0f;
-            }
+            bool side = false;
+            if (vel.sqrMagnitude < 0.0001f) { f.facingAlignment = 0f; }
             else
             {
                 Vector2 facing = move != null ? move.Facing : Vector2.right;
                 f.facingAlignment = -Vector2.Dot(facing.normalized, vel.normalized);
-                float penaltyScale;
-                if (f.facingAlignment >= 0.7071068f)      penaltyScale = 0f;     // front quarter
-                else if (f.facingAlignment >= 0f)         penaltyScale = 0.5f;   // side eighths
-                else                                      penaltyScale = 1f;     // back half
-                f.facingFactor = -catchTuning.facingPenalty * penaltyScale;
+                if (f.facingAlignment < 0f)               f.backFacing = true;   // back half
+                else if (f.facingAlignment < 0.7071068f)  side = true;           // side eighths
             }
 
-            // Timing: press-window reaction. Neutral (0) until a catch is armed.
+            // Flat-footed (not in a defensive stance) tightens the bar.
+            f.inStance = move != null && move.InDefensiveStance;
+
+            // Clean bar: Catch Technique lowers it; speed / side-facing / no-stance raise it.
+            f.cleanBar = Mathf.Lerp(catchTuning.cleanBarAtRating0, catchTuning.cleanBarAtRating20, f.catching01)
+                       + f.speedT * catchTuning.speedTighten
+                       + (side ? catchTuning.sideFacingTighten : 0f)
+                       + (f.inStance ? 0f : catchTuning.stanceTighten);
+            f.bobbleBar = Mathf.Max(0f, f.cleanBar - catchTuning.bobbleBand);
+
+            // Timing precision. Human = real press (1 right at arrival, → 0 at the edge
+            // of the arm window). AI = simulated from skill, with a little wobble.
             f.armed = catcher.IsCatchArmed(catchArmWindow);
-            if (f.armed)
+            if (f.human)
             {
                 float sincePress = Time.time - catcher.CatchArmedAt;
                 f.timingScore = Mathf.Clamp01(1f - sincePress / Mathf.Max(0.01f, catchArmWindow));
-                f.timingFactor = Mathf.Lerp(-catchTuning.timingPenalty, catchTuning.timingBonus, f.timingScore);
             }
             else
             {
-                f.timingScore = 0f;
-                f.timingFactor = 0f;
+                f.timingScore = Mathf.Clamp01(
+                    Mathf.Lerp(catchTuning.aiTimingAtRating0, catchTuning.aiTimingAtRating20, f.catching01)
+                    + Random.Range(-catchTuning.aiTimingNoise, catchTuning.aiTimingNoise));
             }
 
-            // Luck: random upside that grows with the luck rating.
-            f.luckContribution = applyLuck ? Random.value * f.luck01 * catchTuning.luckBonus : 0f;
+            // Resolve the zone. Facing away can never be a clean catch.
+            if (!f.backFacing && f.timingScore >= f.cleanBar) f.zone = CatchZone.Clean;
+            else if (f.timingScore >= f.bobbleBar)            f.zone = CatchZone.Bobble;
+            else                                              f.zone = CatchZone.Miss;
 
-            // Defensive stance: a flat-footed catcher (not set) takes a penalty.
-            f.inStance = move != null && move.InDefensiveStance;
-            f.stanceFactor = f.inStance ? 0f : -catchTuning.stancePenalty;
-
-            f.rawChance = f.baseChance - f.speedPenalty
-                        + f.facingFactor + f.stanceFactor + f.timingFactor + f.luckContribution;
-            f.finalChance = Mathf.Clamp01(f.rawChance);
+            // Display / recovery-difficulty proxy: how far past the bobble bar toward
+            // perfect (1 = clean with margin, 0 = on the edge of a bobble).
+            f.finalChance = Mathf.Clamp01((f.timingScore - f.bobbleBar) / Mathf.Max(0.01f, 1f - f.bobbleBar));
             return f;
         }
 
-        /// <summary>Deterministic catch preview (no luck roll) for HUD / debug.</summary>
-        public CatchFactors PreviewCatch(PlayerZoneTracker catcher) => BuildCatchFactors(catcher, false);
+        /// <summary>Deterministic catch preview for HUD / debug.</summary>
+        public CatchFactors PreviewCatch(PlayerZoneTracker catcher) => BuildCatchFactors(catcher);
 
-        private void RecordCatchAttempt(CatchFactors f, float roll)
+        private void RecordCatchAttempt(CatchFactors f)
         {
             LastCatchFactors = f;
-            LastCatchRoll = roll;
-            LastCatchSucceeded = roll < f.finalChance;
+            LastCatchSucceeded = f.zone == CatchZone.Clean;
             LastCatchTime = Time.time;
         }
 
@@ -812,8 +809,9 @@ namespace Sportland.Sports.Dodgeball
             LastThrow = t;
         }
 
-        // A flubbed catch resolves into one of three outcomes at random.
-        private void ResolveMiss(PlayerZoneTracker catcher)
+        // A non-clean catch. A bobble (near miss) is tipped loose at the catcher's
+        // feet — recoverable. A harder miss caroms or deflects off them (can hit).
+        private void ResolveMiss(PlayerZoneTracker catcher, bool bobble)
         {
             rb.simulated = true;
             Vector2 v = rb.linearVelocity;
@@ -824,7 +822,11 @@ namespace Sportland.Sports.Dodgeball
                 v = dir.sqrMagnitude > 0.0001f ? dir.normalized * 6f : Vector2.right * 6f;
             }
 
-            switch (Random.Range(0, 3))
+            // Bobble → fumble at the feet (case 1). Miss → carom (case 0, 60%) or
+            // deflect backward (case 2). Keeps clean catches deterministic while the
+            // failure flavor stays chaotic.
+            int outcome = bobble ? 1 : (Random.value < 0.6f ? 0 : 2);
+            switch (outcome)
             {
                 case 0: // carom off the catcher (a "hit")
                     rb.linearVelocity = v;

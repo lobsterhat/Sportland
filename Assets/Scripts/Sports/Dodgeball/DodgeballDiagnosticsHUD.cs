@@ -250,13 +250,10 @@ namespace Sportland.Sports.Dodgeball
             else
             {
                 var f = cachedBall.PreviewCatch(tracker);
-                lines.Add($"catching {f.catching01:F2}    base   +{f.baseChance:F2}");
-                lines.Add($"ballspd {f.ballSpeed:F1} u/s ({DodgeballUnits.ToMph(f.ballSpeed):F0}mph) -spd {f.speedPenalty:F2}");
-                lines.Add($"facing  a{f.facingAlignment,5:F2}   {Signed(f.facingFactor)} fac");
-                lines.Add($"stance  {(f.inStance ? "Y" : "n")}        {Signed(f.stanceFactor)} stn");
-                lines.Add($"armed {(f.armed ? "Y" : "n")}  t{f.timingScore:F2}    {Signed(f.timingFactor)} time");
-                lines.Add($"luck {f.luck01:F2} (roll adds 0..{f.luck01 * 0.15f:F2})");
-                lines.Add($"= preview chance {Pct(f.finalChance)}  (no luck)");
+                lines.Add($"catchTech {f.catching01:F2}   ballspd {f.ballSpeed:F1} u/s ({DodgeballUnits.ToMph(f.ballSpeed):F0}mph)");
+                lines.Add($"facing a{f.facingAlignment,5:F2}{(f.backFacing ? " BACK(no clean)" : "")}   stance {(f.inStance ? "Y" : "n")}");
+                lines.Add($"timing {f.timingScore:F2}  vs clean {f.cleanBar:F2} / bobble {f.bobbleBar:F2}");
+                lines.Add($"= {f.zone}  (quality {Pct(f.finalChance)})");
             }
 
             lines.Add("-------- last attempt --------");
@@ -264,9 +261,8 @@ namespace Sportland.Sports.Dodgeball
             {
                 var lf = cachedBall.LastCatchFactors;
                 float ago = Time.time - cachedBall.LastCatchTime;
-                string result = cachedBall.LastCatchSucceeded ? "CAUGHT" : "MISS";
-                lines.Add($"chance {Pct(lf.finalChance)}  (+luck {lf.luckContribution:F2})");
-                lines.Add($"roll {cachedBall.LastCatchRoll:F2} -> {result}  ({ago:F1}s ago)");
+                lines.Add($"timing {lf.timingScore:F2} vs clean {lf.cleanBar:F2}");
+                lines.Add($"-> {lf.zone} ({(lf.human ? "human" : "AI")})  {ago:F1}s ago");
             }
             else
             {
