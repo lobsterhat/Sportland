@@ -196,6 +196,10 @@ namespace Sportland.Sports.Dodgeball
             if (ai != null) ai.enabled = false;            // no movement, no catch-arming → it just takes hits
             var rb = t.GetComponent<Rigidbody2D>();
             if (rb != null) { rb.linearVelocity = Vector2.zero; rb.bodyType = RigidbodyType2D.Kinematic; }
+            // Tuning target: keep it fresh so its catch reflects the RATING you set,
+            // not fatigue (a frozen dummy would otherwise never recover stamina).
+            var stam = t.GetComponent<PlayerStamina>();
+            if (stam != null) { stam.current = 1f; stam.enabled = false; }
         }
 
         private void EnsureSubscribed()
@@ -271,7 +275,7 @@ namespace Sportland.Sports.Dodgeball
             if (mode == DummyMode.NoCatch || dummy == null) return;
             var ca = dummy.GetComponent<DodgeballAttributes>();
             if (ca != null)
-                lines.Add($"  dummy catch: {ca.CatchTechniqueGrade}  (rating {ca.catchTechniqueRating:0}/20)");
+                lines.Add($"  dummy catch: {ca.CatchTechniqueGrade}  (rating {ca.catchTechniqueRating:0}/20, eff {ca.EffectiveCatching01:F2})");
             if (ball == null || ball.CurrentState != Ball.State.Thrown) return;
             var f = ball.PreviewCatch(dummy);
             lines.Add($"  ballspd {f.ballSpeed:F0} u/s  spdT {f.speedT:F2}  facing a{f.facingAlignment:F2}{(f.backFacing ? " BACK" : "")}");
