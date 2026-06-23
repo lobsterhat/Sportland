@@ -257,14 +257,19 @@ namespace Sportland.Sports.Dodgeball
             if (autoReturnBall) returnPending = true;
         }
 
-        // Live (deterministic, no-luck) catch chance for the dummy vs the
-        // in-flight ball at its current facing — shows how the facing penalty
-        // moves the number before the catch even resolves.
-        private string LivePreview()
+        // The dummy's catch breakdown — its Catch Technique grade, and while a ball
+        // is in flight the live timing-vs-bars zone (deterministic preview, no AI
+        // noise) — so you can dial the catch window against it.
+        private void AddDummyCatchLines(List<string> lines)
         {
-            if (mode == DummyMode.NoCatch || ball == null || dummy == null
-                || ball.CurrentState != Ball.State.Thrown) return "";
-            return $"   live catch {ball.PreviewCatch(dummy).finalChance * 100f:F0}%";
+            if (mode == DummyMode.NoCatch || dummy == null) return;
+            var ca = dummy.GetComponent<DodgeballAttributes>();
+            if (ca != null)
+                lines.Add($"  dummy catch: {ca.CatchTechniqueGrade}  (rating {ca.catchTechniqueRating:0}/20)");
+            if (ball == null || ball.CurrentState != Ball.State.Thrown) return;
+            var f = ball.PreviewCatch(dummy);
+            lines.Add($"  ballspd {f.ballSpeed:F0} u/s  spdT {f.speedT:F2}  facing a{f.facingAlignment:F2}{(f.backFacing ? " BACK" : "")}");
+            lines.Add($"  timing {f.timingScore:F2}(exp) vs clean {f.cleanBar:F2}/bobble {f.bobbleBar:F2} -> {f.zone}");
         }
 
         private void OnGUI()
@@ -278,7 +283,8 @@ namespace Sportland.Sports.Dodgeball
             if (dummy == null) lines.Add("(no dummy — control an attacker, non-AI mode)");
             else
             {
-                lines.Add($"dummy: {mode}{LivePreview()}   [T cycles · drag to move · L1 returns ball]");
+                lines.Add($"dummy: {mode}   [T cycles · drag to move · L1 returns ball]");
+                AddDummyCatchLines(lines);
                 if (log.Count == 0)
                 {
                     lines.Add("(attack the dummy to log throws)");
