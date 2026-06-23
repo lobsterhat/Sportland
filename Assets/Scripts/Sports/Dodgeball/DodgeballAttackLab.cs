@@ -289,7 +289,7 @@ namespace Sportland.Sports.Dodgeball
             var lines = new List<string> { "== ATTACK LAB (click = copy all) ==" };
             var atkAttr = attacker != null ? attacker.GetComponent<DodgeballAttributes>() : null;
             if (atkAttr != null)
-                lines.Add($"attacker throw spd: {atkAttr.ThrowSpeedGrade}  (rating {atkAttr.throwSpeedRating:0}/20)");
+                lines.Add($"attacker: throwSpd {atkAttr.ThrowSpeedGrade} {atkAttr.throwSpeedRating:0}   throwAcc {atkAttr.ThrowAccuracyGrade} {atkAttr.throwAccuracyRating:0} (eff {atkAttr.EffectiveThrowAccuracy01:F2})");
             if (dummy == null) lines.Add("(no dummy — control an attacker, non-AI mode)");
             else
             {

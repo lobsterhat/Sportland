@@ -1149,7 +1149,9 @@ namespace Sportland.Sports.Dodgeball
             LastTargetDodge = DodgeKind.None;
             LastReleaseWasThrow = true;
             state = State.Thrown;
-            RecordRelease(power);
+            // Record the ACTUAL release speed (carrier momentum included), so the lab's
+            // "spd" differs from the commanded "pow" on running / crow-hop throws.
+            RecordRelease(rb.linearVelocity.magnitude);
             OnReleased?.Invoke(recentThrower, IntendedTarget, true);
         }
 
