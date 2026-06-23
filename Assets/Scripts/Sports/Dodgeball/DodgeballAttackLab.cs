@@ -57,7 +57,7 @@ namespace Sportland.Sports.Dodgeball
         private float pendingSpeed;
         private bool havePending;
         private DummyMode pendingMode;        // dummy mode at the time of the pending throw
-        private float pendingCatchChance;     // catch chance at resolution (Face* modes)
+        private Ball.CatchFactors pendingCatch;   // catch factors at resolution (Face* modes)
         private PlayerZoneTracker attacker;
         private PlayerMovement dummyMove;
         private bool returnPending;           // defer the ball return a frame (avoid event re-entrancy)
@@ -226,30 +226,36 @@ namespace Sportland.Sports.Dodgeball
             if (!havePending) return;
             float tough = victim != null && victim.TryGetComponent<GeneralAttributes>(out var g) ? g.Toughness01 : 0.5f;
             float dmg = ballSpeed * damagePerSpeed * (1f - tough * toughnessReduction);
-            pendingCatchChance = (pendingMode != DummyMode.NoCatch && ball != null) ? ball.LastCatchFactors.finalChance : -1f;
+            pendingCatch = ball != null ? ball.LastCatchFactors : default;
             RecordRow($"HIT ({zone}) dmg {dmg:F1}");
         }
 
-        // The dummy caught the user's throw (Face* mode): log the facing-based
-        // catch chance and outcome — no damage.
+        // The dummy caught the user's throw (Face* mode): log the catch factors
+        // and outcome — no damage.
         private void OnCaught(PlayerZoneTracker catcher)
         {
             if (!havePending || catcher != dummy) return;
-            pendingCatchChance = ball != null ? ball.LastCatchFactors.finalChance : 0f;
+            pendingCatch = ball != null ? ball.LastCatchFactors : default;
             RecordRow("CAUGHT");
         }
 
         private void OnLoose()
         {
-            if (havePending) RecordRow("miss");
+            if (!havePending) return;
+            pendingCatch = ball != null ? ball.LastCatchFactors : default;
+            // A bobble fumbles the ball loose — got hands on it but dropped it —
+            // which is distinct from a clean miss (didn't get to it).
+            string outcome = pendingCatch.valid && pendingCatch.zone == Ball.CatchZone.Bobble ? "BOBBLE" : "miss";
+            RecordRow(outcome);
         }
 
         private void RecordRow(string outcome)
         {
             var p = pending;
             string acc = p.aimError >= 0f ? $"{p.aimError:F2}u" : "n/a";
-            string face = pendingMode != DummyMode.NoCatch
-                ? $"  {pendingMode} catch {Mathf.Max(0f, pendingCatchChance) * 100f:F0}%"
+            // Catch detail at resolution: actual timing vs the clean / bobble bars.
+            string face = (pendingMode != DummyMode.NoCatch && pendingCatch.valid)
+                ? $"  {pendingMode} t{pendingCatch.timingScore:F2} c{pendingCatch.cleanBar:F2}/b{pendingCatch.bobbleBar:F2}"
                 : "";
             log.Add($"{p.type,-10} [{p.input}]  pow {p.power,4:F0}  spd {pendingSpeed,4:F0}  acc {acc,6}{face}  {outcome}");
             while (log.Count > 60) log.RemoveAt(0);
