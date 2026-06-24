@@ -228,6 +228,11 @@ namespace Sportland.Sports.Dodgeball
                     t.gameObject.SetActive(false);
                 }
             }
+            // Keep the attacker fresh too (like the dummy) so swept/lab throws reflect
+            // the rating set, not fatigue drift over a long sweep.
+            var astam = attacker != null ? attacker.GetComponent<PlayerStamina>() : null;
+            if (astam != null) { astam.current = 1f; astam.enabled = false; }
+
             PlaceDummyStart();       // park the dummy at its start pos, facing the thrower
             ApplyStartingGrades();   // attacker throw stats + dummy catch all start at C
         }
