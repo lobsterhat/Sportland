@@ -267,6 +267,7 @@ namespace Sportland.Sports.Dodgeball
         {
             if (sweeping) { sweeping = false; return; }
             if (attacker == null || dummy == null || ball == null) return;
+            if (mode == DummyMode.NoCatch) mode = DummyMode.FaceToward;   // a catch sweep needs the dummy catching
             System.Array.Clear(sweepCaught, 0, sweepCaught.Length);
             System.Array.Clear(sweepBobble, 0, sweepBobble.Length);
             System.Array.Clear(sweepHit,    0, sweepHit.Length);
