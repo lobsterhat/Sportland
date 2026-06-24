@@ -62,6 +62,12 @@ namespace Sportland.Sports.Dodgeball
         private PlayerMovement dummyMove;
         private bool returnPending;           // defer the ball return a frame (avoid event re-entrancy)
 
+        // Grade-cycle keys (',' throwSpeed · '.' throwAccuracy on the attacker · '/' dummy
+        // catch): start at C, each press steps to the next grade UP — C→B→A→S→F→E→D→C.
+        // Values are the rating midpoint of each grade in that order.
+        private static readonly int[] gradeCycle = { 10, 13, 16, 19, 1, 4, 7 };  // C B A S F E D
+        private int spdGradeIdx, accGradeIdx, catchGradeIdx;   // 0 = C
+
         private GUIStyle style;
         private Texture2D bg;
         private float copiedUntil;
@@ -96,10 +102,16 @@ namespace Sportland.Sports.Dodgeball
             if (pad != null && pad.leftShoulder.wasPressedThisFrame && attacker != null && ball != null)
                 ball.ForcePickup(attacker);
 
-            // T cycles the dummy mode.
+            // T cycles the dummy mode; , / . / / step grades (C→B→A→S→F→E→D).
             var kb = Keyboard.current;
-            if (kb != null && kb.tKey.wasPressedThisFrame)
-                mode = (DummyMode)(((int)mode + 1) % 4);
+            if (kb != null)
+            {
+                if (kb.tKey.wasPressedThisFrame)
+                    mode = (DummyMode)(((int)mode + 1) % 4);
+                if (kb.commaKey.wasPressedThisFrame)  CycleGrade(ref spdGradeIdx,   attacker, (a, r) => a.throwSpeedRating    = r);
+                if (kb.periodKey.wasPressedThisFrame) CycleGrade(ref accGradeIdx,   attacker, (a, r) => a.throwAccuracyRating = r);
+                if (kb.slashKey.wasPressedThisFrame)  CycleGrade(ref catchGradeIdx, dummy,    (a, r) => a.catchTechniqueRating = r);
+            }
 
             // Catching modes: orient the dummy per the mode (relative to the
             // attacker) and arm a catch on an incoming thrown ball so the
@@ -188,6 +200,27 @@ namespace Sportland.Sports.Dodgeball
                     t.gameObject.SetActive(false);
                 }
             }
+            ApplyStartingGrades();   // attacker throw stats + dummy catch all start at C
+        }
+
+        // The grade-cycle keys start everyone at C.
+        private void ApplyStartingGrades()
+        {
+            spdGradeIdx = accGradeIdx = catchGradeIdx = 0;
+            var atk = attacker != null ? attacker.GetComponent<DodgeballAttributes>() : null;
+            if (atk != null) { atk.throwSpeedRating = gradeCycle[0]; atk.throwAccuracyRating = gradeCycle[0]; }
+            var dca = dummy != null ? dummy.GetComponent<DodgeballAttributes>() : null;
+            if (dca != null) dca.catchTechniqueRating = gradeCycle[0];
+        }
+
+        // Advance one grade up the cycle and apply the new rating.
+        private void CycleGrade(ref int idx, PlayerZoneTracker who, System.Action<DodgeballAttributes, float> apply)
+        {
+            if (who == null) return;
+            var a = who.GetComponent<DodgeballAttributes>();
+            if (a == null) return;
+            idx = (idx + 1) % gradeCycle.Length;
+            apply(a, gradeCycle[idx]);
         }
 
         private static void FreezeDummy(PlayerZoneTracker t)
@@ -290,6 +323,7 @@ namespace Sportland.Sports.Dodgeball
             var atkAttr = attacker != null ? attacker.GetComponent<DodgeballAttributes>() : null;
             if (atkAttr != null)
                 lines.Add($"attacker: throwSpd {atkAttr.ThrowSpeedGrade} {atkAttr.throwSpeedRating:0}   throwAcc {atkAttr.ThrowAccuracyGrade} {atkAttr.throwAccuracyRating:0} (eff {atkAttr.EffectiveThrowAccuracy01:F2})");
+            lines.Add("  keys: ,=throwSpd  .=throwAcc  /=dummyCatch   (step C→B→A→S→F→E→D)");
             if (dummy == null) lines.Add("(no dummy — control an attacker, non-AI mode)");
             else
             {
