@@ -373,6 +373,30 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
+        /// <summary>
+        /// Programmatic throw at a target for the attack-lab auto-sweep: same power /
+        /// aim / accuracy-scatter + telemetry as a human release at the given charge,
+        /// with no crow hop and no settle penalty. Caller must give this player the ball first.
+        /// </summary>
+        public void AutoThrowAt(PlayerZoneTracker target, float charge01)
+        {
+            var ball = tracker.HeldBall;
+            if (ball == null || target == null) return;
+            charge01 = Mathf.Clamp01(charge01);
+            const float settle01 = 1f, crow01 = 0f;
+
+            float power = ThrowReleaseSpeed()
+                        * Mathf.Lerp(tapPowerFraction, 1f, charge01)
+                        * Mathf.Lerp(settlePowerFloor, 1f, settle01);
+
+            ball.IntendedTarget = target;
+            Vector2 lead = ball.LeadAim(transform.position, target.transform.position,
+                                        TargetVelocity(target), power, OwnAnticipation01());
+            Vector2 aim = ApplyAccuracyToAim(lead, charge01, settle01, crow01);
+            CaptureUserAttack(charge01 * maxChargeTime, crow01, settle01, power, target, aim);
+            ball.ThrowAt(aim, power);
+        }
+
         // Snapshot the attack's execution for the tuning lab: classify the type
         // from the movement state and summarize the input (run / charge / crow /
         // settle), the computed power, and the aim error vs the target center.

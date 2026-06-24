@@ -68,6 +68,26 @@ namespace Sportland.Sports.Dodgeball
         private static readonly int[] gradeCycle = { 10, 13, 16, 19, 1, 4, 7 };  // C B A S F E D
         private int spdGradeIdx, accGradeIdx, catchGradeIdx;   // 0 = C
 
+        [Header("Dummy start")]
+        [SerializeField] private Vector2 dummyStartPos = new Vector2(4.5f, 0f);
+
+        [Header("Auto sweep (Enter to start/stop)")]
+        [SerializeField] private int throwsPerGrade = 50;
+        [SerializeField] private float autoThrowInterval = 0.4f;   // gap after a throw resolves
+        [SerializeField] private float autoThrowTimeout = 3f;      // watchdog if a throw never resolves
+        // Sweep throw-speed F→S (ascending) so the summary reads in order.
+        private static readonly int[]    sweepRatings = { 1, 4, 7, 10, 13, 16, 19 };
+        private static readonly string[] sweepLabels  = { "F", "E", "D", "C", "B", "A", "S" };
+        private readonly int[] sweepCaught = new int[7];
+        private readonly int[] sweepBobble = new int[7];
+        private readonly int[] sweepHit    = new int[7];
+        private bool sweeping;
+        private int sweepIdx;            // current grade (index into sweepRatings)
+        private int sweepDone;           // throws resolved at the current grade
+        private bool awaitingResolve;    // a throw is in flight
+        private float nextAutoThrow;     // when to fire the next throw
+        private float resolveDeadline;   // watchdog
+
         private GUIStyle style;
         private Texture2D bg;
         private float copiedUntil;
@@ -111,6 +131,14 @@ namespace Sportland.Sports.Dodgeball
                 if (kb.commaKey.wasPressedThisFrame)  CycleGrade(ref spdGradeIdx,   attacker, (a, r) => a.throwSpeedRating    = r);
                 if (kb.periodKey.wasPressedThisFrame) CycleGrade(ref accGradeIdx,   attacker, (a, r) => a.throwAccuracyRating = r);
                 if (kb.slashKey.wasPressedThisFrame)  CycleGrade(ref catchGradeIdx, dummy,    (a, r) => a.catchTechniqueRating = r);
+                if (kb.enterKey.wasPressedThisFrame)  ToggleSweep();
+            }
+
+            // Auto-sweep: fire throws on a cadence; OnSweepThrowResolved tallies + advances grade.
+            if (sweeping)
+            {
+                if (awaitingResolve) { if (Time.time >= resolveDeadline) OnSweepThrowResolved("miss"); }   // watchdog
+                else if (Time.time >= nextAutoThrow) FireAutoThrow();
             }
 
             // Catching modes: orient the dummy per the mode (relative to the
@@ -200,6 +228,7 @@ namespace Sportland.Sports.Dodgeball
                     t.gameObject.SetActive(false);
                 }
             }
+            PlaceDummyStart();       // park the dummy at its start pos, facing the thrower
             ApplyStartingGrades();   // attacker throw stats + dummy catch all start at C
         }
 
@@ -221,6 +250,69 @@ namespace Sportland.Sports.Dodgeball
             if (a == null) return;
             idx = (idx + 1) % gradeCycle.Length;
             apply(a, gradeCycle[idx]);
+        }
+
+        // Park the dummy at its configured start position, facing the thrower.
+        private void PlaceDummyStart()
+        {
+            if (dummy == null) return;
+            var p = dummy.transform.position;
+            dummy.transform.position = new Vector3(dummyStartPos.x, dummyStartPos.y, p.z);
+            if (dummyMove != null) dummyMove.SetFacing(AttackerDir());
+        }
+
+        // Enter starts/stops the auto-sweep: throwsPerGrade full-charge throws at the
+        // dummy for each throw-speed grade F→S, tallying caught / bobble / hit.
+        private void ToggleSweep()
+        {
+            if (sweeping) { sweeping = false; return; }
+            if (attacker == null || dummy == null || ball == null) return;
+            System.Array.Clear(sweepCaught, 0, sweepCaught.Length);
+            System.Array.Clear(sweepBobble, 0, sweepBobble.Length);
+            System.Array.Clear(sweepHit,    0, sweepHit.Length);
+            sweepIdx = 0;
+            sweepDone = 0;
+            SetThrowRating(sweepRatings[0]);
+            awaitingResolve = false;
+            nextAutoThrow = Time.time + 0.3f;
+            sweeping = true;
+        }
+
+        private void SetThrowRating(int rating)
+        {
+            var a = attacker != null ? attacker.GetComponent<DodgeballAttributes>() : null;
+            if (a != null) a.throwSpeedRating = rating;
+        }
+
+        // Give the attacker the ball and fire a full-charge auto-throw at the dummy.
+        private void FireAutoThrow()
+        {
+            var input = attacker != null ? attacker.GetComponent<DodgeballPlayerInput>() : null;
+            if (input == null || dummy == null || ball == null) { sweeping = false; return; }
+            ball.ForcePickup(attacker);
+            input.AutoThrowAt(dummy, 1f);   // full charge → the grade's nominal speed
+            awaitingResolve = true;
+            resolveDeadline = Time.time + autoThrowTimeout;
+        }
+
+        // A swept throw resolved — tally it and advance the grade after throwsPerGrade.
+        private void OnSweepThrowResolved(string outcome)
+        {
+            havePending = false;            // discard this throw's pending state (covers the watchdog)
+            awaitingResolve = false;
+            int g = Mathf.Clamp(sweepIdx, 0, sweepRatings.Length - 1);
+            if (outcome == "CAUGHT")      sweepCaught[g]++;
+            else if (outcome == "BOBBLE") sweepBobble[g]++;
+            else                          sweepHit[g]++;   // HIT / miss / watchdog
+            sweepDone++;
+            if (sweepDone >= throwsPerGrade)
+            {
+                sweepIdx++;
+                sweepDone = 0;
+                if (sweepIdx >= sweepRatings.Length) { sweeping = false; return; }
+                SetThrowRating(sweepRatings[sweepIdx]);
+            }
+            nextAutoThrow = Time.time + autoThrowInterval;
         }
 
         private static void FreezeDummy(PlayerZoneTracker t)
@@ -297,7 +389,8 @@ namespace Sportland.Sports.Dodgeball
             log.Add($"{p.type,-10} [{p.input}]  pow {p.power,4:F0}  spd {pendingSpeed,4:F0}  acc {acc,6}{face}  {outcome}");
             while (log.Count > 60) log.RemoveAt(0);
             havePending = false;
-            if (autoReturnBall) returnPending = true;
+            if (autoReturnBall && !sweeping) returnPending = true;
+            if (sweeping) OnSweepThrowResolved(outcome);
         }
 
         // The dummy's catch breakdown — its Catch Technique grade, and while a ball
@@ -315,6 +408,30 @@ namespace Sportland.Sports.Dodgeball
             lines.Add($"  timing {f.timingScore:F2}(exp) vs clean {f.cleanBar:F2}/bobble {f.bobbleBar:F2} -> {f.zone}");
         }
 
+        // Auto-sweep results: per throw-grade caught / bobble / hit vs the current dummy.
+        private void AddSweepLines(List<string> lines)
+        {
+            int reached = sweeping ? sweepIdx : -1;
+            bool hasData = false;
+            for (int i = 0; i < sweepRatings.Length; i++)
+                if (sweepCaught[i] + sweepBobble[i] + sweepHit[i] > 0) { hasData = true; break; }
+            if (!sweeping && !hasData) return;
+
+            var ca = dummy != null ? dummy.GetComponent<DodgeballAttributes>() : null;
+            string catcher = ca != null ? ca.CatchTechniqueGrade : "?";
+            string status = sweeping
+                ? $"running {sweepLabels[Mathf.Min(sweepIdx, 6)]} {sweepDone}/{throwsPerGrade}  [Enter stops]"
+                : "done";
+            lines.Add($"== SWEEP: catcher {catcher} vs throwSpd  ({status}) ==");
+            lines.Add($"  grade  caught bobble  hit  (of {throwsPerGrade})");
+            for (int i = 0; i < sweepRatings.Length; i++)
+            {
+                int total = sweepCaught[i] + sweepBobble[i] + sweepHit[i];
+                if (total == 0 && i > reached) continue;   // not reached yet
+                lines.Add($"   {sweepLabels[i],-5} {sweepCaught[i],5} {sweepBobble[i],6} {sweepHit[i],5}");
+            }
+        }
+
         private void OnGUI()
         {
             EnsureStyle();
@@ -323,12 +440,13 @@ namespace Sportland.Sports.Dodgeball
             var atkAttr = attacker != null ? attacker.GetComponent<DodgeballAttributes>() : null;
             if (atkAttr != null)
                 lines.Add($"attacker: throwSpd {atkAttr.ThrowSpeedGrade} {atkAttr.throwSpeedRating:0}   throwAcc {atkAttr.ThrowAccuracyGrade} {atkAttr.throwAccuracyRating:0} (eff {atkAttr.EffectiveThrowAccuracy01:F2})");
-            lines.Add("  keys: ,=throwSpd  .=throwAcc  /=dummyCatch   (step C→B→A→S→F→E→D)");
+            lines.Add("  keys: ,=throwSpd  .=throwAcc  /=dummyCatch  Enter=sweep50   (grades C→B→A→S→F→E→D)");
             if (dummy == null) lines.Add("(no dummy — control an attacker, non-AI mode)");
             else
             {
                 lines.Add($"dummy: {mode}   [T cycles · drag to move · L1 returns ball]");
                 AddDummyCatchLines(lines);
+                AddSweepLines(lines);
                 if (log.Count == 0)
                 {
                     lines.Add("(attack the dummy to log throws)");
