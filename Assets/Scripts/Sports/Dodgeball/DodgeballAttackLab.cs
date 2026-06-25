@@ -72,7 +72,7 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private Vector2 dummyStartPos = new Vector2(4.5f, 0f);
 
         [Header("Auto sweep (Enter to start/stop)")]
-        [SerializeField] private int throwsPerGrade = 50;
+        [SerializeField] private int throwsPerGrade = 100;
         [SerializeField] private float autoThrowInterval = 0.4f;   // gap after a throw resolves
         [SerializeField] private float autoThrowTimeout = 3f;      // watchdog if a throw never resolves
         // Sweep throw-speed F→S (ascending) so the summary reads in order.
