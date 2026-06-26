@@ -1036,6 +1036,9 @@ namespace Sportland.Sports.Dodgeball
             t.HeldBall = this;
             rb.linearVelocity = Vector2.zero;
             rb.simulated = false;
+            // Snap to hand height NOW (not next UpdateCarried) so a throw fired the
+            // same frame as the pickup releases from chest, not from the feet.
+            Height = carryHeight + (carrierMovement != null ? carrierMovement.CurrentJumpHeight : 0f);
             state = State.Carried;
             OnAttached?.Invoke(t);
         }
