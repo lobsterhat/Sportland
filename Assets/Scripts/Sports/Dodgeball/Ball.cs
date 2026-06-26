@@ -59,8 +59,8 @@ namespace Sportland.Sports.Dodgeball
             [Range(0f, 1f)] public float aiTimingNoise      = 0.12f;  // ± wobble on the AI's timing
 
             [Header("Bobble")]
-            public float bobbleSquirtSpeed = 5f;   // lateral speed (u/s) as a tipped ball pops off the hands
-            public float bobblePopUp       = 3f;   // upward pop (height velocity) — the gentle bounce off the hands
+            public float bobbleKeepFraction = 0.25f;  // fraction of the incoming ball speed a tipped ball keeps (a hot throw squirts off harder)
+            public float bobblePopUp        = 3f;      // base upward pop off the hands (randomized ±50% per bobble)
         }
 
         public enum CatchZone { Miss, Bobble, Clean }
@@ -838,13 +838,14 @@ namespace Sportland.Sports.Dodgeball
                     rb.linearVelocity = v;
                     Carom(catcher, ClassifyHit(Height));
                     break;
-                case 1: // bobble — tipped off the hands: a soft pop up-and-off the catcher
-                        // that drops loose nearby. Got a hand on it (no damage) but couldn't
-                        // hold it — visibly the soft cousin of a hard hit ricochet.
-                    rb.linearVelocity = (-v.normalized + Random.insideUnitCircle * 0.4f).normalized
-                                        * catchTuning.bobbleSquirtSpeed;
-                    rb.linearDamping = groundDamping;            // high drag → drops nearby, not flung far
-                    heightVelocity = catchTuning.bobblePopUp;    // gentle upward bounce off the hands
+                case 1: // bobble — a flubbed catch off the hands/arms. Deflects in a varied
+                        // direction, keeps a FRACTION of the incoming pace (a hot throw squirts
+                        // off harder than a soft one), and pops up catchable. No damage;
+                        // re-grabbable by the catcher or a teammate after the brief cooldown.
+                    rb.linearVelocity = (-v.normalized + Random.insideUnitCircle * 0.8f).normalized
+                                        * v.magnitude * catchTuning.bobbleKeepFraction * Random.Range(0.7f, 1.3f);
+                    rb.linearDamping = groundDamping;            // high drag → settles loose, not flung far
+                    heightVelocity = catchTuning.bobblePopUp * Random.Range(0.5f, 1.5f);   // varied pop off the hands
                     groundedSinceRelease = true;                 // full (snappy) gravity + no scoring catch
                     recentThrower = catcher;                     // no instant re-grab / re-catch
                     throwerCooldownRemaining = throwerPickupCooldown;
