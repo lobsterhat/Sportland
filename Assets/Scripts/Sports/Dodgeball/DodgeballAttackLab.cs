@@ -69,9 +69,9 @@ namespace Sportland.Sports.Dodgeball
         private int spdGradeIdx, accGradeIdx, catchGradeIdx;   // 0 = C
 
         [Header("Dummy start")]
-        [SerializeField] private Vector2 dummyStartPos = new Vector2(4.5f, 0f);
-        [Tooltip("Catch sweep: place the dummy this many units in front of the attacker (toward the opposing side) so even slow F-grade throws arrive at catch height instead of drooping short and rolling. 0 = use the absolute dummyStartPos instead.")]
-        [SerializeField] private float dummyDistance = 6f;
+        [SerializeField] private Vector2 dummyStartPos = new Vector2(0f, 0f);   // middle of the court
+        [Tooltip("If > 0, place the dummy this many units in front of the attacker (toward the opposing side) instead of the absolute dummyStartPos. 0 = use dummyStartPos.")]
+        [SerializeField] private float dummyDistance = 0f;
 
         [Header("Auto sweep (Enter to start/stop)")]
         [SerializeField] private int throwsPerGrade = 100;
