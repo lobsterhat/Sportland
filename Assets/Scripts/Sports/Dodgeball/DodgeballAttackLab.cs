@@ -390,7 +390,7 @@ namespace Sportland.Sports.Dodgeball
             string acc = p.aimError >= 0f ? $"{p.aimError:F2}u" : "n/a";
             // Catch detail at resolution: actual timing vs the clean / bobble bars.
             string face = (pendingMode != DummyMode.NoCatch && pendingCatch.valid)
-                ? $"  {pendingMode} t{pendingCatch.timingScore:F2} c{pendingCatch.cleanBar:F2}/b{pendingCatch.bobbleBar:F2}"
+                ? $"  {pendingMode} {(pendingCatch.human ? "HU" : "AI")} sp{pendingCatch.ballSpeed:F0} t{pendingCatch.timingScore:F2} c{pendingCatch.cleanBar:F2}/b{pendingCatch.bobbleBar:F2}"
                 : "";
             log.Add($"{p.type,-10} [{p.input}]  pow {p.power,4:F0}  spd {pendingSpeed,4:F0}  acc {acc,6}{face}  {outcome}");
             while (log.Count > 60) log.RemoveAt(0);
