@@ -69,7 +69,7 @@ namespace Sportland.Sports.Dodgeball
         private int spdGradeIdx, accGradeIdx, catchGradeIdx;   // 0 = C
 
         [Header("Dummy start")]
-        [SerializeField] private Vector2 dummyStartPos = new Vector2(0f, 0f);   // middle of the court
+        [SerializeField] private Vector2 dummyStartPos = new Vector2(4.5f, 0f);   // center of the catcher's (opposing) zone
         [Tooltip("If > 0, place the dummy this many units in front of the attacker (toward the opposing side) instead of the absolute dummyStartPos. 0 = use dummyStartPos.")]
         [SerializeField] private float dummyDistance = 0f;
 
