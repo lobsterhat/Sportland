@@ -25,6 +25,28 @@ A multi-sport arcade sports-RPG with a large, persistent player pool. Sports sha
 core (court/field, movement, possession, collisions), each adds its own rules and
 stats, and players carry their attributes + Special Abilities across sports.
 
+The career is the spine: **You** assemble teams across sports and chase the top-level
+championship. Players overlap between sports and teams, and progress is uneven — You
+might be A-League dodgeball but D-League ice hockey — so the game must hold up across
+*wildly* different skill levels, including F-heavy rosters early in the story.
+
+## Design tenet: skill floor & ceiling
+
+**F is a playable floor, not a broken one.** The gap from F to S must be **huge in
+reliability and magnitude** — an S team genuinely slaughters an F team — but it is
+**never a gap in capability**. An F-grade player can always execute the *basic actions*
+of the sport; they just do them weakly and unreliably:
+
+- F dodgeball **thrower** → the ball still *reaches* an opponent (slow, loopy, easy to
+  read — but it gets there; it never just dribbles short).
+- F **catcher** → can still *attempt* a catch (mostly bobbles, occasionally holds).
+- F **mover** → still moves, just slow.
+
+Two F teams play a sloppy but *real, fun* match. S-vs-F is a blowout, but F is still
+playing the sport, not standing helpless. The rule: **never fail to *act* — only fail
+to act *well*.** When tuning a grade's low end, protect the basic action first, then
+let everything above it scale hard toward S.
+
 ## Attribute model (3 layers)
 
 Rated attributes use a hidden **0–20** scale shown to players as an **F–S** grade. Full
