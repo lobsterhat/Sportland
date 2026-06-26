@@ -70,6 +70,8 @@ namespace Sportland.Sports.Dodgeball
 
         [Header("Dummy start")]
         [SerializeField] private Vector2 dummyStartPos = new Vector2(4.5f, 0f);
+        [Tooltip("Catch sweep: place the dummy this many units in front of the attacker (toward the opposing side) so even slow F-grade throws arrive at catch height instead of drooping short and rolling. 0 = use the absolute dummyStartPos instead.")]
+        [SerializeField] private float dummyDistance = 6f;
 
         [Header("Auto sweep (Enter to start/stop)")]
         [SerializeField] private int throwsPerGrade = 100;
@@ -261,8 +263,16 @@ namespace Sportland.Sports.Dodgeball
         private void PlaceDummyStart()
         {
             if (dummy == null) return;
+            Vector2 pos = dummyStartPos;
+            if (dummyDistance > 0f && attacker != null)
+            {
+                // A fixed distance in front of the attacker, toward the opposing side,
+                // so every grade (incl. slow F throws) reaches at catch height.
+                float dir = attacker.transform.position.x <= 0f ? 1f : -1f;
+                pos = (Vector2)attacker.transform.position + new Vector2(dir * dummyDistance, 0f);
+            }
             var p = dummy.transform.position;
-            dummy.transform.position = new Vector3(dummyStartPos.x, dummyStartPos.y, p.z);
+            dummy.transform.position = new Vector3(pos.x, pos.y, p.z);
             if (dummyMove != null) dummyMove.SetFacing(AttackerDir());
         }
 
