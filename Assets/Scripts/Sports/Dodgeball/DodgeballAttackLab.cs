@@ -154,13 +154,17 @@ namespace Sportland.Sports.Dodgeball
                              : (Vector2)(Quaternion.Euler(0f, 0f, partialAngle) * toAtk);
                 dummyMove.SetFacing(face);
 
-                // Don't re-arm on a ball the dummy itself just bobbled — otherwise
-                // the frozen dummy re-catches its own tipped ball and that re-catch
-                // overwrites the original throw's outcome in the sweep tally.
-                if (ball != null && ball.CurrentState == Ball.State.Thrown
+                // Arm ONLY on a fresh inbound throw, and disarm otherwise. The catch
+                // arm is a time window (not consumed by an attempt), so a still-armed
+                // frozen dummy would re-catch its OWN rebound — a carom that pops back
+                // up, or a bobble/deflect — wiping the hit and logging a phantom CAUGHT.
+                // Excluding non-Thrown states (caroms are Bouncing) and balls the dummy
+                // last touched (RecentThrower) measures only the initial catch attempt.
+                bool freshInbound = ball != null && ball.CurrentState == Ball.State.Thrown
                     && ball.RecentThrower != dummy
-                    && Vector2.Distance(dummy.transform.position, ball.transform.position) < catchArmRange)
-                    dummy.ArmCatch();
+                    && Vector2.Distance(dummy.transform.position, ball.transform.position) < catchArmRange;
+                if (freshInbound) dummy.ArmCatch();
+                else              dummy.DisarmCatch();
             }
 
             var mouse = Mouse.current;

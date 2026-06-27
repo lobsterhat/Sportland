@@ -61,6 +61,9 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Records a catch press at the current time.</summary>
         public void ArmCatch() => CatchArmedAt = Time.time;
 
+        /// <summary>Clears the catch arm (e.g. so a rebound off a failed catch isn't auto-caught).</summary>
+        public void DisarmCatch() => CatchArmedAt = -999f;
+
         /// <summary>True if a catch was pressed within the last <paramref name="window"/> seconds.</summary>
         public bool IsCatchArmed(float window) => Time.time - CatchArmedAt <= window;
 
