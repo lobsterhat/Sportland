@@ -53,6 +53,7 @@ namespace Sportland.Sports.Dodgeball
             [Range(0f, 1f)] public float sideFacingTighten  = 0.30f;  // catching off to the side raises the bar
             [Range(0f, 1f)] public float stanceTighten      = 0.15f;  // flat-footed human (no stance) raises the bar
             [Range(0f, 1f)] public float catchSuccessCap    = 0.95f;  // nothing is 100%: even a sure catch flubs to a bobble this often (before ability mods)
+            [Range(0f, 1f)] public float bobbleHardThrough  = 0.30f;  // at MAX ball speed, a bobble punches through to a hit this often (scaled down by speed → slow lobs ~never hit); the throw-vs-catch lethality dial
 
             [Header("AI simulated press (no real button)")]
             [Range(0f, 1f)] public float aiTimingAtRating0  = 0.55f;  // a weak AI's typical timingScore
@@ -776,9 +777,18 @@ namespace Sportland.Sports.Dodgeball
             else if (f.timingScore >= f.bobbleBar)            f.zone = CatchZone.Bobble;
             else                                              f.zone = CatchZone.Miss;
 
+            // A hard throw that beats the hands punches a bobble through into a hit:
+            // the bobble edge thins as the ball speeds up, so soft lobs stay bobble-
+            // safe (a weak thrower can't draw blood) while heat does — and it scales
+            // with the throw-vs-catch speed gap. Resolution only; preview is un-punched.
+            if (f.zone == CatchZone.Bobble && !preview
+                && Random.value < catchTuning.bobbleHardThrough * f.speedT)
+                f.zone = CatchZone.Miss;
+
             // Nothing is a 100% deal: even a sure catch flubs to a bobble now and then.
-            // Caps catch success at catchSuccessCap (before ability mods). Resolution
-            // only — the preview shows the un-flubbed expected zone.
+            // Caps catch success at catchSuccessCap (before ability mods). Runs after
+            // the punch-through so a flubbed-clean stays a soft bobble, never a hit.
+            // Resolution only — the preview shows the un-flubbed expected zone.
             if (f.zone == CatchZone.Clean && !preview && Random.value > catchTuning.catchSuccessCap)
                 f.zone = CatchZone.Bobble;
 
