@@ -154,7 +154,11 @@ namespace Sportland.Sports.Dodgeball
                              : (Vector2)(Quaternion.Euler(0f, 0f, partialAngle) * toAtk);
                 dummyMove.SetFacing(face);
 
+                // Don't re-arm on a ball the dummy itself just bobbled — otherwise
+                // the frozen dummy re-catches its own tipped ball and that re-catch
+                // overwrites the original throw's outcome in the sweep tally.
                 if (ball != null && ball.CurrentState == Ball.State.Thrown
+                    && ball.RecentThrower != dummy
                     && Vector2.Distance(dummy.transform.position, ball.transform.position) < catchArmRange)
                     dummy.ArmCatch();
             }
