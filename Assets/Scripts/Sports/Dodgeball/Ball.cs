@@ -871,6 +871,9 @@ namespace Sportland.Sports.Dodgeball
                 default: // deflect backward, back toward where it came from
                     rb.linearVelocity = -v * 0.5f;
                     heightVelocity = Mathf.Max(heightVelocity, 2.5f);
+                    groundedSinceRelease = true;                 // full (snappy) gravity, like a bobble
+                    recentThrower = catcher;                     // no instant re-grab of one's own deflection
+                    throwerCooldownRemaining = throwerPickupCooldown;
                     state = State.Thrown;
                     break;
             }
