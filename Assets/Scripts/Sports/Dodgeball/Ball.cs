@@ -52,6 +52,7 @@ namespace Sportland.Sports.Dodgeball
             [Range(0f, 1f)] public float speedTighten       = 0.25f;  // a max-speed ball raises the bar this much
             [Range(0f, 1f)] public float sideFacingTighten  = 0.30f;  // catching off to the side raises the bar
             [Range(0f, 1f)] public float stanceTighten      = 0.15f;  // flat-footed human (no stance) raises the bar
+            [Range(0f, 1f)] public float catchSuccessCap    = 0.95f;  // nothing is 100%: even a sure catch flubs to a bobble this often (before ability mods)
 
             [Header("AI simulated press (no real button)")]
             [Range(0f, 1f)] public float aiTimingAtRating0  = 0.55f;  // a weak AI's typical timingScore
@@ -774,6 +775,12 @@ namespace Sportland.Sports.Dodgeball
             if (!f.backFacing && f.timingScore >= f.cleanBar) f.zone = CatchZone.Clean;
             else if (f.timingScore >= f.bobbleBar)            f.zone = CatchZone.Bobble;
             else                                              f.zone = CatchZone.Miss;
+
+            // Nothing is a 100% deal: even a sure catch flubs to a bobble now and then.
+            // Caps catch success at catchSuccessCap (before ability mods). Resolution
+            // only — the preview shows the un-flubbed expected zone.
+            if (f.zone == CatchZone.Clean && !preview && Random.value > catchTuning.catchSuccessCap)
+                f.zone = CatchZone.Bobble;
 
             // Display / recovery-difficulty proxy: how far past the bobble bar toward
             // perfect (1 = clean with margin, 0 = on the edge of a bobble).
