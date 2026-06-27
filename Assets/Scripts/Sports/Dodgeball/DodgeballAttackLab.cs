@@ -383,13 +383,19 @@ namespace Sportland.Sports.Dodgeball
             RecordRow($"HIT ({zone}) dmg {dmg:F1}");
         }
 
-        // The dummy caught the user's throw (Face* mode): log the catch factors
-        // and outcome — no damage.
+        // The dummy "caught" the ball. Classify by the ORIGINAL attempt's zone, not
+        // the bare event: a clean attempt is a real CAUGHT, but a pickup of a ball
+        // the dummy already bobbled or was beaten by (its own carom/deflect rebound
+        // settling at its frozen feet, or a loose recovery) must NOT inflate the
+        // catch count — it's tallied as the bobble/miss the attempt actually was.
         private void OnCaught(PlayerZoneTracker catcher)
         {
             if (!havePending || catcher != dummy) return;
             pendingCatch = ball != null ? ball.LastCatchFactors : default;
-            RecordRow("CAUGHT");
+            string outcome = !pendingCatch.valid || pendingCatch.zone == Ball.CatchZone.Clean ? "CAUGHT"
+                           : pendingCatch.zone == Ball.CatchZone.Bobble ? "BOBBLE"
+                           : "miss";
+            RecordRow(outcome);
         }
 
         private void OnLoose()
