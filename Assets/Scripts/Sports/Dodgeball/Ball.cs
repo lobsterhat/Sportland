@@ -48,7 +48,7 @@ namespace Sportland.Sports.Dodgeball
             [Header("Clean-catch timing bar (timingScore needed)")]
             [Range(0f, 1f)] public float cleanBarAtRating0  = 0.85f;  // weak hands: near-perfect timing
             [Range(0f, 1f)] public float cleanBarAtRating20 = 0.35f;  // soft hands: forgiving
-            [Range(0f, 1f)] public float bobbleBand         = 0.30f;  // bobble zone width below the clean bar
+            [Range(0f, 1f)] public float bobbleBand         = 0.15f;  // bobble zone width below the clean bar (narrow → a badly mistimed catch falls past it to a hit)
             [Range(0f, 1f)] public float speedTighten       = 0.25f;  // a max-speed ball raises the bar this much
             [Range(0f, 1f)] public float sideFacingTighten  = 0.30f;  // catching off to the side raises the bar
             [Range(0f, 1f)] public float stanceTighten      = 0.15f;  // flat-footed human (no stance) raises the bar
