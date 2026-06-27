@@ -418,11 +418,14 @@ namespace Sportland.Sports.Dodgeball
         // noise) — so you can dial the catch window against it.
         private void AddDummyCatchLines(List<string> lines)
         {
-            if (mode == DummyMode.NoCatch || dummy == null) return;
+            if (dummy == null) return;
+            // Always show the configured catch grade so the `/` cycle gives immediate
+            // feedback — even in NoCatch mode (where the dummy just eats hits).
             var ca = dummy.GetComponent<DodgeballAttributes>();
             if (ca != null)
                 lines.Add($"  dummy catch: {ca.CatchTechniqueGrade}  (rating {ca.catchTechniqueRating:0}/20, eff {ca.EffectiveCatching01:F2})");
-            if (ball == null || ball.CurrentState != Ball.State.Thrown) return;
+            // The live timing-vs-bars preview needs a catching mode and a ball in flight.
+            if (mode == DummyMode.NoCatch || ball == null || ball.CurrentState != Ball.State.Thrown) return;
             var f = ball.PreviewCatch(dummy);
             lines.Add($"  ballspd {f.ballSpeed:F0} u/s  spdT {f.speedT:F2}  facing a{f.facingAlignment:F2}{(f.backFacing ? " BACK" : "")}");
             lines.Add($"  timing {f.timingScore:F2}(exp) vs clean {f.cleanBar:F2}/bobble {f.bobbleBar:F2} -> {f.zone}");
