@@ -56,10 +56,23 @@ namespace Sportland.Sports.Dodgeball
             [Range(0f, 1f)] public float bobbleHardThrough  = 0.30f;  // at MAX ball speed, a bobble punches through to a hit this often (scaled down by speed → slow lobs ~never hit); the throw-vs-catch lethality dial
             [Range(0f, 1f)] public float bobbleDamageMul    = 0.33f;  // a mishandle (bobble) deals this fraction of a direct connect's damage/stamina — it still glanced off you
 
-            [Header("AI simulated press (no real button)")]
-            [Range(0f, 1f)] public float aiTimingAtRating0  = 0.55f;  // a weak AI's typical timingScore
-            [Range(0f, 1f)] public float aiTimingAtRating20 = 1.00f;  // an elite AI's typical timingScore
-            [Range(0f, 1f)] public float aiTimingNoise      = 0.12f;  // ± wobble on the AI's timing
+            // AI catch = a skill check, not a faked button press (see design/defense.md).
+            // The CHARACTER's catch skill vs the throw's difficulty gives two odds:
+            //   catchChance = P(get a hand on it = clean OR bobble); 1 - it = clean miss.
+            //   cleanShare  = P(secure it | got a hand on it); the rest is a bobble.
+            // Both are linear in skill (up) and difficulty (down); P(clean) is clamped to
+            // [cleanCatchFloor .. catchSuccessCap] — nothing's hopeless, nothing's sure.
+            [Header("AI catch (skill-check odds, replaces the press emulation)")]
+            public float aiCatchBase  = 0.95f;   // catchChance intercept
+            public float aiCatchSkill = 0.90f;   // catchChance per unit catch skill (0..1)
+            public float aiCatchSpeed = 1.03f;   // catchChance lost per unit difficulty (speedT + facing)
+            [Range(0f, 1f)] public float aiCatchFloor = 0.07f;   // even the worst mismatch gets a hand on it this often
+            public float aiCleanBase  = 0.19f;   // cleanShare intercept
+            public float aiCleanSkill = 0.92f;   // cleanShare per unit catch skill
+            public float aiCleanSpeed = 0.23f;   // cleanShare lost per unit difficulty
+            [Range(0f, 1f)] public float cleanCatchFloor = 0.02f; // giant-killer floor: P(clean) never below this (unless facing away)
+            public float aiSideDifficulty = 0.25f;   // side-facing adds this to the AI's difficulty
+            public float aiBackDifficulty = 0.40f;   // facing away adds this (and blocks a clean catch outright)
 
             [Header("Bobble")]
             public float bobbleKeepFraction = 0.25f;  // fraction of the incoming ball speed a tipped ball keeps (a hot throw squirts off harder)
@@ -79,10 +92,13 @@ namespace Sportland.Sports.Dodgeball
             public bool  backFacing;       // facing away → no clean catch
             public bool  inStance;         // catcher set in a defensive stance
             public bool  armed;            // catch press active
-            public bool  human;            // human (real timing) vs AI (simulated)
-            public float timingScore;      // 0..1 press precision used in the check
-            public float cleanBar;         // timingScore needed for a clean catch
-            public float bobbleBar;        // timingScore needed for at least a bobble
+            public bool  human;            // human (real timing) vs AI (skill-check odds)
+            public float timingScore;      // human: 0..1 press precision used in the check
+            public float cleanBar;         // human: timingScore needed for a clean catch
+            public float bobbleBar;        // human: timingScore needed for at least a bobble
+            public float catchChance;      // AI: P(hand on it = clean OR bobble)
+            public float cleanShare;       // AI: P(secure | hand on it)
+            public float pClean;           // AI: final P(clean) after the floor/cap clamp
             public CatchZone zone;         // resolved outcome
             public float finalChance;      // 0..1 catch quality (display + recovery difficulty)
         }
@@ -768,48 +784,67 @@ namespace Sportland.Sports.Dodgeball
                        + ((f.human && !f.inStance) ? catchTuning.stanceTighten : 0f);
             f.bobbleBar = Mathf.Max(0f, f.cleanBar - catchTuning.bobbleBand);
 
-            // Timing precision. Human = real press (1 right at arrival, → 0 at the edge
-            // of the arm window). AI = simulated from skill, with a little wobble.
+            // Resolution splits by controller. The HUMAN catches on deterministic press
+            // timing vs the window (no RNG — player skill). The AI catches on a skill
+            // CHECK — the character's catch skill vs the throw's difficulty, rolled once
+            // — because an AI has no real press to emulate (see design/defense.md).
             f.armed = catcher.IsCatchArmed(catchArmWindow);
             if (f.human)
             {
                 float sincePress = Time.time - catcher.CatchArmedAt;
                 f.timingScore = Mathf.Clamp01(1f - sincePress / Mathf.Max(0.01f, catchArmWindow));
+
+                // Facing away can never be a clean catch.
+                if (!f.backFacing && f.timingScore >= f.cleanBar) f.zone = CatchZone.Clean;
+                else if (f.timingScore >= f.bobbleBar)            f.zone = CatchZone.Bobble;
+                else                                              f.zone = CatchZone.Miss;
+
+                // A hard throw punches a bobble through into a hit (heat draws blood);
+                // and even a perfect grab flubs occasionally (nothing's 100%). Both
+                // resolution-only — the preview shows the un-rolled expected zone.
+                if (f.zone == CatchZone.Bobble && !preview
+                    && Random.value < catchTuning.bobbleHardThrough * f.speedT)
+                    f.zone = CatchZone.Miss;
+                if (f.zone == CatchZone.Clean && !preview && Random.value > catchTuning.catchSuccessCap)
+                    f.zone = CatchZone.Bobble;
+
+                f.finalChance = Mathf.Clamp01((f.timingScore - f.bobbleBar) / Mathf.Max(0.01f, 1f - f.bobbleBar));
             }
             else
             {
-                f.timingScore = Mathf.Clamp01(
-                    Mathf.Lerp(catchTuning.aiTimingAtRating0, catchTuning.aiTimingAtRating20, f.catching01)
-                    + (preview ? 0f : Random.Range(-catchTuning.aiTimingNoise, catchTuning.aiTimingNoise)));
+                // Difficulty = ball speed + facing pinch; skill = catch technique.
+                float diff = f.speedT + (side ? catchTuning.aiSideDifficulty : 0f)
+                                      + (f.backFacing ? catchTuning.aiBackDifficulty : 0f);
+                f.catchChance = Mathf.Clamp(
+                    catchTuning.aiCatchBase + catchTuning.aiCatchSkill * f.catching01 - catchTuning.aiCatchSpeed * diff,
+                    catchTuning.aiCatchFloor, 1f);
+                f.cleanShare = f.backFacing ? 0f : Mathf.Clamp01(
+                    catchTuning.aiCleanBase + catchTuning.aiCleanSkill * f.catching01 - catchTuning.aiCleanSpeed * diff);
+                // Facing away → no clean (floor 0); else P(clean) ∈ [cleanCatchFloor .. cap]:
+                // nothing's hopeless (the giant-killer 2%), nothing's a sure thing (95%).
+                float cleanLo = f.backFacing ? 0f : catchTuning.cleanCatchFloor;
+                f.pClean = Mathf.Clamp(f.catchChance * f.cleanShare, cleanLo, catchTuning.catchSuccessCap);
+
+                float pBobble = Mathf.Max(0f, f.catchChance - f.pClean);
+                float pMiss   = 1f - f.catchChance;
+                if (preview)   // modal outcome for the readout — no roll
+                    f.zone = (f.pClean >= pBobble && f.pClean >= pMiss) ? CatchZone.Clean
+                           : (pBobble >= pMiss)                         ? CatchZone.Bobble
+                           : CatchZone.Miss;
+                else
+                {
+                    float r = Random.value;
+                    f.zone = r < f.pClean      ? CatchZone.Clean
+                           : r < f.catchChance ? CatchZone.Bobble    // [pClean .. catchChance)
+                           : CatchZone.Miss;
+                }
+
+                f.finalChance = f.cleanShare;   // clean-share doubles as catch quality (recovery difficulty)
             }
-
-            // Resolve the zone. Facing away can never be a clean catch.
-            if (!f.backFacing && f.timingScore >= f.cleanBar) f.zone = CatchZone.Clean;
-            else if (f.timingScore >= f.bobbleBar)            f.zone = CatchZone.Bobble;
-            else                                              f.zone = CatchZone.Miss;
-
-            // A hard throw that beats the hands punches a bobble through into a hit:
-            // the bobble edge thins as the ball speeds up, so soft lobs stay bobble-
-            // safe (a weak thrower can't draw blood) while heat does — and it scales
-            // with the throw-vs-catch speed gap. Resolution only; preview is un-punched.
-            if (f.zone == CatchZone.Bobble && !preview
-                && Random.value < catchTuning.bobbleHardThrough * f.speedT)
-                f.zone = CatchZone.Miss;
-
-            // Nothing is a 100% deal: even a sure catch flubs to a bobble now and then.
-            // Caps catch success at catchSuccessCap (before ability mods). Runs after
-            // the punch-through so a flubbed-clean stays a soft bobble, never a hit.
-            // Resolution only — the preview shows the un-flubbed expected zone.
-            if (f.zone == CatchZone.Clean && !preview && Random.value > catchTuning.catchSuccessCap)
-                f.zone = CatchZone.Bobble;
-
-            // Display / recovery-difficulty proxy: how far past the bobble bar toward
-            // perfect (1 = clean with margin, 0 = on the edge of a bobble).
-            f.finalChance = Mathf.Clamp01((f.timingScore - f.bobbleBar) / Mathf.Max(0.01f, 1f - f.bobbleBar));
             return f;
         }
 
-        /// <summary>Deterministic catch preview for HUD / debug (no AI timing noise).</summary>
+        /// <summary>Deterministic catch preview for HUD / debug (AI shows its odds + the modal zone, no roll).</summary>
         public CatchFactors PreviewCatch(PlayerZoneTracker catcher) => BuildCatchFactors(catcher, preview: true);
 
         private void RecordCatchAttempt(CatchFactors f)
