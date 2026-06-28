@@ -427,10 +427,16 @@ namespace Sportland.Sports.Dodgeball
         {
             var p = pending;
             string acc = p.aimError >= 0f ? $"{p.aimError:F2}u" : "n/a";
-            // Catch detail at resolution: actual timing vs the clean / bobble bars.
-            string face = (pendingMode != DummyMode.NoCatch && pendingCatch.valid)
-                ? $"  {pendingMode} {(pendingCatch.human ? "HU" : "AI")} sp{pendingCatch.ballSpeed:F0} t{pendingCatch.timingScore:F2} c{pendingCatch.cleanBar:F2}/b{pendingCatch.bobbleBar:F2}"
-                : "";
+            // Catch detail at resolution: a human shows timing-vs-bars; an AI shows the
+            // skill-check odds it rolled (clean / bobble / miss).
+            string face = "";
+            if (pendingMode != DummyMode.NoCatch && pendingCatch.valid)
+            {
+                var c = pendingCatch;
+                face = c.human
+                    ? $"  {pendingMode} HU sp{c.ballSpeed:F0} t{c.timingScore:F2} c{c.cleanBar:F2}/b{c.bobbleBar:F2}"
+                    : $"  {pendingMode} AI sp{c.ballSpeed:F0} pC{c.pClean:F2}/pB{Mathf.Max(0f, c.catchChance - c.pClean):F2}/pM{1f - c.catchChance:F2}";
+            }
             float dmg = OutcomeDamage();
             string outcomeText = dmg > 0f ? $"{outcome} dmg {dmg:F1}" : outcome;
             log.Add($"{p.type,-10} [{p.input}]  pow {p.power,4:F0}  spd {pendingSpeed,4:F0}  acc {acc,6}{face}  {outcomeText}");
@@ -440,9 +446,9 @@ namespace Sportland.Sports.Dodgeball
             if (sweeping) OnSweepThrowResolved(outcome);
         }
 
-        // The dummy's catch breakdown — its Catch Technique grade, and while a ball
-        // is in flight the live timing-vs-bars zone (deterministic preview, no AI
-        // noise) — so you can dial the catch window against it.
+        // The dummy's catch breakdown — its Catch Technique grade, and while a ball is
+        // in flight the live skill-check odds (the AI dummy's P(clean)/bobble/miss for
+        // this throw, deterministic preview) — so you can dial the catch grid against it.
         private void AddDummyCatchLines(List<string> lines)
         {
             if (dummy == null) return;
@@ -451,11 +457,12 @@ namespace Sportland.Sports.Dodgeball
             var ca = dummy.GetComponent<DodgeballAttributes>();
             if (ca != null)
                 lines.Add($"  dummy catch: {ca.CatchTechniqueGrade}  (rating {ca.catchTechniqueRating:0}/20, eff {ca.EffectiveCatching01:F2})");
-            // The live timing-vs-bars preview needs a catching mode and a ball in flight.
+            // The live odds preview needs a catching mode and a ball in flight.
             if (mode == DummyMode.NoCatch || ball == null || ball.CurrentState != Ball.State.Thrown) return;
             var f = ball.PreviewCatch(dummy);
             lines.Add($"  ballspd {f.ballSpeed:F0} u/s  spdT {f.speedT:F2}  facing a{f.facingAlignment:F2}{(f.backFacing ? " BACK" : "")}");
-            lines.Add($"  timing {f.timingScore:F2}(exp) vs clean {f.cleanBar:F2}/bobble {f.bobbleBar:F2} -> {f.zone}");
+            float pB = Mathf.Max(0f, f.catchChance - f.pClean), pM = 1f - f.catchChance;
+            lines.Add($"  odds: clean {f.pClean:F2} / bobble {pB:F2} / miss {pM:F2}  -> {f.zone}(modal)");
         }
 
         // Auto-sweep results: per throw-grade caught / bobble / hit vs the current dummy.
