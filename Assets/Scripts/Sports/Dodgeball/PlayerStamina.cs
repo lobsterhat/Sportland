@@ -23,6 +23,10 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float diveCost = 0.14f;
         [Tooltip("Drained per second while running (sprint). A run-jump attack stacks: run drain + jump + throw.")]
         [SerializeField] private float runDrainPerSec = 0.08f;
+        [Tooltip("Stamina drained by taking a FULL-SPEED direct hit (a mishandle scales down by its contactMul). Every game mode — you tire from being hit even when the rebound is caught.")]
+        [SerializeField] private float impactCost = 0.15f;
+        [Tooltip("Ball speed (u/s) treated as 'full speed' for the impact drain.")]
+        [SerializeField] private float impactRefSpeed = 36f;
 
         [Header("Recovery")]
         [Tooltip("Refilled per second while not exerting (walking / idle / set).")]
@@ -64,6 +68,15 @@ namespace Sportland.Sports.Dodgeball
         private float RecoverMul => 1f + Endurance01 * enduranceInfluence;   // and recovers more
 
         public void Drain(float amount) => current = Mathf.Clamp01(current - Mathf.Max(0f, amount) * DrainMul);
+
+        /// <summary>
+        /// Stamina lost from taking a ball impact — universal across all game modes
+        /// (you tire from being hit even if a teammate catches the rebound and saves
+        /// the point). Scales with ball speed and the contact (direct vs glancing);
+        /// endurance softens it like any other drain.
+        /// </summary>
+        public void TakeImpact(float speed, float contactMul)
+            => Drain(impactCost * Mathf.Clamp01(speed / Mathf.Max(0.01f, impactRefSpeed)) * Mathf.Clamp01(contactMul));
 
         private void Update()
         {

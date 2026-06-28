@@ -54,6 +54,7 @@ namespace Sportland.Sports.Dodgeball
             [Range(0f, 1f)] public float stanceTighten      = 0.15f;  // flat-footed human (no stance) raises the bar
             [Range(0f, 1f)] public float catchSuccessCap    = 0.95f;  // nothing is 100%: even a sure catch flubs to a bobble this often (before ability mods)
             [Range(0f, 1f)] public float bobbleHardThrough  = 0.30f;  // at MAX ball speed, a bobble punches through to a hit this often (scaled down by speed → slow lobs ~never hit); the throw-vs-catch lethality dial
+            [Range(0f, 1f)] public float bobbleDamageMul    = 0.33f;  // a mishandle (bobble) deals this fraction of a direct connect's damage/stamina — it still glanced off you
 
             [Header("AI simulated press (no real button)")]
             [Range(0f, 1f)] public float aiTimingAtRating0  = 0.55f;  // a weak AI's typical timingScore
@@ -307,6 +308,16 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>Fires when a thrown ball caroms off an opponent. Args: hit player, zone, impact speed (u/s).</summary>
         public event System.Action<PlayerZoneTracker, HitZone, float> OnHit;
+
+        /// <summary>
+        /// Fires the instant a throw makes contact with a defender — a body connect
+        /// (carom/deflect) OR a mishandle (bobble) — BEFORE the rebound is resolved.
+        /// Carries the damage + stamina effect, which lands at impact and is never
+        /// undone by a later catch (unlike <see cref="OnHit"/>, which is deferred and
+        /// governs points/possession + the catch-save). Args: victim, zone, impact
+        /// speed (u/s), contactMul (1 = direct connect, &lt;1 = glancing mishandle).
+        /// </summary>
+        public event System.Action<PlayerZoneTracker, HitZone, float, float> OnImpact;
 
         /// <summary>Fires when a player skill-catches an opponent's throw. Args: catcher.</summary>
         public event System.Action<PlayerZoneTracker> OnCaught;
@@ -857,8 +868,10 @@ namespace Sportland.Sports.Dodgeball
                     break;
                 case 1: // bobble — a flubbed catch off the hands/arms. Deflects in a varied
                         // direction, keeps a FRACTION of the incoming pace (a hot throw squirts
-                        // off harder than a soft one), and pops up catchable. No damage;
-                        // re-grabbable by the catcher or a teammate after the brief cooldown.
+                        // off harder than a soft one), and pops up catchable. A mishandle still
+                        // deals CHIP damage (it glanced off you); re-grabbable by the catcher or
+                        // a teammate after the brief cooldown.
+                    OnImpact?.Invoke(catcher, ClassifyHit(Height), v.magnitude, catchTuning.bobbleDamageMul);
                     rb.linearVelocity = (-v.normalized + Random.insideUnitCircle * 0.8f).normalized
                                         * v.magnitude * catchTuning.bobbleKeepFraction * Random.Range(0.7f, 1.3f);
                     rb.linearDamping = groundDamping;            // high drag → settles loose, not flung far
@@ -868,7 +881,9 @@ namespace Sportland.Sports.Dodgeball
                     throwerCooldownRemaining = throwerPickupCooldown;
                     state = State.Thrown;
                     break;
-                default: // deflect backward, back toward where it came from
+                default: // deflect backward — the ball still CONNECTED (beat the hands), so it
+                         // deals full connect damage; the backward glance is only direction.
+                    OnImpact?.Invoke(catcher, ClassifyHit(Height), v.magnitude, 1f);
                     rb.linearVelocity = -v * 0.5f;
                     heightVelocity = Mathf.Max(heightVelocity, 2.5f);
                     groundedSinceRelease = true;                 // full (snappy) gravity, like a bobble
@@ -936,10 +951,16 @@ namespace Sportland.Sports.Dodgeball
             bounceArcApex = apex;
             state = State.Bouncing;
 
-            // Defer the hit: record it (one entry per distinct player) instead of
-            // firing OnHit now. It only counts once the ball touches the floor; if
+            // Damage + stamina land NOW, at the connect — a direct body hit (contactMul
+            // 1) — and are never undone by a later catch (that's the whole point of the
+            // damage game). Distinct from the deferred OnHit below, which governs only
+            // points/possession + the catch-save.
+            OnImpact?.Invoke(hit, zone, incoming.magnitude, 1f);
+
+            // Defer the SCORING hit: record it (one entry per distinct player) instead
+            // of firing OnHit now. It only counts once the ball touches the floor; if
             // the victim's team catches it first, every hit collected this airborne
-            // segment is wiped. Repeated touches of a player count once.
+            // segment is wiped (the points-game save). Repeated touches count once.
             AddPendingHit(hit, zone, incoming.magnitude);
         }
 

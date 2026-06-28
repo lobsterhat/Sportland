@@ -143,6 +143,7 @@ namespace Sportland.Sports.Dodgeball
             if (ball != null && subscribed)
             {
                 ball.OnHit -= OnBallHit;
+                ball.OnImpact -= OnBallImpact;
                 ball.OnCaught -= OnBallCaught;
                 ball.OnReleased -= OnBallReleased;
                 ball.OnBecameLoose -= OnBallBecameLoose;
@@ -398,6 +399,7 @@ namespace Sportland.Sports.Dodgeball
             if (ball == null) ball = FindFirstObjectByType<Ball>();
             if (ball == null) return;
             ball.OnHit += OnBallHit;
+            ball.OnImpact += OnBallImpact;
             ball.OnCaught += OnBallCaught;
             ball.OnReleased += OnBallReleased;
             ball.OnBecameLoose += OnBallBecameLoose;
@@ -465,9 +467,10 @@ namespace Sportland.Sports.Dodgeball
                             hitCounts[victim] = ++n;
                             if (n >= mode.hitsToOut) TakeOut(victim, permanent: true);
                             break;
-                        case VictimOutcome.DamageEnergy: // Mode 3
-                            if (ApplyDamage(victim, ballSpeed) <= 0f) TakeOut(victim, permanent: true);
-                            break;
+                        case VictimOutcome.DamageEnergy: // Mode 3 — energy damage + the
+                            break;                       // 0-energy elimination now land at
+                                                         // IMPACT (OnBallImpact), so a caught
+                                                         // rebound can't undo them.
                         case VictimOutcome.Sideline:     // Mode 4
                             TakeOut(victim, permanent: false);
                             break;
@@ -483,16 +486,46 @@ namespace Sportland.Sports.Dodgeball
             FlushPlay();
         }
 
-        // Drain the victim's energy by the ball's impact speed, softened by the
-        // victim's toughness. Returns the energy remaining.
-        private float ApplyDamage(PlayerZoneTracker victim, float ballSpeed)
+        // The instant a throw contacts a defender (connect or mishandle), BEFORE the
+        // rebound resolves. Damage + stamina land here and are never undone by a catch
+        // (the catch only saves the deferred scoring hit / outs the thrower). contactMul
+        // is 1 for a direct connect, <1 for a glancing mishandle (bobble).
+        private void OnBallImpact(PlayerZoneTracker victim, Ball.HitZone zone, float ballSpeed, float contactMul)
+        {
+            if (matchOver || victim == null) return;
+            var attacker = ball != null ? ball.RecentThrower : null;
+            if (attacker == null || attacker.Spawn.team == victim.Spawn.team) return;   // opponent's hit only
+            if (ball != null && ball.LastReleaseFromOpposingInfield) return;             // neutered throw (Phase D)
+
+            // Universal across all modes: being hit tires you — even when a teammate
+            // catches the rebound and saves the point.
+            victim.GetComponent<PlayerStamina>()?.TakeImpact(ballSpeed, contactMul);
+
+            // Damage game (Mode 3): energy drains at impact; 0 = out. Same vulnerability
+            // rule as scoring — a backrow outfielder shrugs it off.
+            if (mode.victimOutcome == VictimOutcome.DamageEnergy && IsVulnerable(victim))
+                if (ApplyDamage(victim, ballSpeed, contactMul) <= 0f) TakeOut(victim, permanent: true);
+        }
+
+        // Who an opponent's throw can damage / eliminate: infielders always; an
+        // outfielder only while grounded inside the opposing infield (Phase C).
+        private bool IsVulnerable(PlayerZoneTracker victim)
+            => victim.Spawn.role == PlayerRole.Infielder
+               || (victim.Spawn.role == PlayerRole.Outfielder && victim.IsInOpposingInfield && victim.IsGrounded);
+
+        // Drain the victim's energy by the ball's impact speed, softened by the victim's
+        // toughness and scaled by the contact (direct connect vs glancing mishandle).
+        // Returns the energy remaining.
+        private float ApplyDamage(PlayerZoneTracker victim, float ballSpeed, float contactMul)
         {
             var gen = victim.GetComponent<GeneralAttributes>();
             float maxE = gen != null ? gen.maxEnergy : 100f;
             float tough01 = gen != null ? gen.Toughness01 : 0.5f;
 
             if (!energy.TryGetValue(victim, out float e)) e = maxE;
-            float dmg = ballSpeed * mode.damagePerSpeed * (1f - tough01 * mode.toughnessReduction);
+            // TODO: × thrower "sting" damage multiplier (future attribute) — see defense.md
+            float dmg = ballSpeed * mode.damagePerSpeed * Mathf.Clamp01(contactMul)
+                      * (1f - tough01 * mode.toughnessReduction);
             e -= Mathf.Max(0f, dmg);
             energy[victim] = e;
             return e;
