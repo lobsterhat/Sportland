@@ -27,7 +27,9 @@ namespace Sportland.Sports.Dodgeball
 
         [Header("Panel")]
         [SerializeField] private float panelWidth = 680f;
-        [SerializeField] private int rowsShown = 14;
+        [SerializeField] private int rowsShown = 14;     // raw rows DISPLAYED (panel height)
+        [Tooltip("Raw rows kept in the buffer for copy-all. A full sweep is throwsPerGrade x 7 grades; default holds it so earlier grades aren't lost to the S-rank tail.")]
+        [SerializeField] private int maxLogRows = 750;   // raw rows RETAINED (copy-all grabs all of these)
         [SerializeField] private int fontSize = 14;
 
         [Header("Dummy drag")]
@@ -440,7 +442,7 @@ namespace Sportland.Sports.Dodgeball
             float dmg = OutcomeDamage();
             string outcomeText = dmg > 0f ? $"{outcome} dmg {dmg:F1}" : outcome;
             log.Add($"{p.type,-10} [{p.input}]  pow {p.power,4:F0}  spd {pendingSpeed,4:F0}  acc {acc,6}{face}  {outcomeText}");
-            while (log.Count > 60) log.RemoveAt(0);
+            while (log.Count > maxLogRows) log.RemoveAt(0);
             havePending = false;
             if (autoReturnBall && !sweeping) returnPending = true;
             if (sweeping) OnSweepThrowResolved(outcome);
@@ -493,17 +495,19 @@ namespace Sportland.Sports.Dodgeball
         {
             EnsureStyle();
             float x = Screen.width - panelWidth - 12f;
+            int infoLineCount = 0;   // how many leading lines are header + summary (vs raw rows)
             var lines = new List<string> { "== ATTACK LAB (click = copy all) ==" };
             var atkAttr = attacker != null ? attacker.GetComponent<DodgeballAttributes>() : null;
             if (atkAttr != null)
                 lines.Add($"attacker: throwSpd {atkAttr.ThrowSpeedGrade} {atkAttr.throwSpeedRating:0}   throwAcc {atkAttr.ThrowAccuracyGrade} {atkAttr.throwAccuracyRating:0} (eff {atkAttr.EffectiveThrowAccuracy01:F2})");
-            lines.Add("  keys: ,=throwSpd  .=throwAcc  /=dummyCatch  Enter=sweep50   (grades C→B→A→S→F→E→D)");
+            lines.Add($"  keys: ,=throwSpd  .=throwAcc  /=dummyCatch  Enter=sweep{throwsPerGrade}   (grades C→B→A→S→F→E→D)");
             if (dummy == null) lines.Add("(no dummy — control an attacker, non-AI mode)");
             else
             {
                 lines.Add($"dummy: {mode}   [T cycles · drag to move · L1 returns ball]");
                 AddDummyCatchLines(lines);
                 AddSweepLines(lines);
+                infoLineCount = lines.Count;   // header + summary grid end here; raw rows follow
                 if (log.Count == 0)
                 {
                     lines.Add("(attack the dummy to log throws)");
@@ -525,7 +529,13 @@ namespace Sportland.Sports.Dodgeball
             var e = Event.current;
             if (e != null && e.type == EventType.MouseDown && e.button == 0 && rect.Contains(e.mousePosition))
             {
-                GUIUtility.systemCopyBuffer = string.Join("\n", log);
+                // Copy the header + the per-rank SWEEP SUMMARY (the matrix data) plus the
+                // ENTIRE raw-row buffer — not just the rowsShown display slice — so a full
+                // sweep's earlier grades aren't lost to the S-rank tail.
+                var copy = new List<string>(infoLineCount + log.Count);
+                for (int i = 0; i < infoLineCount && i < lines.Count; i++) copy.Add(lines[i]);
+                copy.AddRange(log);
+                GUIUtility.systemCopyBuffer = string.Join("\n", copy);
                 copiedUntil = Time.realtimeSinceStartup + 1.2f;
                 e.Use();
             }
