@@ -21,6 +21,11 @@ matches. Canvas for cross-sport flow. The dodgeball match flow is built (branch
 - **Possession / scoring:** hit / catch / opposing-infield rules; per-mode
   turnover-vs-point (`GameMode.clockExpiryEffect`); bonus when a throw hits/catches an
   outfielder who's in the opposing infield.
+- **Hit / impact model:** the five ball-fates (connect / mishandle / miss × caught /
+  grounded), and how *points* vs *damage* games read them, live in
+  [defense.md → Damage & impact](defense.md). Headline: a **caught rebound still deals
+  its damage** (the catch only saves the point), and **every impact saps stamina in all
+  modes**. Damage lands at contact (`OnImpact`), not on the deferred scoring hit.
 
 ---
 

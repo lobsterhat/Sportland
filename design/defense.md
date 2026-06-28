@@ -88,6 +88,57 @@ Every failure stays live: a mistimed catch bobbles off you, an un-evaded ball
 hits/deflects — head/torso/limb per the existing zone bounce (`ResolveMiss` / `Carom`).
 No clean pass-throughs. (This is the chaos we want to keep.)
 
+## Damage & impact
+
+When a ball is thrown at an opposing player there are **five fates**, crossing the
+*contact* (did the ball touch them, and how) with the *rebound* (caught or grounded):
+
+| # | Contact | Rebound | Points game | Damage game |
+|---|---------|---------|-------------|-------------|
+| 1 | **Connects** (body / beat the hands) | hits ground | attacker scores | **more** dmg |
+| 2 | **Connects** | caught (self/teammate) | no score — *save* | **more** dmg |
+| 3 | **Mishandled** (hands, fumbled) | hits ground | attacker scores | **less** dmg |
+| 4 | **Mishandled** | caught (self/teammate) | no score — *save* | **less** dmg |
+| 5 | **Misses** completely | hits ground | — | none |
+
+Plus the defensive win not in the table: a **clean interception** (caught in the hands,
+no prior contact) → no damage, gains possession, outs the thrower in the points game.
+
+**The key rule: catching the rebound does NOT undo the damage.** The impact already
+happened (1≡2, 3≡4 deal the same damage). A catch only governs **points & possession** —
+in the points game it *saves the point* and outs the thrower; in the damage game it just
+recovers the ball. So a teammate snagging your rebound saves the point but you still
+*took the hit*.
+
+**Maps onto the catch zones:**
+
+- `Clean` → clean interception → **no damage** (the defensive win).
+- `Bobble` → **mishandled** → **less** damage (chip), still recatchable.
+- `Miss` → **connects** (body hit) → **more** damage. Carom *and* deflect both deal it —
+  the backward glance is just rebound *direction*, never a damage exemption.
+- ball wide of the body / no attempt → **misses completely** → none.
+
+**Damage formula (damage game / Mode 3 Energy):**
+
+```
+dmg = ballSpeed × damagePerSpeed × contactMul × throwerSting × (1 − victimToughness × reduction)
+```
+
+- **contactMul** — connect (`Miss`) = 1.0; mishandle (`Bobble`) ≈ ⅓ (`bobbleDamageMul`).
+- **throwerSting** — a future thrower attribute, "knack for tender places" (a damage
+  multiplier, and/or a bias toward the high-damage **Head** zone). Stubbed at 1.0 for
+  now, same pattern as the ability `Effective` hooks.
+- **ballSpeed / victimToughness** — already in (`damagePerSpeed`, Damage Capacity).
+
+**Impact is immediate, never deferred/wiped.** Damage + the stamina sap below land at
+the moment of contact (`OnImpact`), decoupled from the deferred `OnHit` that the points
+game uses for scoring + the catch-save. (This also kills the lab artifact where a frozen
+dummy recovered its own carom and nullified the damage.)
+
+**Endurance sap — every impact, BOTH games.** Any contact (connect or mishandle, caught
+or not) drains the victim's stamina pool (`PlayerStamina`), scaled by `speed × contactMul`.
+Getting hit tires you even when your team catches the rebound and saves the point.
+
 ## Stat map
 
 | Stat | Drives |
