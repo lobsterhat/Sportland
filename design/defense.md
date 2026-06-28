@@ -45,9 +45,16 @@ Mechanics:
   This *replaces* the old flat speed penalty (the difficulty is now emergent).
 - **Facing / stance pinch the clean core** — back-facing ⇒ no clean core (always a
   bobble/carom); flat-footed ⇒ narrower.
-- **Deterministic for the human** (position + timing). **AI** uses a *simulated* press
-  whose timing error scales with its skill — a great bot lands the core, a poor one
-  bobbles or misses. The only randomness is the AI's press timing; no separate coin-flip.
+- **Deterministic for the human** (position + timing) — no RNG; player skill aims at the
+  window, which `catchTechnique` sizes. The cap + speed punch-through apply here.
+- **The AI does NOT emulate a press** — it has no button to time. It runs a **skill
+  check**: the character's catch skill vs the throw's difficulty (speed + facing) gives
+  `catchChance` (hand on it = clean or bobble) and `cleanShare` (secure vs fumble); roll
+  once for the zone. `P(clean)` is clamped to `[2% … 95%]` — a giant-killer floor and a
+  sure-thing cap. The grade×grade grid is **authored** (e.g. F-vs-S `2/5/93`, S-vs-F
+  `95/5/0`, F-vs-F `17/68/15`), not reverse-engineered from a timing distribution. This
+  replaced the old emulated-press model, which made the AI's outcomes a tuning cliff and
+  couldn't give a weak AI a reachable floor. Both paths emit the same `CatchZone`.
 
 ## Brace — posture, ramped
 
