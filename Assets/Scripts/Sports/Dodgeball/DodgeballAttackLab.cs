@@ -22,6 +22,8 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Energy lost per unit of ball impact speed, before toughness reduction.")]
         public float damagePerSpeed = 1.5f;
         [Range(0f, 1f)] public float toughnessReduction = 0.5f;
+        [Tooltip("Mishandle (bobble) damage as a fraction of a direct connect — mirror of Ball.catchTuning.bobbleDamageMul.")]
+        [Range(0f, 1f)] public float bobbleDamageMul = 0.33f;
 
         [Header("Panel")]
         [SerializeField] private float panelWidth = 680f;
@@ -377,10 +379,23 @@ namespace Sportland.Sports.Dodgeball
         private void OnHit(PlayerZoneTracker victim, Ball.HitZone zone, float ballSpeed)
         {
             if (!havePending) return;
-            float tough = victim != null && victim.TryGetComponent<GeneralAttributes>(out var g) ? g.Toughness01 : 0.5f;
-            float dmg = ballSpeed * damagePerSpeed * (1f - tough * toughnessReduction);
             pendingCatch = ball != null ? ball.LastCatchFactors : default;
-            RecordRow($"HIT ({zone}) dmg {dmg:F1}");
+            RecordRow($"HIT ({zone})");   // damage appended by RecordRow (connect = full)
+        }
+
+        // Illustrative impact damage for the row, derived from the attempt's contact
+        // type: connect (Miss zone) = full, mishandle (Bobble) = bobbleDamageMul, clean
+        // = none. Mirrors DodgeballMatch.ApplyDamage so bobbles/deflects show their
+        // damage even though the lab usually runs Mode 1 (which applies none for real).
+        private float OutcomeDamage()
+        {
+            if (!pendingCatch.valid) return 0f;
+            float contactMul = pendingCatch.zone == Ball.CatchZone.Miss   ? 1f
+                             : pendingCatch.zone == Ball.CatchZone.Bobble ? bobbleDamageMul
+                             : 0f;
+            if (contactMul <= 0f) return 0f;
+            float tough = dummy != null && dummy.TryGetComponent<GeneralAttributes>(out var g) ? g.Toughness01 : 0.5f;
+            return pendingCatch.ballSpeed * damagePerSpeed * contactMul * (1f - tough * toughnessReduction);
         }
 
         // The dummy "caught" the ball. Classify by the ORIGINAL attempt's zone, not
@@ -416,7 +431,9 @@ namespace Sportland.Sports.Dodgeball
             string face = (pendingMode != DummyMode.NoCatch && pendingCatch.valid)
                 ? $"  {pendingMode} {(pendingCatch.human ? "HU" : "AI")} sp{pendingCatch.ballSpeed:F0} t{pendingCatch.timingScore:F2} c{pendingCatch.cleanBar:F2}/b{pendingCatch.bobbleBar:F2}"
                 : "";
-            log.Add($"{p.type,-10} [{p.input}]  pow {p.power,4:F0}  spd {pendingSpeed,4:F0}  acc {acc,6}{face}  {outcome}");
+            float dmg = OutcomeDamage();
+            string outcomeText = dmg > 0f ? $"{outcome} dmg {dmg:F1}" : outcome;
+            log.Add($"{p.type,-10} [{p.input}]  pow {p.power,4:F0}  spd {pendingSpeed,4:F0}  acc {acc,6}{face}  {outcomeText}");
             while (log.Count > 60) log.RemoveAt(0);
             havePending = false;
             if (autoReturnBall && !sweeping) returnPending = true;
