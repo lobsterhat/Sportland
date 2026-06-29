@@ -132,9 +132,11 @@ dmg = ballSpeed × damagePerSpeed × contactMul × throwerSting × (1 − victim
 ```
 
 - **contactMul** — connect (`Miss`) = 1.0; mishandle (`Bobble`) ≈ ⅓ (`bobbleDamageMul`).
-- **throwerSting** — a future thrower attribute, "knack for tender places" (a damage
-  multiplier, and/or a bias toward the high-damage **Head** zone). Stubbed at 1.0 for
-  now, same pattern as the ability `Effective` hooks.
+- **throwerSting** — a future thrower attribute, a flat damage multiplier. Stubbed at 1.0
+  for now, same pattern as the ability `Effective` hooks. (We **dropped body-zone
+  targeting** — Head/Torso/Limb was incidental to the throw arc, not aimed, and would
+  have made mid-speed throws headshot-spike *above* the fastest throws. A flat sting is
+  simpler and intuitive.)
 - **ballSpeed / victimToughness** — already in (`damagePerSpeed`, Damage Capacity).
 
 **Impact is immediate, never deferred/wiped.** Damage + the stamina sap below land at
@@ -157,12 +159,20 @@ Getting hit tires you even when your team catches the rebound and saves the poin
 
 ## Build order
 
-1. **`catching → catchTechniqueRating`** (0–20 + grade) — mechanical, isolated. ← *first*
-2. **Zoned catch window** — replace the additive `BuildCatchFactors` chance with the
-   arrival-anchored clean-core/bobble/miss model. The core change; playtest in isolation.
+1. ✅ **`catching → catchTechniqueRating`** (0–20 + grade) — done.
+2. ✅ **Catch resolution** — *done & validated.* Human = deterministic timing-vs-window;
+   AI = a skill-check (`catchChance × cleanShare`, `P(clean)` clamped `[2% … 95%]`). The
+   full 7×7 throw-grade × catch-grade grid was swept (100 throws/cell) and is smooth &
+   monotonic, corners on spec (F-vs-S `2/5/93`, S-vs-F `94`, F-vs-F `12/73/15`, S-vs-S
+   `72`). Damage lands at impact (connect = full, mishandle = ⅓), never wiped by a catch;
+   every impact saps stamina. Body-zone targeting removed.
 3. **Ramped brace** — stance toggle → hold + plant ramp; window scales with brace.
 4. **Evade dash** on Agility + the Def-Anticipation lead-time; collapse the old
    duck/jump/dodge verbs into one evade.
 5. **Defensive Anticipation** as a real 0–20 stat (+ AI dodge roll).
+6. **`throwerSting`** damage attribute (flat multiplier) — replace the 1.0 stub.
+7. **Points-game scoring for mishandles** — outcomes 1 & 3 score; today only a connect
+   `AddPendingHit`s, so a mishandle deals damage but doesn't yet score in Mode 1.
 
-Explicitly *not* building: throw-height attack dimension, high/low tell, Duck/Jump defense.
+Explicitly *not* building: throw-height attack dimension, high/low tell, Duck/Jump defense,
+body-zone (Head/Torso/Limb) targeting.
