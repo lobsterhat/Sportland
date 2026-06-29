@@ -26,7 +26,6 @@ namespace Sportland.Sports.Dodgeball
     /// </summary>
     public class Ball : MonoBehaviour
     {
-        public enum HitZone { Head, Torso, Limb }
 
         /// <summary>How a throw's intended target evaded it (for the play-by-play log).</summary>
         public enum DodgeKind { None, Duck, Jump, Dive }
@@ -179,28 +178,13 @@ namespace Sportland.Sports.Dodgeball
                  "(each rating point = (max-min)/20 u/s). One shared mapping for AI and human throws.")]
         [SerializeField] private float maxReleaseSpeed = 36f;
 
-        [Header("Throw bounce zones (Height above the floor)")]
-        [Tooltip("Ball Height at/above this lands in the head zone.")]
-        [SerializeField] private float headZoneMinHeight = 1.4f;
-        [Tooltip("Ball Height at/below this lands in the limb zone.")]
-        [SerializeField] private float limbZoneMaxHeight = 0.6f;
         [Tooltip("When a thrown ball's speed drops below this, it transitions to Loose without hitting.")]
         [SerializeField] private float thrownToLooseSpeed = 4f;
 
-        [Header("Bounce — head")]
-        [SerializeField, Range(0f, 1f)] private float headBounceFactor = 0.25f;
-        [SerializeField] private float headBounceArcApex = 1.2f;
-        [SerializeField] private float headBounceArcDuration = 0.6f;
-
-        [Header("Bounce — torso")]
-        [SerializeField, Range(0f, 1f)] private float torsoBounceFactor = 0.6f;
-        [SerializeField] private float torsoBounceArcApex = 0.3f;
-        [SerializeField] private float torsoBounceArcDuration = 0.3f;
-
-        [Header("Bounce — limb")]
-        [SerializeField, Range(0f, 1f)] private float limbBounceFactor = 0.35f;
-        [SerializeField] private float limbBounceArcApex = 0.15f;
-        [SerializeField] private float limbBounceArcDuration = 0.25f;
+        [Header("Bounce — carom off a struck player")]
+        [SerializeField, Range(0f, 1f)] private float caromBounceFactor = 0.5f;   // fraction of incoming speed kept
+        [SerializeField] private float caromArcApex = 0.4f;                       // pop height of the carom
+        [SerializeField] private float caromArcDuration = 0.35f;                  // carom arc time
 
         [Header("Bounce chain")]
         [Tooltip("Apex multiplier per ground bounce (coefficient of restitution).")]
@@ -257,7 +241,7 @@ namespace Sportland.Sports.Dodgeball
         // ball touches the floor. If the victim's team catches it before then,
         // every pending hit is wiped — the "caught before it hit the ground"
         // rule. Repeated touches of the same player still count once.
-        private struct PendingHit { public PlayerZoneTracker victim; public HitZone zone; public float speed; public bool victimOutOfZone; }
+        private struct PendingHit { public PlayerZoneTracker victim; public float speed; public bool victimOutOfZone; }
         private readonly List<PendingHit> pendingHits = new List<PendingHit>();
 
         // True once the ball has touched the floor since the last release. A
@@ -322,18 +306,18 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>Fires whenever the ball attaches to a player (pickup, pass catch, or ForcePickup).</summary>
         public event System.Action<PlayerZoneTracker> OnAttached;
 
-        /// <summary>Fires when a thrown ball caroms off an opponent. Args: hit player, zone, impact speed (u/s).</summary>
-        public event System.Action<PlayerZoneTracker, HitZone, float> OnHit;
+        /// <summary>Fires when a thrown ball caroms off an opponent. Args: hit player, impact speed (u/s).</summary>
+        public event System.Action<PlayerZoneTracker, float> OnHit;
 
         /// <summary>
         /// Fires the instant a throw makes contact with a defender — a body connect
         /// (carom/deflect) OR a mishandle (bobble) — BEFORE the rebound is resolved.
         /// Carries the damage + stamina effect, which lands at impact and is never
         /// undone by a later catch (unlike <see cref="OnHit"/>, which is deferred and
-        /// governs points/possession + the catch-save). Args: victim, zone, impact
-        /// speed (u/s), contactMul (1 = direct connect, &lt;1 = glancing mishandle).
+        /// governs points/possession + the catch-save). Args: victim, impact speed
+        /// (u/s), contactMul (1 = direct connect, &lt;1 = glancing mishandle).
         /// </summary>
-        public event System.Action<PlayerZoneTracker, HitZone, float, float> OnImpact;
+        public event System.Action<PlayerZoneTracker, float, float> OnImpact;
 
         /// <summary>Fires when a player skill-catches an opponent's throw. Args: catcher.</summary>
         public event System.Action<PlayerZoneTracker> OnCaught;
@@ -691,7 +675,7 @@ namespace Sportland.Sports.Dodgeball
             // can pass over/under and miss.
             if (caromOnMiss)
             {
-                if (WithinBody(t)) { RecordArrival(); Carom(t, ClassifyHit(Height)); return true; }
+                if (WithinBody(t)) { RecordArrival(); Carom(t); return true; }
                 return false;   // passed over a ducker / under a jumper
             }
 
@@ -899,14 +883,14 @@ namespace Sportland.Sports.Dodgeball
             {
                 case 0: // carom off the catcher (a "hit")
                     rb.linearVelocity = v;
-                    Carom(catcher, ClassifyHit(Height));
+                    Carom(catcher);
                     break;
                 case 1: // bobble — a flubbed catch off the hands/arms. Deflects in a varied
                         // direction, keeps a FRACTION of the incoming pace (a hot throw squirts
                         // off harder than a soft one), and pops up catchable. A mishandle still
                         // deals CHIP damage (it glanced off you); re-grabbable by the catcher or
                         // a teammate after the brief cooldown.
-                    OnImpact?.Invoke(catcher, ClassifyHit(Height), v.magnitude, catchTuning.bobbleDamageMul);
+                    OnImpact?.Invoke(catcher, v.magnitude, catchTuning.bobbleDamageMul);
                     rb.linearVelocity = (-v.normalized + Random.insideUnitCircle * 0.8f).normalized
                                         * v.magnitude * catchTuning.bobbleKeepFraction * Random.Range(0.7f, 1.3f);
                     rb.linearDamping = groundDamping;            // high drag → settles loose, not flung far
@@ -918,7 +902,7 @@ namespace Sportland.Sports.Dodgeball
                     break;
                 default: // deflect backward — the ball still CONNECTED (beat the hands), so it
                          // deals full connect damage; the backward glance is only direction.
-                    OnImpact?.Invoke(catcher, ClassifyHit(Height), v.magnitude, 1f);
+                    OnImpact?.Invoke(catcher, v.magnitude, 1f);
                     rb.linearVelocity = -v * 0.5f;
                     heightVelocity = Mathf.Max(heightVelocity, 2.5f);
                     groundedSinceRelease = true;                 // full (snappy) gravity, like a bobble
@@ -929,14 +913,7 @@ namespace Sportland.Sports.Dodgeball
             }
         }
 
-        private HitZone ClassifyHit(float height)
-        {
-            if (height >= headZoneMinHeight) return HitZone.Head;
-            if (height >  limbZoneMaxHeight) return HitZone.Torso;
-            return HitZone.Limb;
-        }
-
-        private void Carom(PlayerZoneTracker hit, HitZone zone)
+        private void Carom(PlayerZoneTracker hit)
         {
             LastDeflector = hit;   // a deflection — for the play-by-play log
             Vector2 incoming = rb.linearVelocity;
@@ -957,58 +934,37 @@ namespace Sportland.Sports.Dodgeball
             normal = normal.sqrMagnitude > 0.0001f ? normal.normalized : Vector2.up;
 
             Vector2 reflected = Vector2.Reflect(incoming, normal);
-
-            float factor, apex, duration;
-            switch (zone)
-            {
-                case HitZone.Head:
-                    factor = headBounceFactor;
-                    apex = headBounceArcApex;
-                    duration = headBounceArcDuration;
-                    break;
-                case HitZone.Limb:
-                    factor = limbBounceFactor;
-                    apex = limbBounceArcApex;
-                    duration = limbBounceArcDuration;
-                    break;
-                default:
-                    factor = torsoBounceFactor;
-                    apex = torsoBounceArcApex;
-                    duration = torsoBounceArcDuration;
-                    break;
-            }
-
-            rb.linearVelocity = reflected.normalized * (incoming.magnitude * factor);
+            rb.linearVelocity = reflected.normalized * (incoming.magnitude * caromBounceFactor);
 
             bounceArcTimer = 0f;
-            bounceArcDuration = Mathf.Max(0.05f, duration);
+            bounceArcDuration = Mathf.Max(0.05f, caromArcDuration);
             bounceStartHeight = Height;
-            bounceArcApex = apex;
+            bounceArcApex = caromArcApex;
             state = State.Bouncing;
 
             // Damage + stamina land NOW, at the connect — a direct body hit (contactMul
             // 1) — and are never undone by a later catch (that's the whole point of the
             // damage game). Distinct from the deferred OnHit below, which governs only
             // points/possession + the catch-save.
-            OnImpact?.Invoke(hit, zone, incoming.magnitude, 1f);
+            OnImpact?.Invoke(hit, incoming.magnitude, 1f);
 
             // Defer the SCORING hit: record it (one entry per distinct player) instead
             // of firing OnHit now. It only counts once the ball touches the floor; if
             // the victim's team catches it first, every hit collected this airborne
             // segment is wiped (the points-game save). Repeated touches count once.
-            AddPendingHit(hit, zone, incoming.magnitude);
+            AddPendingHit(hit, incoming.magnitude);
         }
 
         // Record a strike as a pending (airborne) hit — one entry per distinct
         // player, so repeated touches of the same player still count once.
-        private void AddPendingHit(PlayerZoneTracker victim, HitZone zone, float speed)
+        private void AddPendingHit(PlayerZoneTracker victim, float speed)
         {
             if (victim == null) return;
             for (int i = 0; i < pendingHits.Count; i++)
                 if (pendingHits[i].victim == victim) return;   // already struck this segment
             pendingHits.Add(new PendingHit
             {
-                victim = victim, zone = zone, speed = speed,
+                victim = victim, speed = speed,
                 victimOutOfZone = !victim.IsInZone,   // hit while out of their area can't be saved by a catch
             });
         }
@@ -1021,7 +977,7 @@ namespace Sportland.Sports.Dodgeball
             for (int i = 0; i < pendingHits.Count; i++)
             {
                 var h = pendingHits[i];
-                if (h.victim != null) OnHit?.Invoke(h.victim, h.zone, h.speed);
+                if (h.victim != null) OnHit?.Invoke(h.victim, h.speed);
             }
             pendingHits.Clear();
         }
@@ -1040,7 +996,7 @@ namespace Sportland.Sports.Dodgeball
                 var h = pendingHits[i];
                 if (h.victimOutOfZone)
                 {
-                    if (h.victim != null) OnHit?.Invoke(h.victim, h.zone, h.speed);   // stands — no save
+                    if (h.victim != null) OnHit?.Invoke(h.victim, h.speed);   // stands — no save
                 }
                 else
                 {

@@ -93,7 +93,7 @@ namespace Sportland.Sports.Dodgeball
             subscribed = true;
         }
 
-        private void OnBallHit(PlayerZoneTracker victim, Ball.HitZone zone, float ballSpeed)
+        private void OnBallHit(PlayerZoneTracker victim, float ballSpeed)
         {
             if (victim != tracker) return;
             LastDamageTime = Time.time;

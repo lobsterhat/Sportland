@@ -417,7 +417,7 @@ namespace Sportland.Sports.Dodgeball
         // release came from inside the opposing infield is wholly neutered
         // (Phase D): no points, no elimination, no damage, no sideline — just
         // a play-by-play entry.
-        private void OnBallHit(PlayerZoneTracker victim, Ball.HitZone zone, float ballSpeed)
+        private void OnBallHit(PlayerZoneTracker victim, float ballSpeed)
         {
             if (matchOver || victim == null) return;
             var attacker = ball != null ? ball.RecentThrower : null;
@@ -490,7 +490,7 @@ namespace Sportland.Sports.Dodgeball
         // rebound resolves. Damage + stamina land here and are never undone by a catch
         // (the catch only saves the deferred scoring hit / outs the thrower). contactMul
         // is 1 for a direct connect, <1 for a glancing mishandle (bobble).
-        private void OnBallImpact(PlayerZoneTracker victim, Ball.HitZone zone, float ballSpeed, float contactMul)
+        private void OnBallImpact(PlayerZoneTracker victim, float ballSpeed, float contactMul)
         {
             if (matchOver || victim == null) return;
             var attacker = ball != null ? ball.RecentThrower : null;

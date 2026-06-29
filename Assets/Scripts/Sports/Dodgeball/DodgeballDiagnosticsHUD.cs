@@ -137,8 +137,8 @@ namespace Sportland.Sports.Dodgeball
 
         private void OnBallLoose() => LogDecision("  ball loose (miss)");
 
-        private void OnBallHit(PlayerZoneTracker victim, Ball.HitZone zone, float speed)
-            => LogDecision($"  >> HIT {Short(victim)} ({zone}, {speed:F0}u/s)");
+        private void OnBallHit(PlayerZoneTracker victim, float speed)
+            => LogDecision($"  >> HIT {Short(victim)} ({speed:F0}u/s)");
 
         private void OnBallCaught(PlayerZoneTracker catcher)
             => LogDecision($"  >> {Short(catcher)} CAUGHT");
