@@ -64,7 +64,7 @@ Stated as requirements, not implementation:
 1. **Archetype definitions as data.** Name, fantasy text, stat template, meter grades, perk identifier, and modifier set — authorable without code changes so the roster can grow/rebalance.
 2. **A persistent player-character record.** Identity + chosen archetype + bonus-point allocation, saved for the whole career.
 3. **Modifier hooks.** Places where archetype effects land: daily action count, training-gain multiplier, team morale, in-game ability/play-call availability, scouting accuracy, conflict-resolution chance.
-4. **A teammate conflict & chemistry system.** The Mediator requires conflicts to exist as real events (personality clashes, fights, ego flare-ups — likely fed by the flag system) with a resolution mechanic whose odds archetypes can modify, and a team-chemistry value that resolutions can raise.
+4. **A teammate conflict & chemistry system.** The Mediator requires conflicts to exist as real events with a resolution mechanic whose odds archetypes can modify, and a team-chemistry value that resolutions can raise. Full design in `ConflictChemistryDesign.md`.
 5. **Creator UI sequence.** Card picker + stat allocation + summary, embeddable inside the Skip-guided introduction (and skippable rails for repeat players are worth considering).
 
 ## 6. Open Questions
