@@ -104,6 +104,26 @@ Rules that keep it fair and readable:
 - **Giving in counts.** Letting the Spotlight guy take his shot feeds his expectation in the moment — an in-game micro-concession with the same flavor of trade-off as conceding in the hub: peace now, at the cost of the play you actually wanted.
 - **The player character and Skip never refuse.** Ego immunity means total compliance — controlling them is always reliable, which quietly makes them the steady hands on a chaotic roster.
 
+### 5.1 The refusal roll — a push-your-luck loop
+
+When an athlete is in a *might-refuse* state (clashing command + sufficient trait rating/discontent), the game rolls:
+
+- **Comply** — the action executes. You got your play.
+- **Refuse** — the telegraphed head-shake, and the athlete's **stubbornness stack** for this game ticks up by one.
+
+Each refusal makes the athlete **angrier and more stubborn**: every subsequent clashing command rolls at worse odds, and the anger is visibly staged (head-shake → arm wave → full blow-up) so the player always knows how deep they are.
+
+This is deliberately a risk/reward standoff after the first refusal:
+
+- **Back off** — give him the ego play (let him shoot, leave him at his position). De-escalates the moment and feeds his expectation, but you're running his offense now, not yours.
+- **Insist** — issue the command again and re-roll at worse odds. Maybe he caves and you get the right play; maybe he digs in and the hole deepens.
+
+Boundaries and consequences:
+
+- **The stack is per-game.** Stubbornness resets when the final whistle blows — but every refusal that fired converts to discontent at the post-game checkpoint, so an in-game standoff always has a hub-side bill.
+- **A maxed stack can escalate into a live conflict event** (in-game flare-up, Section 4) — the standoff stops being between you and him and starts costing the locker room.
+- **Odds inputs stay consistent:** trait rating and discontent stage set the base, team chemistry dampens, the stubbornness stack multiplies. No hidden modifiers beyond these.
+
 ## 6. Resolution
 
 When a conflict event is live, the player chooses how to handle it (a hub action, typically at the Office):
@@ -154,8 +174,8 @@ That second effect makes chemistry self-reinforcing in both directions — prote
 ## 9. Open Questions
 
 - **Trait list final cut.** Are these six + Volatility right? Candidates considered and parked: Loyalty (expects not to be trade bait), Rivalry (specific-athlete grudges as links rather than ratings).
-- **Refusal override.** Can the player force a refused command (mash to insist)? If so, at what cost — a big discontent spike, a chemistry hit, or a chance the athlete botches the play out of spite?
-- **Refusal frequency caps.** How often can refusals fire before they stop being characterful and start being unfair — per possession, per game, per athlete? Playtest-driven.
+- **Vindication.** When an athlete grudgingly complies and the play *works*, should winning the standoff pay out — a contentment/respect gain because results ease egos? And the mirror: if the forced play fails, a "told you so" discontent bonus? Deepens the risk/reward but adds outcome-tracking complexity.
+- **Escalation curve tuning.** How steep the per-refusal odds penalty is, the stack size that triggers a live flare-up, and whether backing off mid-game cools the stack slightly or just freezes it. Playtest-driven.
 - **Expectation growth.** Do egos change over a career — a breakout youngster's Playing Time expectation rising with his stats, a veteran mellowing? (Strong candidate: yes, driven by performance and age.)
 - **Split "how much" from "how hard."** One rating currently covers both the size of the expectation and the reaction strength (with Volatility as a global modifier). Is a per-trait split worth the complexity?
 - **Pairwise chemistry.** Team-level only for now; individual friendships/rivalries as links or flags could layer on later.
