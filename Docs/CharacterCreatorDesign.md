@@ -33,7 +33,7 @@ Grades use the same letter scale as athletes (S/A/B/C/D/F), so the player is lea
 
 ## 4. Proposed Archetype Roster
 
-Five archetypes spanning the axis — two extremes, one center, two management specialists with different flavors:
+Six archetypes spanning the axis — two extremes, one center, three management specialists with different flavors:
 
 | Archetype | Playing | Management | Signature perk | The catch |
 |---|---|---|---|---|
@@ -41,6 +41,7 @@ Five archetypes spanning the axis — two extremes, one center, two management s
 | **Player-Coach** | B | B | *Double Shift* — one bonus management action per day | Master of none: no elite edge anywhere |
 | **Tactician** | C | A (tactics) | *Chalkboard* — expanded play-calling options and opponent-tendency reads in-game | Modest body: your genius is in the scheme, not your legs |
 | **Motivator** | C | A (morale) | *Locker Room Aura* — passive team-wide morale/chemistry boost, slump protection | Weak on tactics and scouting; you inspire, you don't outscheme |
+| **Mediator** | C | A (chemistry) | *Clear the Air* — greater chance to resolve conflicts between teammates; successful resolutions build team chemistry | Reactive power: a peaceful locker room leaves your gift idle, and you bring little tactics or training |
 | **Developer** | C | A (training) | *Growth Eye* — training gains multiplier and the ability to spot hidden potential in athletes | Little direct game-day impact; your wins are built weeks earlier |
 
 ### Design notes per archetype
@@ -49,6 +50,7 @@ Five archetypes spanning the axis — two extremes, one center, two management s
 - **Player-Coach** is the recommended default and the tutorial's implicit baseline: every system matters a medium amount, so the player sees the whole game.
 - **Tactician** trades the body for the brain. In-game, this is the archetype that makes coaching *gameplay*: more calls, better information, visible opponent tendencies.
 - **Motivator** is the people-person: the team plays above its numbers because of you. Deliberately low-maintenance mechanically (passive aura) so it suits players who want vibes over menus.
+- **Mediator** is the locker-room diplomat. Where the Motivator *prevents* (a passive aura that keeps morale high), the Mediator *repairs*: when personality clashes, fights, or ego flare-ups happen between teammates, the Mediator has a much greater chance of resolving them — and a resolved conflict doesn't just return the team to neutral, it *builds* chemistry beyond where it started. Best on volatile, high-talent rosters; the archetype that makes signing difficult personalities a viable strategy.
 - **Developer** is the long-game archetype for players who love progression systems — a farm-system fantasy. Strongest synergy with training and scouting screens.
 
 ### Relationship to Skip
@@ -61,12 +63,14 @@ Stated as requirements, not implementation:
 
 1. **Archetype definitions as data.** Name, fantasy text, stat template, meter grades, perk identifier, and modifier set — authorable without code changes so the roster can grow/rebalance.
 2. **A persistent player-character record.** Identity + chosen archetype + bonus-point allocation, saved for the whole career.
-3. **Modifier hooks.** Places where archetype effects land: daily action count, training-gain multiplier, team morale, in-game ability/play-call availability, scouting accuracy.
-4. **Creator UI sequence.** Card picker + stat allocation + summary, embeddable inside the Skip-guided introduction (and skippable rails for repeat players are worth considering).
+3. **Modifier hooks.** Places where archetype effects land: daily action count, training-gain multiplier, team morale, in-game ability/play-call availability, scouting accuracy, conflict-resolution chance.
+4. **A teammate conflict & chemistry system.** The Mediator requires conflicts to exist as real events (personality clashes, fights, ego flare-ups — likely fed by the flag system) with a resolution mechanic whose odds archetypes can modify, and a team-chemistry value that resolutions can raise.
+5. **Creator UI sequence.** Card picker + stat allocation + summary, embeddable inside the Skip-guided introduction (and skippable rails for repeat players are worth considering).
 
 ## 6. Open Questions
 
-- **Roster final cut.** Are these the right five? A sixth *scout-flavored* archetype (find hidden gems, read opponents) is possible but overlaps most with Skip — deliberately left out for now.
+- **Roster final cut.** Are these the right six? A *scout-flavored* archetype (find hidden gems, read opponents) is possible but overlaps most with Skip — deliberately left out for now.
+- **Motivator/Mediator balance.** Both are people-specialists; the prevent-vs-repair split must stay sharp in tuning. If chemistry systems end up shallow, consider whether they merge into one archetype.
 - **Point pool.** Does the "personal touch" point allocation exist at all, and how big is it? (Proposed: small — flavor, not build-crafting.)
 - **Appearance depth.** Palette swaps on a shared sprite vs. a fuller editor.
 - **Respec & growth.** Is the archetype locked for a career? Can it evolve (Superstar aging into Player-Coach), or hybridize via unlocks?
