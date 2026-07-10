@@ -26,7 +26,7 @@ Scheduled games themselves are owned by the individual sport modules; the hub ha
    - **Office** — roster and team management, league standings, scheduling.
    - **Hospital** — fatigue and injury management.
    - **Cafe / Home** — morale, social events, and advancing to the next day.
-3. **Between-game management.** Days between scheduled games are spent on management actions — training, scouting, roster moves — each consuming time until the next game day arrives.
+3. **Between-game management.** Days between scheduled games are spent on management actions — training, scouting, roster moves — each consuming time until the next game day arrives. Full design of the daily action economy in `HubActionsDesign.md`.
 4. **Game day round trip.** The hub launches the sport, the game plays out, and the player returns to the hub where results are surfaced: stat changes, new flags earned, fatigue accrued, and anything else with consequences for the days ahead.
 
 ## 3. Introduction Flow
