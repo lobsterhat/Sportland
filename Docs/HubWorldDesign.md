@@ -34,7 +34,7 @@ Scheduled games themselves are owned by the individual sport modules; the hub ha
 The introduction is not a menu-driven tutorial overlay — it is a guided first play-through of the real loop, led by the mentor. Every step teaches by doing:
 
 1. **Welcome.** The mentor greets the new player and frames Sportland: a city of sports where you play *and* manage.
-2. **Character creation.** The mentor walks the player through building their character — name, look, and class choice, with the skill-vs-management trade-off explained in plain terms.
+2. **Character creation.** The mentor walks the player through building their character — name, look, and archetype choice, with the skill-vs-management trade-off explained in plain terms. Full design in `CharacterCreatorDesign.md`.
 3. **Build a team.** Guided first roster construction: what the stats and letter grades mean, how to read an athlete, how to sign one.
 4. **Join a league.** Picking a league/competition, what the schedule commitment means, and how the season calendar works.
 5. **Schedule practice.** First management action: setting up practice, what training does, and the cost of a day.
