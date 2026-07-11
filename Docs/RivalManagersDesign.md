@@ -51,7 +51,31 @@ The manager-player is on the roster, so the archetype threat is physical:
 
 Skip's pre-game scouting naturally extends to rival managers: *"Coach Vega calls the press late in close games — watch for it."* Knowing the manager becomes part of knowing the opponent.
 
-## 5. Rivalry Over Time
+## 5. Fallen Rivals Can Join You
+
+**Confirmed:** a rival manager whose club folds, or who is deposed, becomes a **signable athlete**. Their management days are done, but the character walks into your locker room:
+
+- They arrive as a normal pool athlete — their real per-sport stats, their personality intact, their history with you remembered.
+- **They are NOT ego-immune.** Immunity belongs to the player character and Skip alone. A former Superstar manager brings a monster ego (Starter, Spotlight, and the memory of running his own show); a former Motivator might be the best locker-room presence money can't buy. Signing a fallen rival is signing their whole personality.
+- What becomes of their archetype perk as a mere athlete — a diminished echo (a former Tactician as an on-court coach's brain?) or nothing — is an open tuning question.
+
+This is the payoff of shared parts: the character who was your final boss in Division 2 can, three seasons later, be your veteran mentor-figure with a Playing Time grievance. No special systems required — he's made of athlete.
+
+## 6. Drama Without Scripts
+
+Should a signature rival's team be scripted to always reach the championship — the straight-RPG structure? **No. Sportland is a sports sim: we script personalities and reactions, never results.** The championship opponent is whoever earned it; that's the covenant that makes winning mean anything.
+
+But the RPG's boss-arc *feeling* is recoverable with honest tools:
+
+- **The ladder is the pacing.** Promotion structure already delivers boss progression without touching a single result: Division 1's signature rivals literally cannot be met until you climb. Higher tiers *are* later acts.
+- **Weighted casting, not fixed outcomes.** Signature rivals are *built* strong — good generated rosters, high management stats, personalities that keep their clubs competitive. They'll *tend* to be in the hunt, honestly. When one collapses anyway, that's a story too — the fallen giant is authored content nobody scripted.
+- **Narrative attaches to whoever emerges.** Authored rivals carry dialogue for many situations — meeting in a final, a relegation scrap, a shock early exit — and the game surfaces whichever scene the real standings produce. The script follows the season, not the reverse.
+- **Comebacks, not protection.** Soft between-season logic keeps faces relevant without falsifying games: a relegated signature rival rebuilds aggressively and pushes back toward their tier. Resilient, never rigged — and *rebuilds happen in the offseason ledger, not by bending match results.*
+- **Emergent rivals get promoted.** Track real history for *every* manager: the generated nobody who knocks you out two years running has earned rivalry flavor — extra Skip intel, sharper pre-game lines. The sim generates its own villains; the game's job is to notice them.
+
+The honest cost, accepted: a player might never meet a particular authored rival in a final. Fine. The one they do meet will have beaten someone to get there — and the sim's stories ("we both got promoted the same year and he's beaten me in three straight deciders") outrun anything we'd dare to script.
+
+## 7. Rivalry Over Time
 
 Persistent managers + a promotion ladder = rivalry arcs for free:
 
@@ -59,7 +83,7 @@ Persistent managers + a promotion ladder = rivalry arcs for free:
 - **History accrues.** Playoff eliminations, promotion deciders, poached players — the fixture list writes grudges without scripting. (How much the game *tracks and surfaces* this history is an open question; even a simple head-to-head record with flavor lines goes far.)
 - **Pre/post-game presence.** Rival managers are the natural voice of the league: a line before the match, a reaction after, temperament-flavored.
 
-## 6. System Dependencies
+## 8. System Dependencies
 
 1. **A shared manager-player data model** — the player character and rivals are the same shape (archetype + athletic skills + management stats + personality), differing only in who controls them.
 2. **Personality-driven club AI** — recruiting, retention, development, poaching, and roster churn decisions parameterized by the manager's personality and management stats (this implements `AthleteDevelopmentDesign.md` §7's "AI club roster behavior").
@@ -68,10 +92,11 @@ Persistent managers + a promotion ladder = rivalry arcs for free:
 5. **Persistence** — rival managers survive across seasons with their clubs, promotions, relegations, and roster history.
 6. **Rivalry memory (lightweight)** — at minimum, head-to-head records per rival manager for flavor and Skip intel.
 
-## 7. Open Questions
+## 9. Open Questions
 
 - **Do rival managers have egos?** The player character and Skip are immune by rule; rivals presumably feel like personalities, but do their expectation traits mechanically matter (their locker rooms suffering their temperament), or is rival club mood abstracted?
-- **Can a rival manager ever join you?** If their club folds or they're deposed — can a former rival be signed as an athlete (their management days done), and what happens to their perks? Memorable if yes; complicated if yes.
+- **Fallen-rival perk echo.** Confirmed that fallen rivals are signable (Section 5); open whether their old archetype perk survives as a diminished athlete-side echo, and how often clubs fold/depose so the supply feels rare and special.
+- **Comeback-logic strength.** How aggressive the between-season rebuild push for relegated signature rivals is before it starts to feel like protection (Section 6's line to hold: offseason ledger only, never match results).
 - **Manager progression.** Do rival managers develop over a career like their athletes do — a lower-division Tactician slowly climbing with you, or are they static anchors of their tier?
 - **How much history is surfaced?** Head-to-head records only, or a real rivalry meter with escalating flavor (special pre-game scenes for old enemies in a promotion decider)?
 - **Authored rival count.** How many signature rivals per sport, and are any *cross-sport* characters (a manager you battle in two leagues)?
