@@ -23,7 +23,7 @@ Division 3
 (Division 4 — entry tier, if we go with four)
 ```
 
-- **Each division holds a fixed number of teams** (placeholder: 8) playing a scheduled season against each other (placeholder: double round-robin — 14 game days).
+- **Each division holds at least 8 teams** (confirmed floor; exact count per division open) playing a scheduled season against each other (placeholder: double round-robin — 14+ game days). Populating this many teams across every tier requires a big, living player pool — see `AthleteDevelopmentDesign.md`.
 - **Promotion & relegation.** Season's end moves teams between tiers (placeholder: top 2 up, bottom 2 down). The player's team can absolutely be relegated — the ladder goes both directions.
 - **New teams enter at the bottom.** The intro's "join a league" step (see `HubWorldDesign.md` §3) enrolls the player's fresh team in the lowest division of their chosen sport.
 - **The crown.** Winning Division 1 makes you that sport's champion. The long-game fantasy — the reason the hub has more than one arena — is taking one club to the top of *every* sport in Sportland.
@@ -56,7 +56,7 @@ Sport D                            ░░██████████
 
 - **One club, many sports.** The player's franchise can field teams in multiple sports' leagues simultaneously. Each sport's league membership, division standing, and promotion track is independent.
 - **Overlap is the designed crunch.** During overlap windows, two sports' game days compete for the same calendar — the "holding two jobs" pressure from `HubActionsDesign.md` §5 is created *here*, on purpose, at the edges of seasons rather than constantly.
-- **Multi-sport athletes are the tempting mistake.** Athletes carry per-sport stats, so your basketball star may also be a gifted volleyball player. Rostering someone in two overlapping sports doubles their value and their fatigue — and their Playing Time ego applies in *both* sports. The ego budget and the fatigue system make dual-rostering a high-wire act rather than a free win.
+- **Multi-sport athletes are the tempting mistake.** Athletes carry per-sport stats, so your basketball star may also be a gifted volleyball player. Rostering someone in two overlapping sports doubles their value and their fatigue — and their Playing Time ego applies in *both* sports. The ego budget and the fatigue system make dual-rostering a high-wire act rather than a free win. (Aptitude profiles, specialization, and the club-pool-vs-rosters model live in `AthleteDevelopmentDesign.md`.)
 - **The off-window is never empty.** When one sport sleeps, another is peaking — a full-franchise career has no true dead time, but a single-sport club gets genuine offseasons to rebuild.
 
 ## 5. Scheduling Mechanics
@@ -79,7 +79,7 @@ Sport D                            ░░██████████
 
 - **Three or four divisions?** Four gives a longer climb and a gentler entry tier; three keeps every season closer to the summit. May vary per sport (a niche sport might only sustain three).
 - **Tiers confirmed?** This doc assumes divisions are a promotion/relegation ladder. The alternative reading — parallel/regional divisions feeding a shared playoff — is a different game shape; confirming the ladder is the first ruling this doc needs.
-- **Teams per division & season length.** 8 teams / double round-robin / 2–4 free days per fixture are placeholders; these numbers *are* the game's pacing and want playtesting.
+- **Teams per division & season length.** At least 8 teams is confirmed; the exact count, double round-robin, and 2–4 free days per fixture remain placeholders — these numbers *are* the game's pacing and want playtesting.
 - **Postseason shape.** Standings-only promotion vs. promotion playoffs; whether D1 gets a grander championship event than lower tiers.
 - **Sport count & the year wheel.** Which sports occupy which windows, how many the wheel holds at launch, and how much overlap is fun vs. punishing.
 - **Entry choice.** Does a new career enroll in one sport's league (expanding later), or can an ambitious player enroll in several from day one?
