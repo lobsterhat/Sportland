@@ -41,7 +41,8 @@ The catalog is data-driven and will grow; this is the starting set. **(A)** = co
 - **Set lineup / rotation** (F) — never charge for the basic job of coaching.
 - **Talk it down** (A) — resolve a live conflict event (`ConflictChemistryDesign.md` §6).
 - **Assign scouting** (A) — investigate an athlete (own roster or target): reveals expectation traits, condition, potential. Results may take days; depth scales with scouting stat / *Growth Eye*.
-- **Sign / release** (A) — roster transactions. Costing an action makes churn deliberate (open question below).
+- **Sign / release** (F) — the paperwork is free. Once an athlete is willing to join, signing them costs nothing; releasing anyone costs nothing. Roster churn is limited by *willingness*, not clerical friction.
+- **Interview / schmooze** (A) — the recruiting pitch: sit down with a signable athlete to entice them onto the team. Raises their **willingness to sign**, and — being a conversation — has a chance to reveal an expectation trait (`ConflictChemistryDesign.md` §2.2), so recruiting doubles as due diligence. Low-profile athletes may sign without any courtship; stars expect to be wooed, possibly across multiple sittings. Skip never needs schmoozing — he is always willing, per his contract.
 - **League business** (F to view; A for commitments like joining a league or scheduling a friendly).
 
 ### Practice Facility — where the weeks are won
@@ -76,12 +77,13 @@ Consulting Skip is **never an action**: his warnings, suggestions, and explanati
 3. **Action definitions as data** — id, building, cost, requirements, effects — so the catalog grows without code changes.
 4. **Building interaction points in the hub scene** — each building exposes its actions when approached/entered.
 5. **Consumer-system hooks** — training, scouting, conflict queue, chemistry, injury/fatigue systems all execute the effects actions trigger.
-6. **A day-summary surface** — morning briefing (Skip) and overnight results need somewhere to land.
+6. **A willingness-to-sign value on signable athletes** — raised by interviews/schmoozing (scaled by talent/ego), gating signings instead of an action cost; the mentor is permanently at maximum willingness.
+7. **A day-summary surface** — morning briefing (Skip) and overnight results need somewhere to land.
 
 ## 7. Open Questions
 
 - **Points vs. time slots.** Current model is abstract points spent in any order. Alternative: Persona-style day slots (morning/afternoon/evening) where actions occupy times — more flavor and more scheduling texture, more UI. Points are the simpler default; slots are worth a look once the hub is walkable.
-- **Sign/release cost.** Should transactions cost an action (deliberate churn) or be free with cooldowns/windows doing the limiting? Interacts with Skip's free release/rejoin guarantee — releasing or re-signing *Skip specifically* should probably always be free, consistent with his contract.
+- **Recruiting depth.** How many interviews does a star demand, and what raises willingness besides schmoozing (team success, chemistry reputation, a friend already on the roster)? Does a botched pitch or a release *lower* willingness — can burned bridges exist, and how do they mend?
 - **Banking and overdraft.** Use-it-or-lose-it is the proposal; any exceptions (bank exactly 1? borrow 1 against tomorrow at a morale cost?) or is the hard edge better?
 - **Delegation/staff.** Can hired staff (or Skip?) execute actions autonomously later in a career — auto-scouting, assistant-run practices? Big lever for late-game scale; out of scope for the first pass.
 - **Batch actions.** Does a multi-day training camp exist (spend several days' actions at once for efficiency), or is everything day-granular?
