@@ -36,7 +36,7 @@ The introduction is not a menu-driven tutorial overlay — it is a guided first 
 1. **Welcome.** The mentor greets the new player and frames Sportland: a city of sports where you play *and* manage.
 2. **Character creation.** The mentor walks the player through building their character — name, look, and archetype choice, with the skill-vs-management trade-off explained in plain terms. Full design in `CharacterCreatorDesign.md`.
 3. **Build a team.** Guided first roster construction: what the stats and letter grades mean, how to read an athlete, how to sign one.
-4. **Join a league.** Picking a league/competition, what the schedule commitment means, and how the season calendar works.
+4. **Join a league.** Picking a league/competition, what the schedule commitment means, and how the season calendar works. Full design in `CalendarLeagueDesign.md`.
 5. **Schedule practice.** First management action: setting up practice, what training does, and the cost of a day.
 6. **First game.**
    - **Pre-game:** lineup selection, opponent scouting intel from the mentor.
