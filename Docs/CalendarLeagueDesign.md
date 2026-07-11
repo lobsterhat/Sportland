@@ -37,7 +37,7 @@ Each sport's season passes through four phases:
 1. **Preseason** — no league fixtures; the natural window for recruiting pushes, training camps, and friendlies. The fixture list for the coming season is published here.
 2. **Regular season** — scheduled game days against division rivals, with free days between them (the hub economy's rhythm: 2–4 free days per fixture, placeholder). Standings update game by game.
 3. **Postseason** — the season's sharp end (placeholder: a small playoff among the division's top finishers to crown the division champion; whether promotion is decided by standings alone or a promotion playoff is open).
-4. **Offseason** — the league sleeps. Transfers and roster building happen here, and it's the ego system's annual checkpoint: expectations get renegotiated (a breakout season inflates a Playing Time ego; a veteran mellows), contentment resets toward neutral, and departures happen.
+4. **Offseason** — the league sleeps. Transfers and roster building happen here, and it's the ego system's annual checkpoint: expectations get renegotiated (a breakout season inflates a Playing Time ego; a veteran mellows), contentment resets toward neutral, and every athlete runs a stay/go evaluation — chronically frustrated players jump ship unless retained (`ConflictChemistryDesign.md` §6.1).
 
 Season results feed reputation: promotion raises the willingness of free agents to sign (everyone wants to join a riser); relegation sours it and can spark departure conflicts.
 

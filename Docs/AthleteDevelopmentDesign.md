@@ -67,6 +67,7 @@ The club signs athletes into **one club pool**; each sport team the club operate
 - **Nobody has to be everywhere.** A pool athlete can be rostered on one sport's team, several (the dual-sport high-wire act, `CalendarLeagueDesign.md` §4), or **none**.
 - **Unrostered athletes are the development squad.** They train, build familiarity, and wait — the natural home for growth-phase prospects not ready for league minutes.
 - **Egos apply where relevant.** Playing Time/Starter/Spotlight expectations are evaluated per sport roster an athlete is on. Being left *entirely* unrostered frustrates a strong Playing Time ego eventually — low-ego youngsters sit happily in the development squad; a proud veteran will not. Roster assignment is itself an ego-budget decision.
+- **And it's not a one-way street.** An athlete stuck out of the games or the role he wants can demand a trade/release mid-season or jump ship at season's end (`ConflictChemistryDesign.md` §6.1) — the development squad only holds players who accept being there.
 - **Assignment is free.** Like lineups, moving pool athletes onto and off sport rosters costs no actions (`HubActionsDesign.md`: the paperwork is free) — though league rules may impose windows/deadlines for competition integrity (open question).
 
 ## 7. System Dependencies

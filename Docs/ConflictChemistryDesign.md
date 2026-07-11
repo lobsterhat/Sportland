@@ -71,7 +71,7 @@ Each athlete's unmet expectations accumulate into **discontent**, evaluated at n
 1. **Content** — expectations met. No effects.
 2. **Annoyed** — grumbling; small personal morale dip. Visible early-warning state (Skip flags it: *"Jackson's been eyeing the minutes column."*).
 3. **Upset** — visible attitude; personal performance dip; begins draining team chemistry passively; may trigger a **conflict event**.
-4. **Fed up** — demands a meeting (forced conflict event); may refuse assignments; sustained chemistry drain.
+4. **Fed up** — demands a meeting (forced conflict event); may refuse assignments; sustained chemistry drain; if the grievance persists, escalates to a formal exit demand (Section 6.1).
 
 **Conflict events** are discrete, dated things that happen and must be dealt with:
 
@@ -137,6 +137,25 @@ When a conflict event is live, the player chooses how to handle it (a hub action
 
 The "resolution builds past neutral" rule (from the Mediator spec) applies to **successful talk-downs by anyone** — the Mediator just succeeds far more often. A team that fights and reconciles ends up tighter than one that never fought.
 
+### 6.1 Athlete-initiated exits — rostering is not a one-way street
+
+The player isn't the only one with agency. An athlete who isn't playing, or isn't in the role he wants, has his own exit ramp — two of them:
+
+**Mid-season: the exit demand.** A grievance left in Fed up long enough escalates into a formal demand — the role, a trade, or an outright release. It's a forced conflict event with sharpened stakes:
+
+- **Concede the role** — give him what the ego wants. The grievance closes; your lineup pays for it.
+- **Talk it down** — possible, but at meaningfully worse odds than an ordinary conflict (it got this far for a reason). A Mediator's best save.
+- **Grant the exit** — trade or release him. Clean, immediate, and final.
+- **Refuse the demand** — he stays, but **checked out**: performance tanked, passive chemistry drain, and he walks for free at season's end regardless. Refusing buys his roster spot, not his heart.
+
+**Season's end: jumping ship.** Every athlete runs a stay/go evaluation in the offseason. Chronic unmet expectations push toward the door; **familiarity, team chemistry, and a winning trajectory pull toward staying** (promotion papers over a lot of grievances; relegation sharpens all of them). Departing athletes leave for free agency or a rival club — the roster you neglected socially is the roster you lose in the spring.
+
+**The retention pitch.** During the offseason window, the interview/schmooze action (`HubActionsDesign.md`) points inward: sit down with a wavering player and make the case to stay — same action, same conversation mechanics, same chance of revealing something you didn't know about him. Recruiting and retention are one skill.
+
+**Skip and the player character never leave** — ego immunity extends here. Skip departs only when released, per his contract.
+
+Design intent: exits give every ignored warning a real deadline. "I'll deal with Jackson's minutes after the playoff push" is now a bet with his departure as the table stakes — and lower-division churn (see `AthleteDevelopmentDesign.md` §2) gets one more engine: unhappy athletes don't just sit, they *move*.
+
 ## 7. Team Chemistry
 
 A single team-level value (0–100, letter-graded like everything else).
@@ -170,12 +189,16 @@ That second effect makes chemistry self-reinforcing in both directions — prote
 7. **Skip hint hooks** — discontent states feed Skip's pre-game/post-game tips.
 8. **Per-trait reveal state on athlete data** — which expectations have been discovered (via scouting or behavior), persisted for the career; UI shows `?` for undiscovered traits.
 9. **An ego-veto hook in sport command handling** — when the player commands a controlled athlete, the ego layer can refuse the command before it executes, with a telegraphed animation/indicator; sports must route player commands through this check and support the refusal feedback.
+10. **Exit machinery** — mid-season demand events (with the checked-out state), an offseason stay/go evaluation per athlete (discontent vs. familiarity/chemistry/trajectory), retention-pitch hooks on the interview action, and destinations for departures (free agency, AI clubs).
 
 ## 9. Open Questions
 
 - **Trait list final cut.** Are these six + Volatility right? Candidates considered and parked: Loyalty (expects not to be trade bait), Rivalry (specific-athlete grudges as links rather than ratings).
 - **Vindication.** When an athlete grudgingly complies and the play *works*, should winning the standoff pay out — a contentment/respect gain because results ease egos? And the mirror: if the forced play fails, a "told you so" discontent bonus? Deepens the risk/reward but adds outcome-tracking complexity.
 - **Escalation curve tuning.** How steep the per-refusal odds penalty is, the stack size that triggers a live flare-up, and whether backing off mid-game cools the stack slightly or just freezes it. Playtest-driven.
+- **Promises.** Should talking down an exit demand create a tracked *promise* ("you'll start by March") that auto-escalates brutally if broken? High drama, needs commitment-tracking machinery.
+- **Ambition as an exit driver.** Beyond role grievances — does a high-ceiling athlete outgrowing your division want out on ambition alone ("I'm too good for D3")? Feeds lower-division churn naturally; could be a seventh expectation trait.
+- **Poaching.** Do AI clubs actively court your discontented players (visible approaches you can counter), or do departures just resolve to destinations invisibly?
 - **Expectation growth.** Do egos change over a career — a breakout youngster's Playing Time expectation rising with his stats, a veteran mellowing? (Strong candidate: yes, driven by performance and age.)
 - **Split "how much" from "how hard."** One rating currently covers both the size of the expectation and the reaction strength (with Volatility as a global modifier). Is a per-trait split worth the complexity?
 - **Pairwise chemistry.** Team-level only for now; individual friendships/rivalries as links or flags could layer on later.
