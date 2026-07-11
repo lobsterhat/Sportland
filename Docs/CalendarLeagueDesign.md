@@ -28,7 +28,7 @@ Division 3
 - **New teams enter at the bottom.** The intro's "join a league" step (see `HubWorldDesign.md` §3) enrolls the player's fresh team in the lowest division of their chosen sport.
 - **The crown.** Winning Division 1 makes you that sport's champion. The long-game fantasy — the reason the hub has more than one arena — is taking one club to the top of *every* sport in Sportland.
 
-AI teams occupy every other slot in every division, with their own rosters and (eventually) their own personalities as rivals the player meets year after year.
+AI teams occupy every other slot in every division, each run by its own **manager-player** — a rival built from the same archetype/skills/personality parts as the player's character. Full design in `RivalManagersDesign.md`.
 
 ## 3. Anatomy of a Season
 

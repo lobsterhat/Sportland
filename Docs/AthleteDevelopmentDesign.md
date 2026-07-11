@@ -78,7 +78,7 @@ The club signs athletes into **one club pool**; each sport team the club operate
 4. **A development model** — training and game minutes converting into stat gains, scaled by age phase, ceiling headroom, focus/specialization choices, and archetype/stat multipliers.
 5. **Familiarity value per athlete** — accumulation sources, its team-play/volatility/training effects, and loss on departure.
 6. **Club pool ↔ sport roster separation** — one signed pool, per-sport roster assignment (including none), with per-roster ego evaluation.
-7. **AI club roster behavior** — AI teams signing, developing, and releasing so the league's churn (especially lower divisions) actually happens in the world, not just in flavor text.
+7. **AI club roster behavior** — AI teams signing, developing, and releasing so the league's churn (especially lower divisions) actually happens in the world, not just in flavor text. Steered by each club's rival manager-player personality (`RivalManagersDesign.md`).
 
 ## 8. Open Questions
 
