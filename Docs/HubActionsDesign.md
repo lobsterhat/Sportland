@@ -55,10 +55,22 @@ The catalog is data-driven and will grow; this is the starting set. **(A)** = co
 - **Checkup** (F) — condition report on any athlete; pairs with scouting for full information.
 
 ### Cafe / Home — the social engine
-- **Team event** (A) — group chemistry builder (dinner, outing). The blunt instrument for chemistry.
+- **Team event** (A) — group chemistry builder (dinner, bowling night, outing) with a **guest list** the player curates — see below.
 - **One-on-one** (A) — time with a single athlete: contentment gain, and it can reveal an expectation trait through conversation — the social alternative to scouting.
 - **Rest** (A) — deliberately burn an action to clear your own character's fatigue. Turning time into readiness.
 - **End the day** (F) — sleep; forfeit anything unspent.
+
+#### The guest list — how team events work
+
+One action buys the event; the player decides who's on the list and on what terms:
+
+- **Invite anyone, from two players to the whole pool.** The guest list is the design space — an intimate dinner and a full-club bowling night are the same action with very different shapes.
+- **Depth dilutes with size.** The event's benefits spread across attendees: a small gathering gives strong per-person contentment/chemistry gains and a real chance of learning something about an individual (an expectation-trait read, per the scouting discovery rules — `ScoutingDesign.md`); a big party gives everyone a little and reveals almost nothing about anyone. Broad-and-shallow or narrow-and-deep is the core choice.
+- **Exclusion has a social cost.** Every player left off the list has a *chance to feel left out* — a contentment hit scaled by how big the party was (nobody resents missing a quiet dinner for two; being one of three names left off the whole-team night out stings), and by who they are: Recognition and Spotlight egos take exclusion hardest, high familiarity shrugs it off.
+- **Optional or mandatory attendance.** Invited players don't always want to come:
+  - **Optional** — reluctant invitees (tired, low contentment, unfamiliar newcomers, private personalities) simply decline, no harm done. You get a willing room and a pure vibe, but no guarantee the players who *need* to be there show up.
+  - **Mandatory** — everyone invited attends. Now you can force the two feuding teammates into the same booth (a Mediator's favorite move) — but unwilling attendees drag the event's benefit down for everyone and pick up a little discontent themselves (Workload egos especially resent mandatory fun).
+- **Skip and the player character** are always happy to attend and never feel left out — ego immunity extends to party invitations.
 
 ### Skip — everywhere, always free
 Consulting Skip is **never an action**: his warnings, suggestions, and explanations are ambient (per `HubWorldDesign.md` §4.3). He tells you *where* the fires are; putting them out is what actions are for.
@@ -87,4 +99,6 @@ Consulting Skip is **never an action**: his warnings, suggestions, and explanati
 - **Banking and overdraft.** Use-it-or-lose-it is the proposal; any exceptions (bank exactly 1? borrow 1 against tomorrow at a morale cost?) or is the hard edge better?
 - **Delegation/staff.** Can hired staff (or Skip?) execute actions autonomously later in a career — auto-scouting, assistant-run practices? Big lever for late-game scale; out of scope for the first pass.
 - **Batch actions.** Does a multi-day training camp exist (spend several days' actions at once for efficiency), or is everything day-granular?
-- **Numbers.** Base 3 / Superstar 2 / Player-Coach 4, one pre-game action, fatigue thresholds — all placeholders pending playtesting.
+- **Event attendance willingness.** What drives an invitee's desire to attend — derived from existing values (contentment, fatigue, familiarity, volatility), or is a *Social* personality trait worth adding to the expectation set?
+- **Event timing plays.** Can an event fire the evening after a bad loss as a deliberate spiral-breaker, and is that window mechanically stronger (morale repair) or just flavor?
+- **Numbers.** Base 3 / Superstar 2 / Player-Coach 4, one pre-game action, fatigue thresholds, dilution curves and exclusion odds — all placeholders pending playtesting.

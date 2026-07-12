@@ -65,7 +65,7 @@ The interview/schmooze from `HubActionsDesign.md` — sit down and talk. Best fo
 The 1v1 roster (golf, bowling, table tennis) and mini-game sports (**rowing, rock climbing**) are deliberately cheap to build relative to team sports — and every one pays multiple ways:
 
 1. **Scouting venue** (Section 3.2) — their entry point into the package.
-2. **Team events.** The Cafe's chemistry-building event (`HubActionsDesign.md` §4) gets real: bowling night *is* the bowling module with five athletes and pizza. Played or simulated, same content.
+2. **Team events.** The Cafe's chemistry-building event (`HubActionsDesign.md` §4) gets real: bowling night *is* the bowling module with the guest list and pizza. The guest-list rules apply — small gatherings can double as individual scouting reads; big parties are chemistry-broad and information-shallow.
 3. **Training minigames.** Rowing is a conditioning session you can actually play; rock climbing reads as strength/agility work — individual training sessions with hands on the controller.
 4. **Their own competitions, later.** Nothing stops a bowling ladder or a climbing meet becoming a real fixture on the calendar wheel eventually — the module's already built, and athletes carry ratings in these sports like any other (a fun tell: your point guard is a secret table-tennis monster).
 
