@@ -52,7 +52,7 @@ Invite a target to something casual and competitive: **golf, bowling, table tenn
 
 ### 3.3 Direct contact (A)
 
-The interview/schmooze from `HubActionsDesign.md` — sit down and talk. Best for **intentions**: willingness, role hopes, a chance at an expectation trait. Cheapest and most direct, least good at anything the athlete would rather you not know; people manage their own image in interviews in a way they can't mid-bowling-meltdown.
+The interview/schmooze from `HubActionsDesign.md` — sit down and talk. Best for **intentions**: willingness, role hopes, a chance at an expectation trait. Cheapest and most direct, least good at anything the athlete would rather you not know; people manage their own image in interviews in a way they can't mid-bowling-meltdown. Disposition-gated (`ConflictChemistryDesign.md` §2.3): high-Openness athletes spill readily; private ones are nearly interview-proof — take *them* bowling, and note that a high-Competitive target rarely turns down a 1v1 challenge.
 
 ### 3.4 Additional channels (proposed)
 

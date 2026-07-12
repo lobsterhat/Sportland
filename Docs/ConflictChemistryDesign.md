@@ -54,6 +54,20 @@ Expectation ratings are **hidden by default**, for free agents *and* your own ro
 
 This makes the first season with any new athlete a genuine discovery arc: who they are emerges through play unless you paid to know in advance.
 
+### 2.3 Disposition traits — how they like to live
+
+Alongside expectations, each athlete carries a small set of **disposition traits** (same 0–100 ratings, same letter grades): personality dimensions that shape **willingness to do or avoid activities and interactions**. Where expectations are *claims* (unmet ones breed conflict), dispositions are *styles* — they don't generate grievances on their own; they decide how the athlete engages with everything social.
+
+Proposed starting set:
+
+| Trait | High rating | Low rating |
+|---|---|---|
+| **Social** | Loves team events, accepts every invitation, feels exclusion keenly | Declines optional events, drags mandatory ones, barely notices being left out |
+| **Competitive** | Jumps at 1v1 invitationals, wants extra practice, takes losses hard | Coasts; casual about challenges and results alike |
+| **Openness** | Easy to read — interviews and one-on-ones reveal traits readily | Private; declines direct contact, hard to scout socially — actions must speak |
+
+Dispositions plug into existing systems as modifiers: event attendance willingness and exclusion sting (the guest list, `HubActionsDesign.md`), channel yield in scouting (`ScoutingDesign.md` — a private athlete is nearly interview-proof but can't hide at the bowling alley), and reception of the post-game address (`HubActionsDesign.md` §2). They're discovered through the same hidden-until-scouted-or-revealed machinery as expectations (§2.2).
+
 ## 3. The Ego Budget
 
 Expectations are claims on **finite resources**: there are only so many minutes, one starting lineup, one spot per position, so many plays to call, so much praise-worthy spotlight. This makes team building a budget problem:

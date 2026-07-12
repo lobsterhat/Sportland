@@ -24,7 +24,21 @@ Two principles:
 3. **End the day.** Return Home (or choose "advance day" from anywhere once designed). Unspent actions are lost — **use it or lose it**, so ending early is itself a choice, not a savings plan.
 4. **Overnight tick.** Fatigue recovery, discontent checkpoints, training results land, calendar advances. Next morning: new budget, new situation.
 
-**Game days** are different: the scheduled game consumes the heart of the day. The player gets **one action** before the game (a pre-game talk, a last lineup fix, a quick treatment) — then it's off to the arena, and the post-game recap replaces the evening.
+**Game days** are different: the scheduled game consumes the heart of the day. The player gets **one action** before the game (a pre-game talk, a last lineup fix, a quick treatment) — then it's off to the arena, and the evening belongs to the post-game.
+
+### 2.1 The post-game address
+
+After the final whistle, before the recap closes the day, the coach speaks — a **free choice** (no action cost; it's part of game day), picked from:
+
+| Option | What it does | The fine print |
+|---|---|---|
+| **Motivate / praise** | Contentment and morale up; **the main feeder of the Recognition trait** (`ConflictChemistryDesign.md` §2) — big performers who go unpraised here are the ones who sour | Praise has to land: a rousing speech after a gutless blowout loss rings hollow (reduced or no effect); the Motivator archetype's words land harder |
+| **Chastise** | The risk/reward read: can sharpen focus (a performance edge next game) when the team *knows* it deserved it and chemistry can absorb it | Backfires into discontent against volatile players or after games they actually played well; punishing effort is how locker rooms are lost |
+| **Call practice** | Books tomorrow as an enhanced team practice (focus chosen now, small efficiency bonus for striking while the iron's hot) | Spends one of tomorrow's actions tonight; Workload egos grumble on the spot |
+| **Team building** | Books a team event for tomorrow (guest-list flow as normal) | After a **loss**, this is the spiral-breaker: the event lands with a morale-repair bonus — the designed answer to bad-night momentum |
+| **Rest day** | Tomorrow is off: everyone (including you) recovers extra fatigue, Workload egos are pleased | Tomorrow's entire action budget is forfeit — recovery is bought with a management day |
+
+Two design notes: **the address is free but rarely neutral** — most options mortgage tomorrow, so the post-game choice is really a calendar commitment made in an emotional moment; and **reception is filtered through who's listening** — dispositions (`ConflictChemistryDesign.md` §2.3), expectation traits, volatility, and the actual result all shape how each athlete takes the same words. Skip and the player character, as ever, take everything well.
 
 ## 3. The Action Budget
 
@@ -99,6 +113,6 @@ Consulting Skip is **never an action**: his warnings, suggestions, and explanati
 - **Banking and overdraft.** Use-it-or-lose-it is the proposal; any exceptions (bank exactly 1? borrow 1 against tomorrow at a morale cost?) or is the hard edge better?
 - **Delegation/staff.** Can hired staff (or Skip?) execute actions autonomously later in a career — auto-scouting, assistant-run practices? Big lever for late-game scale; out of scope for the first pass.
 - **Batch actions.** Does a multi-day training camp exist (spend several days' actions at once for efficiency), or is everything day-granular?
-- **Event attendance willingness.** What drives an invitee's desire to attend — derived from existing values (contentment, fatigue, familiarity, volatility), or is a *Social* personality trait worth adding to the expectation set?
-- **Event timing plays.** Can an event fire the evening after a bad loss as a deliberate spiral-breaker, and is that window mechanically stronger (morale repair) or just flavor?
+- ~~Event attendance willingness~~ **Resolved:** disposition traits (Social, Competitive, Openness — `ConflictChemistryDesign.md` §2.3) drive activity willingness, layered on contentment, fatigue, and familiarity.
+- ~~Event timing plays~~ **Resolved:** the post-game address (§2.1) books next-day events, and post-loss team building carries a morale-repair bonus.
 - **Numbers.** Base 3 / Superstar 2 / Player-Coach 4, one pre-game action, fatigue thresholds, dilution curves and exclusion odds — all placeholders pending playtesting.
