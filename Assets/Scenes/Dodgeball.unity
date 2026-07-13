@@ -13,7 +13,7 @@ OcclusionCullingSettings:
 --- !u!104 &2
 RenderSettings:
   m_ObjectHideFlags: 0
-  serializedVersion: 9
+  serializedVersion: 10
   m_Fog: 0
   m_FogColor: {r: 0.5, g: 0.5, b: 0.5, a: 1}
   m_FogMode: 3
@@ -38,13 +38,12 @@ RenderSettings:
   m_ReflectionIntensity: 1
   m_CustomReflection: {fileID: 0}
   m_Sun: {fileID: 0}
-  m_IndirectSpecularColor: {r: 0, g: 0, b: 0, a: 1}
   m_UseRadianceAmbientProbe: 0
 --- !u!157 &3
 LightmapSettings:
   m_ObjectHideFlags: 0
-  serializedVersion: 12
-  m_GIWorkflowMode: 1
+  serializedVersion: 13
+  m_BakeOnSceneLoad: 0
   m_GISettings:
     serializedVersion: 2
     m_BounceScale: 1
@@ -67,9 +66,6 @@ LightmapSettings:
     m_LightmapParameters: {fileID: 0}
     m_LightmapsBakeMode: 1
     m_TextureCompression: 1
-    m_FinalGather: 0
-    m_FinalGatherFiltering: 1
-    m_FinalGatherRayCount: 256
     m_ReflectionCompression: 2
     m_MixedBakeMode: 2
     m_BakeBackend: 0
@@ -104,7 +100,7 @@ NavMeshSettings:
   serializedVersion: 2
   m_ObjectHideFlags: 0
   m_BuildSettings:
-    serializedVersion: 2
+    serializedVersion: 3
     agentTypeID: 0
     agentRadius: 0.5
     agentHeight: 2
@@ -117,12 +113,105 @@ NavMeshSettings:
     cellSize: 0.16666667
     manualTileSize: 0
     tileSize: 256
-    accuratePlacement: 0
+    buildHeightMesh: 0
     maxJobWorkers: 0
     preserveTilesOutsideBounds: 0
     debug:
       m_Flags: 0
   m_NavMeshData: {fileID: 0}
+--- !u!1 &1000001
+GameObject:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  serializedVersion: 6
+  m_Component:
+  - component: {fileID: 1000002}
+  - component: {fileID: 1000003}
+  - component: {fileID: 1000004}
+  m_Layer: 0
+  m_Name: DodgeballField
+  m_TagString: Untagged
+  m_Icon: {fileID: 0}
+  m_NavMeshLayer: 0
+  m_StaticEditorFlags: 0
+  m_IsActive: 1
+--- !u!4 &1000002
+Transform:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000001}
+  serializedVersion: 2
+  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
+  m_LocalPosition: {x: 0, y: 0, z: 0}
+  m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
+  m_Children: []
+  m_Father: {fileID: 0}
+  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
+--- !u!114 &1000003
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: 8aba76e091175464bb07b8105e9c2935, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  spritePrefab: {fileID: 4757217570519896899, guid: 4adc7eabe311b964a92f8c7f53624d2d, type: 3}
+  ballPrefab: {fileID: 100000001, guid: 257205362ecf75460ceb5498e38b3123, type: 3}
+  courtPrefab: {fileID: 0}
+  centerLinePrefab: {fileID: 0}
+  playerControlledId: A_In_2
+  allAIControlled: 0
+  showDiagnosticsHud: 0
+  spawnDebugCannon: 0
+  showPlayerLabels: 0
+  showPlayByPlay: 0
+  showMatchControls: 0
+  showTuningPanel: 0
+  obliqueViewSpike: 0
+  obliqueFarScale: 0.5
+  obliqueDepthBunch: 1.6
+  obliqueHeightExaggeration: 1.5
+  gameMode: {fileID: 0}
+  startMode: 0
+  runMatch: 1
+  allowRuntimeModeSwitch: 0
+  abilityPool: []
+  abilityChance: 0.35
+  maxAbilitiesPerPlayer: 1
+  guaranteeStarAbility: 1
+  debugForcedAbilities: []
+  enableStamina: 1
+  attackLabMode: 1
+  uiFont: {fileID: 12800000, guid: 71a55b0538d48354b87afab937af74d2, type: 3}
+  spawnedPlayers: []
+--- !u!114 &1000004
+MonoBehaviour:
+  m_ObjectHideFlags: 0
+  m_CorrespondingSourceObject: {fileID: 0}
+  m_PrefabInstance: {fileID: 0}
+  m_PrefabAsset: {fileID: 0}
+  m_GameObject: {fileID: 1000001}
+  m_Enabled: 1
+  m_EditorHideFlags: 0
+  m_Script: {fileID: 11500000, guid: c1dfb4e10f7a4d3b9e2c5a6f8b0d3e51, type: 3}
+  m_Name: 
+  m_EditorClassIdentifier: 
+  teamAHalfColor: {r: 0.18, g: 0.3, b: 0.55, a: 1}
+  teamBHalfColor: {r: 0.55, g: 0.2, b: 0.22, a: 1}
+  teamAStripColor: {r: 0.45, g: 0.6, b: 0.9, a: 0.9}
+  teamBStripColor: {r: 0.9, g: 0.5, b: 0.5, a: 0.9}
+  boundaryColor: {r: 0.92, g: 0.92, b: 0.92, a: 0.9}
+  centerLineColor: {r: 0.98, g: 0.98, b: 0.98, a: 1}
+  lineWidth: 0.08
 --- !u!1 &519420028
 GameObject:
   m_ObjectHideFlags: 0
@@ -159,13 +248,21 @@ Camera:
   m_Enabled: 1
   serializedVersion: 2
   m_ClearFlags: 2
-  m_BackGroundColor: {r: 0.06, g: 0.08, b: 0.10, a: 1}
+  m_BackGroundColor: {r: 0.06, g: 0.08, b: 0.1, a: 1}
   m_projectionMatrixMode: 1
   m_GateFitMode: 2
   m_FOVAxisMode: 0
+  m_Iso: 200
+  m_ShutterSpeed: 0.005
+  m_Aperture: 16
+  m_FocusDistance: 10
+  m_FocalLength: 50
+  m_BladeCount: 5
+  m_Curvature: {x: 2, y: 11}
+  m_BarrelClipping: 0.25
+  m_Anamorphism: 0
   m_SensorSize: {x: 36, y: 24}
   m_LensShift: {x: 0, y: 0}
-  m_FocalLength: 50
   m_NormalizedViewPortRect:
     serializedVersion: 2
     x: 0
@@ -199,82 +296,14 @@ Transform:
   m_PrefabInstance: {fileID: 0}
   m_PrefabAsset: {fileID: 0}
   m_GameObject: {fileID: 519420028}
+  serializedVersion: 2
   m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
   m_LocalPosition: {x: 0, y: 0, z: -10}
   m_LocalScale: {x: 1, y: 1, z: 1}
+  m_ConstrainProportionsScale: 0
   m_Children: []
   m_Father: {fileID: 0}
-  m_RootOrder: 0
   m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!1 &1000001
-GameObject:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  serializedVersion: 6
-  m_Component:
-  - component: {fileID: 1000002}
-  - component: {fileID: 1000003}
-  - component: {fileID: 1000004}
-  m_Layer: 0
-  m_Name: DodgeballField
-  m_TagString: Untagged
-  m_Icon: {fileID: 0}
-  m_NavMeshLayer: 0
-  m_StaticEditorFlags: 0
-  m_IsActive: 1
---- !u!4 &1000002
-Transform:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1000001}
-  m_LocalRotation: {x: 0, y: 0, z: 0, w: 1}
-  m_LocalPosition: {x: 0, y: 0, z: 0}
-  m_LocalScale: {x: 1, y: 1, z: 1}
-  m_Children: []
-  m_Father: {fileID: 0}
-  m_RootOrder: 1
-  m_LocalEulerAnglesHint: {x: 0, y: 0, z: 0}
---- !u!114 &1000003
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1000001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 8aba76e091175464bb07b8105e9c2935, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  spritePrefab: {fileID: 4757217570519896899, guid: 4adc7eabe311b964a92f8c7f53624d2d, type: 3}
-  ballPrefab: {fileID: 100000001, guid: 257205362ecf75460ceb5498e38b3123, type: 3}
-  courtPrefab: {fileID: 0}
-  centerLinePrefab: {fileID: 0}
-  playerControlledId: A_In_2
-  spawnedPlayers: []
---- !u!114 &1000004
-MonoBehaviour:
-  m_ObjectHideFlags: 0
-  m_CorrespondingSourceObject: {fileID: 0}
-  m_PrefabInstance: {fileID: 0}
-  m_PrefabAsset: {fileID: 0}
-  m_GameObject: {fileID: 1000001}
-  m_Enabled: 1
-  m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: c1dfb4e10f7a4d3b9e2c5a6f8b0d3e51, type: 3}
-  m_Name:
-  m_EditorClassIdentifier:
-  teamAHalfColor: {r: 0.18, g: 0.30, b: 0.55, a: 1}
-  teamBHalfColor: {r: 0.55, g: 0.20, b: 0.22, a: 1}
-  teamAStripColor: {r: 0.45, g: 0.60, b: 0.90, a: 0.9}
-  teamBStripColor: {r: 0.90, g: 0.50, b: 0.50, a: 0.9}
-  boundaryColor: {r: 0.92, g: 0.92, b: 0.92, a: 0.9}
-  centerLineColor: {r: 0.98, g: 0.98, b: 0.98, a: 1}
-  lineWidth: 0.08
 --- !u!1660057539 &9223372036854775807
 SceneRoots:
   m_ObjectHideFlags: 0

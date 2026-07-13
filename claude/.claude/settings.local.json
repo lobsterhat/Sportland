@@ -21,7 +21,11 @@
       "Bash(git -C \"D:/Unity/Sportland\" --no-pager log --oneline -3)",
       "Bash('/c/Program Files/GitHub CLI/gh.exe' --version)",
       "Bash('/c/Users/epilnock/AppData/Local/Programs/GitHub CLI/gh.exe' --version)",
-      "Bash('/c/Program Files/GitHub CLI/gh.exe' issue list --label dodgeball-idea --state open --repo lobsterhat/Sportland --limit 20)"
+      "Bash('/c/Program Files/GitHub CLI/gh.exe' issue list --label dodgeball-idea --state open --repo lobsterhat/Sportland --limit 20)",
+      "Bash(git -C D:/Unity/Sportland add Assets/Scripts/Sports/Dodgeball/Rating.cs Assets/Scripts/Sports/Dodgeball/Rating.cs.meta Assets/Scripts/Sports/Dodgeball/DodgeballAttributes.cs Assets/Scripts/Sports/Dodgeball/CourtSetup.cs Assets/Scripts/Sports/Dodgeball/DodgeballAI.cs Assets/Scripts/Sports/Dodgeball/DodgeballPlayerInput.cs Assets/Scripts/Sports/Dodgeball/DodgeballTuningPanel.cs Assets/Scripts/Sports/Dodgeball/DodgeballAttackLab.cs Assets/Scripts/Sports/Dodgeball/DodgeballAttackLab.cs.meta Assets/Scripts/Sports/Dodgeball/DodgeballUI.cs.meta Assets/Scripts/Sports/Dodgeball/PlayerStamina.cs.meta)",
+      "Bash(grep -n \"wallRestitution\" \"D:/Unity/Sportland/Assets/Prefabs/Dodgeball/Dodgeball.prefab\" \"D:/Unity/Sportland/Assets/Scripts/Sports/Dodgeball/Ball.cs\")",
+      "Read(//d/Unity/Sportland/**)",
+      "Bash(rm -f design/ideas-inbox.md)"
     ],
     "ask": [
       "Bash(git -C \"D:/Unity/Sportland\" push:*)"
