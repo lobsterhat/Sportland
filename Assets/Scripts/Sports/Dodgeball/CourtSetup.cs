@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Sportland.Sports.Dodgeball
 {
@@ -36,6 +37,11 @@ namespace Sportland.Sports.Dodgeball
         public const float HalfWidth = CourtWidth / 2f;   // 9
         public const float HalfHeight = CourtHeight / 2f; // 4.5
 
+        /// <summary>Outer hard bound (half-width) of the play area — the court + the outfielder strip on either side. Players are clamped to this in PlayerMovement.LateUpdate so nothing can slide off-screen.</summary>
+        public const float PlayAreaHalfWidth = HalfWidth + ZoneFactory.StripDepth;   // 12
+        /// <summary>Outer hard bound (half-height) of the play area — the court + the outfielder strip top and bottom.</summary>
+        public const float PlayAreaHalfHeight = HalfHeight + ZoneFactory.StripDepth; // 7.5
+
         // ---- Outfielder offsets from court boundary ----
         // How far behind the baseline outfielders stand:
         public const float BackOutfielderOffset = 1.5f;   // beyond ±9 on X
@@ -46,17 +52,258 @@ namespace Sportland.Sports.Dodgeball
         public const float SideOutfielderX = 4.5f;
 
         [Header("Prefabs")]
-        [SerializeField] private GameObject playerPrefab;
+        // Sprite to use as the player's visual child. We always build the player
+        // root in code (Rigidbody2D + PlayerMovement + PlayerZoneTracker) and
+        // attach this prefab — or a procedural circle if null — as child[0],
+        // which PlayerMovement bobs for the jump arc. Team tint is applied at
+        // runtime via DodgeballPlayerVisual.
+        [SerializeField] private GameObject spritePrefab;
+        // Optional prefab for the dodgeball. Must carry the Ball component
+        // itself; if null, CourtSetup spawns a procedural ball at runtime.
+        [SerializeField] private GameObject ballPrefab;
         [SerializeField] private GameObject courtPrefab;       // optional: visual court sprite
         [SerializeField] private GameObject centerLinePrefab;  // optional: visual divider
+
+        [Header("Player Control")]
+        // Spawn ID of the human-driven character. A_In_2 is Team A's center
+        // infielder at (-4.5, 0).
+        [SerializeField] private string playerControlledId = "A_In_2";
+        [Tooltip("Hand every player to the CPU brain (no human input). Pure AI-vs-AI for observation; toggleable live from the Match controls panel.")]
+        [SerializeField] private bool allAIControlled = false;
+
+        [Header("Diagnostics")]
+        [Tooltip("Spawn an on-screen readout of player/ball state for tuning.")]
+        [SerializeField] private bool showDiagnosticsHud = true;
+        [Tooltip("Spawn the debug cannon (C / R1) that fires balls at the controlled player.")]
+        [SerializeField] private bool spawnDebugCannon = true;
+        [Tooltip("Float a jersey number (e.g. A2) above each player for identification.")]
+        [SerializeField] private bool showPlayerLabels = true;
+        [Tooltip("Show the play-by-play log panel (top-right, under the cannon).")]
+        [SerializeField] private bool showPlayByPlay = true;
+        [Tooltip("Show the Match controls panel (mode dropdown + Reset button) top-right.")]
+        [SerializeField] private bool showMatchControls = true;
+        [SerializeField] private bool showTuningPanel = true;
+
+        [Header("3/4 perspective view — toggle live with Q")]
+        [Tooltip("Render the court as a receding trapezoid (3/4 perspective) and project players/ball onto it. Toggle live in-game with the Q key. Sets the INITIAL state; Q flips it at runtime. Note: perspective brings back the top/bottom spacing difference a flat field avoids.")]
+        [SerializeField] private bool obliqueViewSpike = false;
+        [Tooltip("Far (top) edge scale vs the near (bottom) edge. Lower = stronger perspective.")]
+        [Range(0.2f, 1f)] [SerializeField] private float obliqueFarScale = 0.5f;
+        [Tooltip("How much depth bunches toward the far edge. 1 = flat oblique; higher = stronger perspective.")]
+        [Range(1f, 3f)] [SerializeField] private float obliqueDepthBunch = 1.6f;
+        [Range(1f, 3f)] [SerializeField] private float obliqueHeightExaggeration = 1.4f;
+
+        [Header("Match")]
+        [Tooltip("Scoring rules asset. Leave null to use Start Mode below (built in code).")]
+        [SerializeField] private GameMode gameMode;
+        [Tooltip("Which built-in mode to start in when no Game Mode asset is assigned.")]
+        [SerializeField] private GameMode.Preset startMode = GameMode.Preset.RunningHits;
+        [Tooltip("Run the match scorer (score + clock + win condition).")]
+        [SerializeField] private bool runMatch = true;
+        [Tooltip("Switch modes at runtime for testing: M cycles; F1-F4 pick Running Hits / Elimination / Energy / Hybrid. Resets the match.")]
+        [SerializeField] private bool allowRuntimeModeSwitch = true;
+
+        [Header("Abilities")]
+        [Tooltip("Special Abilities that can be randomly assigned to players at spawn. Leave empty to disable random ability assignment.")]
+        [SerializeField] private SpecialAbility[] abilityPool;
+        [Tooltip("Per-player chance (0..1) to roll an ability from the pool. Each additional ability up to the cap is rolled again at this chance, so multiples get progressively rarer.")]
+        [Range(0f, 1f)] [SerializeField] private float abilityChance = 0.35f;
+        [Tooltip("Max Special Abilities a single player can have (random + forced combined).")]
+        [Min(0)] [SerializeField] private int maxAbilitiesPerPlayer = 1;
+        [Tooltip("Star players (A_In_1 / B_In_1) are guaranteed at least one rolled ability.")]
+        [SerializeField] private bool guaranteeStarAbility = true;
+        [Tooltip("Debug override: force a specific ability onto a specific player by spawn id (e.g. A_In_2). Always assigned, on top of the random roll, up to the cap.")]
+        [SerializeField] private List<ForcedAbility> debugForcedAbilities = new List<ForcedAbility>();
+
+        /// <summary>Inspector entry forcing one ability onto one player (debug / scripted scenarios).</summary>
+        [System.Serializable]
+        public struct ForcedAbility
+        {
+            public string spawnId;
+            public SpecialAbility ability;
+        }
+
+        [Header("Stamina / fatigue")]
+        [Tooltip("Players tire from strenuous actions (throw / catch / jump / dive / sustained run), lowering throw power, accuracy, and catching until they rest; the endurance stat eases it. Off = no fatigue.")]
+        [SerializeField] private bool enableStamina = true;
+
+        [Header("Attack lab (ability tuning)")]
+        [Tooltip("Testing mode: opposing team becomes a single stationary dummy and every user attack is logged (input, type, power, speed, accuracy, damage) — for fine-tuning abilities. Control an attacker; run a non-elimination mode so the dummy persists.")]
+        [SerializeField] private bool attackLabMode = false;
+
+        [Header("UI font (IMGUI overlays)")]
+        [Tooltip("Optional font for the on-screen IMGUI text (score, debug HUDs). Drag a .ttf here (e.g. BoldPixels) to test it; empty = Unity's built-in font. Set the .ttf import to a dynamic font.")]
+        [SerializeField] private Font uiFont;
 
         [Header("Runtime")]
         [SerializeField] private List<GameObject> spawnedPlayers = new List<GameObject>();
 
+        private DodgeballMatch match;
+        private Ball ball;
+        private DodgeballObliqueView obliqueView;
+        private GameMode.Preset currentPreset;
+
+        /// <summary>The mode the match is currently running in (read by the controls panel).</summary>
+        public GameMode.Preset CurrentPreset => currentPreset;
+
+        /// <summary>True if all players are CPU-controlled (no human input).</summary>
+        public bool AllAIControlled => allAIControlled;
+
+        /// <summary>Toggle pure AI-vs-AI play live. On: remove the human input wherever it currently lives. Off: re-attach it to the spawn-time controlled player (or any active player if that one's eliminated).</summary>
+        public void SetAllAI(bool value)
+        {
+            allAIControlled = value;
+            if (value)
+            {
+                if (DodgeballPlayerInput.Current != null) Destroy(DodgeballPlayerInput.Current);
+            }
+            else if (DodgeballPlayerInput.Current == null)
+            {
+                var go = FindActiveSpawnedById(playerControlledId) ?? FirstActiveSpawnedPlayer();
+                if (go != null) go.AddComponent<DodgeballPlayerInput>();
+            }
+        }
+
+        private GameObject FindActiveSpawnedById(string id)
+        {
+            for (int i = 0; i < spawnedPlayers.Count; i++)
+            {
+                var go = spawnedPlayers[i];
+                if (go == null || !go.activeSelf) continue;
+                var tr = go.GetComponent<PlayerZoneTracker>();
+                if (tr != null && tr.Spawn.id == id) return go;
+            }
+            return null;
+        }
+
+        private GameObject FirstActiveSpawnedPlayer()
+        {
+            for (int i = 0; i < spawnedPlayers.Count; i++)
+                if (spawnedPlayers[i] != null && spawnedPlayers[i].activeSelf) return spawnedPlayers[i];
+            return null;
+        }
+
         private void Awake()
         {
+            DodgeballUI.Font = uiFont;   // shared with the runtime-added IMGUI overlays
             BuildCourt();
             SpawnAllPlayers();
+            SpawnBall();
+            if (showDiagnosticsHud) gameObject.AddComponent<DodgeballDiagnosticsHUD>();
+            if (spawnDebugCannon) gameObject.AddComponent<DodgeballCannon>();
+            if (showPlayerLabels) gameObject.AddComponent<DodgeballPlayerLabels>();
+            if (showPlayByPlay) gameObject.AddComponent<DodgeballPlayByPlay>();
+            if (showMatchControls) gameObject.AddComponent<DodgeballMatchControls>();
+            if (showTuningPanel) gameObject.AddComponent<DodgeballTuningPanel>();
+            if (runMatch)
+            {
+                match = gameObject.AddComponent<DodgeballMatch>();
+                currentPreset = startMode;
+                match.Configure(gameMode != null ? gameMode : GameMode.Create(startMode));
+            }
+            // Oblique view: always present, toggled live with Q. Starts in the
+            // state of the inspector bool. Disabled = zero effect (the component's
+            // OnDisable restores the court and its projection stops, so the
+            // movement/ball scripts revert the visuals next frame).
+            obliqueView = gameObject.AddComponent<DodgeballObliqueView>();
+            obliqueView.farScale = obliqueFarScale;
+            obliqueView.depthBunch = obliqueDepthBunch;
+            obliqueView.heightExaggeration = obliqueHeightExaggeration;
+            // Re-toggle so OnEnable (which builds the floor) runs with the params
+            // set above, not the defaults AddComponent's auto-enable used.
+            obliqueView.enabled = false;
+            obliqueView.enabled = obliqueViewSpike;
+
+            if (attackLabMode) gameObject.AddComponent<DodgeballAttackLab>();
+        }
+
+        private void Update()
+        {
+            var kb = Keyboard.current;
+            if (kb == null) return;
+
+            // Q toggles the oblique-view spike live (works regardless of the
+            // mode-switch gating below).
+            if (kb.qKey.wasPressedThisFrame && obliqueView != null)
+            {
+                obliqueView.enabled = !obliqueView.enabled;
+                Debug.Log($"[Dodgeball] Oblique view {(obliqueView.enabled ? "ON" : "off")}");
+            }
+
+            if (!allowRuntimeModeSwitch || match == null) return;
+
+            if (kb.f1Key.wasPressedThisFrame)      SwitchMode(GameMode.Preset.RunningHits);
+            else if (kb.f2Key.wasPressedThisFrame) SwitchMode(GameMode.Preset.Elimination);
+            else if (kb.f3Key.wasPressedThisFrame) SwitchMode(GameMode.Preset.Energy);
+            else if (kb.f4Key.wasPressedThisFrame) SwitchMode(GameMode.Preset.Hybrid);
+            else if (kb.mKey.wasPressedThisFrame)  SwitchMode(NextPreset(currentPreset));
+        }
+
+        private static GameMode.Preset NextPreset(GameMode.Preset p)
+        {
+            switch (p)
+            {
+                case GameMode.Preset.RunningHits: return GameMode.Preset.Elimination;
+                case GameMode.Preset.Elimination: return GameMode.Preset.Energy;
+                case GameMode.Preset.Energy:      return GameMode.Preset.Hybrid;
+                default:                          return GameMode.Preset.RunningHits;
+            }
+        }
+
+        // Rebuild the chosen mode and reset to a fresh match in it.
+        public void SwitchMode(GameMode.Preset preset)
+        {
+            currentPreset = preset;
+            RestartInMode(GameMode.Create(preset));
+            Debug.Log($"[Dodgeball] Switched to mode: {preset}");
+        }
+
+        /// <summary>Restart the current mode in place (Reset button).</summary>
+        public void RestartMatch() => SwitchMode(currentPreset);
+
+        // Revive + reposition every spawned player (incl. any eliminated under a
+        // previous mode), reset the ball to a loose ball at center, and reconfigure
+        // the scorer — a clean fresh match in the new mode.
+        private void RestartInMode(GameMode mode)
+        {
+            for (int i = 0; i < spawnedPlayers.Count; i++)
+            {
+                var go = spawnedPlayers[i];
+                if (go == null) continue;
+                var tracker = go.GetComponent<PlayerZoneTracker>();
+                if (tracker != null) go.transform.position = tracker.Spawn.position;
+                var body = go.GetComponent<Rigidbody2D>();
+                if (body != null) body.linearVelocity = Vector2.zero;
+                if (!go.activeSelf) go.SetActive(true);   // re-adds to PlayerZoneTracker.All
+                var pa = go.GetComponent<PlayerAbilities>();
+                if (pa != null) pa.ResetRuntimes();        // fresh match → all abilities inactive
+            }
+            if (ball != null) ball.ResetLoose(Vector2.zero);
+            if (match != null) match.Configure(mode);
+            DodgeballPlayByPlay.Clear();   // fresh log for the new match
+        }
+
+        private void SpawnBall()
+        {
+            GameObject ballGO;
+            if (ballPrefab != null)
+            {
+                ballGO = Instantiate(ballPrefab, transform);
+                ballGO.name = ballPrefab.name;
+            }
+            else
+            {
+                ballGO = new GameObject("Ball");
+                ballGO.transform.SetParent(transform, false);
+                ballGO.AddComponent<Ball>();
+            }
+            ballGO.transform.localPosition = Vector3.zero;
+            ball = ballGO.GetComponent<Ball>();
+
+            // Depth sorting in the same band as players, so the ball interleaves
+            // correctly front/back against them.
+            if (ballGO.GetComponent<DodgeballDepthSort>() == null)
+                ballGO.AddComponent<DodgeballDepthSort>();
         }
 
         private void BuildCourt()
@@ -80,33 +327,182 @@ namespace Sportland.Sports.Dodgeball
 
         private void SpawnAllPlayers()
         {
+            int aCount = 0, bCount = 0;
             foreach (var spawn in GetAllSpawns())
             {
-                SpawnPlayer(spawn);
+                int number = spawn.team == Team.A ? ++aCount : ++bCount;
+                SpawnPlayer(spawn, number);
             }
         }
 
-        private void SpawnPlayer(PlayerSpawn spawn)
+        private void SpawnPlayer(PlayerSpawn spawn, int number)
         {
-            if (playerPrefab == null)
-            {
-                Debug.LogWarning($"[CourtSetup] playerPrefab not assigned; skipping spawn for {spawn.id}");
-                return;
-            }
-
-            var go = Instantiate(
-                playerPrefab,
-                new Vector3(spawn.position.x, spawn.position.y, 0f),
-                Quaternion.identity,
-                transform
-            );
+            var go = BuildPlayer();
             go.name = spawn.id;
+            go.transform.position = new Vector3(spawn.position.x, spawn.position.y, 0f);
 
             var tracker = go.GetComponent<PlayerZoneTracker>();
             if (tracker == null) tracker = go.AddComponent<PlayerZoneTracker>();
             tracker.Initialize(spawn);
+            tracker.Number = number;
+
+            // Ability ratings used by skill checks (catching, etc.) and AI
+            // routing decisions (ScorePotential01). Randomized per-player with
+            // a deterministic seed off spawn.id so each player has a stable
+            // personality across game restarts; means are role-biased
+            // (infielders lean stronger throwers, outfielders lean better
+            // catchers — they retrieve a lot of loose balls).
+            var gen = go.GetComponent<GeneralAttributes>() ?? go.AddComponent<GeneralAttributes>();
+            var dba = go.GetComponent<DodgeballAttributes>() ?? go.AddComponent<DodgeballAttributes>();
+            RandomizeStats(spawn, dba, gen);
+
+            var visual = go.GetComponentInChildren<DodgeballPlayerVisual>();
+            if (visual != null) visual.Configure(spawn.team, spawn.role, tracker);
+
+            // Every player gets a CPU brain; the human input component
+            // (added below) disables it on the controlled player while present.
+            go.AddComponent<DodgeballAI>();
+            if (!allAIControlled && spawn.id == playerControlledId)
+            {
+                go.AddComponent<DodgeballPlayerInput>();
+            }
+
+            AssignAbilities(go, spawn);
+
+            // Depth sorting: lower on screen (front) draws over higher up (back).
+            go.AddComponent<DodgeballDepthSort>();
+
+            if (enableStamina) go.AddComponent<PlayerStamina>();
 
             spawnedPlayers.Add(go);
+        }
+
+        // Roster wiring: give the player its Special Abilities at spawn. Debug
+        // forced assignments always apply; the rest are rolled from abilityPool,
+        // deterministically per spawn.id (stable across restarts, like the stat
+        // rolls) and capped at maxAbilitiesPerPlayer. Star infielders are
+        // guaranteed at least one when guaranteeStarAbility is set. Players who
+        // roll nothing get no PlayerAbilities component at all (stays inert).
+        private const int AbilitySeedSalt = 0x5A17;
+
+        private void AssignAbilities(GameObject go, PlayerSpawn spawn)
+        {
+            bool havePool = abilityPool != null && abilityPool.Length > 0;
+            bool haveForced = debugForcedAbilities != null && debugForcedAbilities.Count > 0;
+            if (!havePool && !haveForced) return;
+
+            var chosen = new List<SpecialAbility>();
+
+            // Debug forced assignments for this player (always applied, capped).
+            if (haveForced)
+                for (int i = 0; i < debugForcedAbilities.Count; i++)
+                {
+                    var f = debugForcedAbilities[i];
+                    if (f.ability != null && f.spawnId == spawn.id
+                        && !chosen.Contains(f.ability) && chosen.Count < maxAbilitiesPerPlayer)
+                        chosen.Add(f.ability);
+                }
+
+            // Random roll filling the remaining slots, deterministic per player.
+            int slots = Mathf.Max(0, maxAbilitiesPerPlayer - chosen.Count);
+            if (havePool && slots > 0)
+            {
+                bool isStar = spawn.id == "A_In_1" || spawn.id == "B_In_1";
+                var rng = new System.Random(spawn.id.GetHashCode() ^ AbilitySeedSalt);
+
+                int rollCount = (isStar && guaranteeStarAbility && chosen.Count == 0) ? 1 : 0;
+                for (int s = rollCount; s < slots; s++)
+                {
+                    if (rng.NextDouble() < abilityChance) rollCount++;
+                    else break;   // geometric — each extra ability is rarer; stop at first miss
+                }
+
+                if (rollCount > 0)
+                {
+                    var candidates = new List<SpecialAbility>();
+                    for (int i = 0; i < abilityPool.Length; i++)
+                        if (abilityPool[i] != null && !chosen.Contains(abilityPool[i]))
+                            candidates.Add(abilityPool[i]);
+
+                    for (int i = candidates.Count - 1; i > 0; i--)   // Fisher-Yates, same rng
+                    {
+                        int j = rng.Next(i + 1);
+                        (candidates[i], candidates[j]) = (candidates[j], candidates[i]);
+                    }
+
+                    int take = Mathf.Min(rollCount, candidates.Count);
+                    for (int i = 0; i < take; i++) chosen.Add(candidates[i]);
+                }
+            }
+
+            if (chosen.Count == 0) return;
+            go.AddComponent<PlayerAbilities>().SetAbilities(chosen);
+        }
+
+        // Per-player stat differentiation. Deterministic RNG keyed off spawn.id
+        // so a given player has a stable personality across restarts; role-
+        // biased means so infielders feel like throwers and outfielders feel
+        // like retrievers. Spread ±18 around the mean (clamped to 0..100)
+        // gives meaningful variety without anyone being unusable.
+        //
+        // Star players: each team's A_In_1 / B_In_1 get a +starBoost shift on
+        // every stat, so they're consistently the highest-scoring shooters
+        // and the AI's best-player routing converges on them.
+        private static void RandomizeStats(PlayerSpawn spawn, DodgeballAttributes dba, GeneralAttributes gen)
+        {
+            const float starBoost = 18f;
+            var rng = new System.Random(spawn.id.GetHashCode());
+            float Roll(float mean, float spread, float max = 100f) =>
+                Mathf.Clamp(mean + ((float)(rng.NextDouble() - 0.5) * 2f * spread), 0f, max);
+
+            bool isInfielder = spawn.role == PlayerRole.Infielder;
+            bool isStar = spawn.id == "A_In_1" || spawn.id == "B_In_1";
+            float boost = isStar ? starBoost : 0f;
+
+            // throwSpeedRating / throwAccuracyRating / catchTechniqueRating are on the
+            // 0-20 rating scale (anticipation is the last on 0-100); means/spread/boost
+            // for the rating stats are the old 0-100 values divided by 5.
+            dba.throwSpeedRating     = Roll((isInfielder ? 13f : 10f) + boost * 0.2f, 3.6f, 20f);
+            dba.throwAccuracyRating  = Roll((isInfielder ? 13f : 11f) + boost * 0.2f, 3.6f, 20f);
+            dba.anticipation         = Roll(60f + boost, 18f);
+            dba.catchTechniqueRating = Roll((isInfielder ? 12f : 14f) + boost * 0.2f, 3f, 20f);
+
+            gen.luck              = Roll(50f + boost * 0.5f, 15f);
+            gen.toughness         = Roll(50f + boost, 18f);
+            gen.changeOfDirection = Roll(50f + boost * 0.5f, 18f);
+            gen.endurance         = Roll(50f + boost * 0.5f, 15f);
+            gen.maxEnergy         = Mathf.Lerp(80f, 120f, (float)rng.NextDouble()) + (isStar ? 20f : 0f);
+        }
+
+        // Builds the player root in code and attaches the sprite (or a
+        // procedural placeholder) as the Visual child. PlayerMovement bobs
+        // child[0] for the jump arc, so the visual must live there.
+        private GameObject BuildPlayer()
+        {
+            var go = new GameObject("DodgeballPlayer");
+            go.transform.SetParent(transform, false);
+
+            GameObject visualGO;
+            if (spritePrefab != null)
+            {
+                visualGO = Instantiate(spritePrefab, go.transform);
+                visualGO.name = "Visual";
+                visualGO.transform.localPosition = Vector3.zero;
+            }
+            else
+            {
+                visualGO = new GameObject("Visual");
+                visualGO.transform.SetParent(go.transform, false);
+            }
+
+            if (visualGO.GetComponent<DodgeballPlayerVisual>() == null)
+                visualGO.AddComponent<DodgeballPlayerVisual>();
+
+            // PlayerMovement RequireComponent pulls in Rigidbody2D automatically.
+            // Added after the visual child exists so PlayerMovement.Awake sees it.
+            go.AddComponent<PlayerMovement>();
+
+            return go;
         }
 
         /// <summary>

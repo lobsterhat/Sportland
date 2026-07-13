@@ -44,6 +44,21 @@ namespace Sportland.Sports.Dodgeball
         public const float StripDepth = 3f;
 
         /// <summary>
+        /// The infield (front-court half) belonging to a given team. Team A is
+        /// the left half [-9, 0]; team B is the right half [0, 9]. Used both
+        /// as an infielder's assigned zone and as the "opposing infield"
+        /// outfielders may not enter while carrying.
+        /// </summary>
+        public static PlayZone InfieldFor(Team team)
+        {
+            float hw = CourtSetup.HalfWidth;   // 9
+            float hh = CourtSetup.HalfHeight;  // 4.5
+            return team == Team.A
+                ? new PlayZone { min = new Vector2(-hw, -hh), max = new Vector2( 0f, hh) }
+                : new PlayZone { min = new Vector2( 0f, -hh), max = new Vector2( hw, hh) };
+        }
+
+        /// <summary>
         /// Returns the zone assigned to a player based on their spawn definition.
         /// We use the spawn ID suffix to distinguish outfielder strips
         /// (Back / Top / Bottom). Infielders share their whole team half.
@@ -53,13 +68,7 @@ namespace Sportland.Sports.Dodgeball
             float hw = CourtSetup.HalfWidth;   // 9
             float hh = CourtSetup.HalfHeight;  // 4.5
 
-            if (spawn.role == PlayerRole.Infielder)
-            {
-                // Team A: left half [-9, 0]. Team B: right half [0, 9].
-                return spawn.team == Team.A
-                    ? new PlayZone { min = new Vector2(-hw, -hh), max = new Vector2( 0f, hh) }
-                    : new PlayZone { min = new Vector2( 0f, -hh), max = new Vector2( hw, hh) };
-            }
+            if (spawn.role == PlayerRole.Infielder) return InfieldFor(spawn.team);
 
             // Outfielders surround the *opposing* team's half.
             // Determine which strip from the spawn ID.
@@ -67,10 +76,12 @@ namespace Sportland.Sports.Dodgeball
 
             if (spawn.id.EndsWith("_Back"))
             {
-                // Back strip: behind the opposing team's baseline.
+                // Back strip: behind the opposing team's baseline. Runs the full
+                // court height so the left/right ends also cover the corners.
+                float fh = hh + StripDepth;
                 return surroundsRightHalf
-                    ? new PlayZone { min = new Vector2( hw,           -hh),              max = new Vector2( hw + StripDepth,  hh) }
-                    : new PlayZone { min = new Vector2(-hw - StripDepth, -hh),           max = new Vector2(-hw,               hh) };
+                    ? new PlayZone { min = new Vector2( hw,            -fh), max = new Vector2( hw + StripDepth,  fh) }
+                    : new PlayZone { min = new Vector2(-hw - StripDepth, -fh), max = new Vector2(-hw,               fh) };
             }
             if (spawn.id.EndsWith("_Top"))
             {

@@ -1,0 +1,144 @@
+using UnityEngine;
+
+namespace Sportland.Sports.Dodgeball
+{
+    /// <summary>What a hit does to the player who got hit.</summary>
+    public enum VictimOutcome
+    {
+        None,          // hit just scores; victim keeps playing (Mode 1)
+        CountToOut,    // Nth hit removes the player (Mode 2)
+        DamageEnergy,  // hit drains energy; 0 removes the player (Mode 3)
+        Sideline,      // hit benches the player, recallable by a team catch (Mode 4)
+    }
+
+    /// <summary>What catching an opponent's throw does, beyond the turnover.</summary>
+    public enum CatchEffect
+    {
+        TurnoverOnly,        // just possession (Modes 1-3)
+        ScoreAndReviveTeam,  // point + recall all benched teammates (Mode 4)
+    }
+
+    /// <summary>What happens when a rule timer expires (shot clock, return-to-zone,
+    /// loose-ball delay-of-game).</summary>
+    public enum ClockExpiryEffect
+    {
+        PointPenalty,   // -clockExpiryPenalty to the offending team; ball drops if held (Modes 1 / 4)
+        TurnoverOnly,   // ball drops if held (becomes loose); no score change; delay clock disabled (Modes 2 / 3)
+    }
+
+    /// <summary>
+    /// Data-driven rules for a dodgeball match. Author one asset per mode
+    /// (Create &gt; Sportland &gt; Dodgeball &gt; Game Mode); the runtime
+    /// DodgeballMatch reads it. This is immutable config — live state (scores,
+    /// clock, who's out) lives in DodgeballMatch, not here.
+    ///
+    /// The planned modes map to:
+    ///   1 Running hits : isTimed, pointsPerHit 1, VictimOutcome.None
+    ///   2 Elimination  : VictimOutcome.CountToOut (hitsToOut 3), endOnTeamWipeout
+    ///   3 Energy       : VictimOutcome.DamageEnergy, endOnTeamWipeout
+    ///                    (per-player energy lives on the player, not here)
+    ///   4 Hybrid       : isTimed, pointsPerHit 1, pointsPerCatch 1,
+    ///                    VictimOutcome.Sideline, CatchEffect.ScoreAndReviveTeam,
+    ///                    endOnTeamWipeout
+    /// </summary>
+    [CreateAssetMenu(menuName = "Sportland/Dodgeball/Game Mode", fileName = "DodgeballGameMode")]
+    public class GameMode : ScriptableObject
+    {
+        [Header("Identity")]
+        public string modeName = "Running Hits";
+
+        [Header("Match / timing")]
+        public bool isTimed = true;
+        [Tooltip("Match length in seconds (used when isTimed).")]
+        public float secondsPerPeriod = 120f;
+        [Tooltip("End immediately (other team wins) when a team has no players left on the court.")]
+        public bool endOnTeamWipeout = false;
+
+        [Header("Scoring")]
+        public int pointsPerHit = 1;
+        public int pointsPerCatch = 0;
+
+        [Header("On hit")]
+        public VictimOutcome victimOutcome = VictimOutcome.None;
+        [Tooltip("Hits needed to remove a player (used by VictimOutcome.CountToOut).")]
+        public int hitsToOut = 3;
+
+        [Header("On catch")]
+        public CatchEffect catchEffect = CatchEffect.TurnoverOnly;
+
+        [Header("Outfielder in opposing infield")]
+        [Tooltip("Bonus points awarded to the ATTACKING team when their throw hits OR is caught by an outfielder positioned inside the opposing infield (the outfielder's team's opposing infield — i.e., the infield they're not supposed to be in). Stacks on top of pointsPerHit / pointsPerCatch. Discourages outfielders from venturing into the opposing infield to make plays. Set to 0 to disable.")]
+        public int outfielderInOppInfieldBonus = 1;
+
+        [Header("On timer expiry")]
+        [Tooltip("What happens when a clock expires (per-team shot clock, return-to-zone window, loose-ball delay-of-game). PointPenalty = current -clockExpiryPenalty to the offending team. TurnoverOnly = ball drops if held but no score change, and the delay-of-game clock is disabled entirely (no penalty to apply on a loose ball). Modes that don't score on hits (Elimination, Energy) should use TurnoverOnly.")]
+        public ClockExpiryEffect clockExpiryEffect = ClockExpiryEffect.PointPenalty;
+
+        [Header("Energy (Mode 3 — VictimOutcome.DamageEnergy)")]
+        [Tooltip("Energy lost per unit of ball impact speed, before toughness reduction.")]
+        public float damagePerSpeed = 1.5f;
+        [Tooltip("Fraction of damage a max-toughness (100) player shrugs off; scales with the victim's toughness.")]
+        [Range(0f, 1f)] public float toughnessReduction = 0.5f;
+
+        [Header("Roster (per team)")]
+        public int infieldersPerTeam = 3;
+        public int outfieldersPerTeam = 3;
+
+        /// <summary>Built-in mode presets for quick testing (no .asset needed).</summary>
+        public enum Preset { RunningHits, Elimination, Energy, Hybrid }
+
+        /// <summary>
+        /// Build one of the four planned modes in code (so the modes are testable
+        /// without authoring assets). See the class summary for the field map.
+        /// </summary>
+        public static GameMode Create(Preset preset)
+        {
+            var m = CreateInstance<GameMode>();
+            switch (preset)
+            {
+                case Preset.RunningHits:   // Mode 1 — most hits over the clock
+                    m.modeName = "Running Hits";
+                    m.isTimed = true;
+                    m.secondsPerPeriod = 120f;
+                    m.endOnTeamWipeout = false;
+                    m.pointsPerHit = 1;
+                    m.pointsPerCatch = 0;
+                    m.victimOutcome = VictimOutcome.None;
+                    m.catchEffect = CatchEffect.TurnoverOnly;
+                    m.clockExpiryEffect = ClockExpiryEffect.TurnoverOnly;
+                    break;
+
+                case Preset.Elimination:   // Mode 2 — N hits and you're out
+                    m.modeName = "Elimination";
+                    m.isTimed = false; m.endOnTeamWipeout = true;
+                    m.pointsPerHit = 0; m.pointsPerCatch = 0;
+                    m.victimOutcome = VictimOutcome.CountToOut; m.hitsToOut = 3;
+                    m.catchEffect = CatchEffect.TurnoverOnly;
+                    m.clockExpiryEffect = ClockExpiryEffect.TurnoverOnly;
+                    break;
+
+                case Preset.Energy:        // Mode 3 — drain energy to eliminate
+                    m.modeName = "Energy";
+                    m.isTimed = false; m.endOnTeamWipeout = true;
+                    m.pointsPerHit = 0; m.pointsPerCatch = 0;
+                    m.victimOutcome = VictimOutcome.DamageEnergy;
+                    m.catchEffect = CatchEffect.TurnoverOnly;
+                    m.clockExpiryEffect = ClockExpiryEffect.TurnoverOnly;
+                    break;
+
+                case Preset.Hybrid:        // Mode 4 — sideline + catch-revive, timed
+                    m.modeName = "Hybrid";
+                    m.isTimed = true; m.secondsPerPeriod = 120f; m.endOnTeamWipeout = true;
+                    m.pointsPerHit = 1; m.pointsPerCatch = 1;
+                    m.victimOutcome = VictimOutcome.Sideline;
+                    m.catchEffect = CatchEffect.ScoreAndReviveTeam;
+                    m.clockExpiryEffect = ClockExpiryEffect.PointPenalty;
+                    break;
+            }
+            return m;
+        }
+
+        /// <summary>Fallback Mode 1 (running hits) used when no asset is assigned.</summary>
+        public static GameMode CreateDefault() => Create(Preset.RunningHits);
+    }
+}
