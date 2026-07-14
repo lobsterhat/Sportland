@@ -1,15 +1,15 @@
 using System;
 using System.Collections.Generic;
+using System.IO;
 using UnityEngine;
 
 namespace Sportland.Career
 {
     /// <summary>
-    /// The career layer's persistent heart: the club, the calendar, and the
-    /// daily action budget (design/hub_actions.md). Survives scene loads.
-    ///
-    /// Slice scope: one club, day/action loop, overnight tick. Leagues,
-    /// training results, and conflicts consume this later.
+    /// The career layer's persistent heart: the club, the calendar, the daily
+    /// action budget (design/hub_actions.md), the league enrollment, and the
+    /// lineup. State auto-saves to a JSON file on every change and reloads on
+    /// startup, so a career survives closing the game.
     /// </summary>
     public class CareerManager : MonoBehaviour
     {
@@ -42,6 +42,8 @@ namespace Sportland.Career
 
         private System.Random rng;
 
+        private static string SavePath => Path.Combine(Application.persistentDataPath, "sportland_career.json");
+
         private void Awake()
         {
             if (Instance != null && Instance != this)
@@ -52,10 +54,95 @@ namespace Sportland.Career
             Instance = this;
             DontDestroyOnLoad(gameObject);
 
-            rng = new System.Random(generationSeed);
-            if (club == null || club.pool.Count == 0)
+            rng = new System.Random(generationSeed ^ Environment.TickCount);
+            if (!LoadCareer())
                 StartNewCareer();
         }
+
+        /// <summary>Notify listeners and persist — every mutation funnels through here.</summary>
+        private void Commit()
+        {
+            StateChanged?.Invoke();
+            SaveCareer();
+        }
+
+        // ── Save / load ─────────────────────────────────────────────────
+
+        [Serializable]
+        private class CareerSaveData
+        {
+            public int day;
+            public long currentDateTicks;
+            public int actionsPerDay;
+            public int actionsRemaining;
+            public Club club;
+            public List<CareerAthlete> freeAgents;
+            public bool inLeague;
+            public LeagueMembership league;
+        }
+
+        private void SaveCareer()
+        {
+            var data = new CareerSaveData
+            {
+                day = day,
+                currentDateTicks = currentDate.Ticks,
+                actionsPerDay = actionsPerDay,
+                actionsRemaining = actionsRemaining,
+                club = club,
+                freeAgents = freeAgents,
+                inLeague = league != null,
+                league = league,
+            };
+            try
+            {
+                File.WriteAllText(SavePath, JsonUtility.ToJson(data));
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"Career save failed: {e.Message}");
+            }
+        }
+
+        private bool LoadCareer()
+        {
+            try
+            {
+                if (!File.Exists(SavePath)) return false;
+                var data = JsonUtility.FromJson<CareerSaveData>(File.ReadAllText(SavePath));
+                if (data == null || data.club == null || data.club.pool.Count == 0) return false;
+
+                day = data.day;
+                currentDate = new DateTime(data.currentDateTicks);
+                actionsPerDay = data.actionsPerDay;
+                actionsRemaining = data.actionsRemaining;
+                club = data.club;
+                freeAgents = data.freeAgents ?? new List<CareerAthlete>();
+                league = data.inLeague ? data.league : null;
+
+                Debug.Log($"Career loaded: {club.clubName}, day {day}.");
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogWarning($"Career load failed, starting fresh: {e.Message}");
+                return false;
+            }
+        }
+
+        /// <summary>Delete the save and start over (debug/testing affordance — F9 in the hub).</summary>
+        public void ResetCareer()
+        {
+            try { if (File.Exists(SavePath)) File.Delete(SavePath); }
+            catch (Exception e) { Debug.LogWarning($"Save delete failed: {e.Message}"); }
+
+            day = 1;
+            currentDate = new DateTime(2026, 9, 1);
+            actionsPerDay = 3;
+            StartNewCareer();
+        }
+
+        // ── Career setup ────────────────────────────────────────────────
 
         /// <summary>
         /// Bootstraps a fresh career: the club is just you and Skip — the
@@ -75,7 +162,34 @@ namespace Sportland.Career
 
             league = null;
             actionsRemaining = actionsPerDay;
-            StateChanged?.Invoke();
+            Commit();
+        }
+
+        /// <summary>Has the player been through character creation yet?</summary>
+        public bool PlayerCreated
+        {
+            get
+            {
+                var pc = club?.PlayerCharacter;
+                return pc != null && !string.IsNullOrEmpty(pc.archetypeId);
+            }
+        }
+
+        /// <summary>
+        /// Character creation: lock in an archetype. Applies the rating
+        /// template and the archetype's daily action budget, and refreshes
+        /// today's remaining actions to the new budget.
+        /// </summary>
+        public void ApplyArchetype(ArchetypeDefinition archetype)
+        {
+            var pc = club.PlayerCharacter;
+            pc.archetypeId = archetype.id;
+            for (int i = 0; i < pc.generalRatings.Length; i++)
+                pc.generalRatings[i] = new TraitEntry(archetype.generalRatingValue, revealed: true);
+
+            actionsPerDay = archetype.actionsPerDay;
+            actionsRemaining = actionsPerDay;
+            Commit();
         }
 
         // ── League ──────────────────────────────────────────────────────
@@ -127,13 +241,13 @@ namespace Sportland.Career
             DateTime gameDate = currentDate.AddDays(7); // one week of preseason
             foreach (var fixture in slate)
             {
-                fixture.date = gameDate;
+                fixture.Date = gameDate;
                 fixture.slot = slotBag[rng.Next(slotBag.Length)];
                 league.fixtures.Add(fixture);
                 gameDate = gameDate.AddDays(3);
             }
 
-            StateChanged?.Invoke();
+            Commit();
         }
 
         /// <summary>
@@ -170,43 +284,68 @@ namespace Sportland.Career
 
             club.pool.Add(athlete);
             message = $"{athlete.FullName} signs with {club.clubName}!";
-            StateChanged?.Invoke();
+            Commit();
             return true;
         }
 
-        /// <summary>Has the player been through character creation yet?</summary>
-        public bool PlayerCreated
+        // ── Lineup ──────────────────────────────────────────────────────
+
+        public CareerAthlete AthleteById(string id) => club.pool.Find(a => a.id == id);
+
+        /// <summary>
+        /// Put an athlete in a starter slot (0-2 infield, 3-5 outfield) or a
+        /// reserve slot. They're pulled out of any slot they already hold, so
+        /// assignment doubles as a move. Empty id clears the slot.
+        /// </summary>
+        public void AssignLineupSlot(bool starter, int slot, string athleteId)
         {
-            get
-            {
-                var pc = club?.PlayerCharacter;
-                return pc != null && !string.IsNullOrEmpty(pc.archetypeId);
-            }
+            if (league == null) return;
+
+            if (!string.IsNullOrEmpty(athleteId))
+                league.RemoveFromLineup(athleteId);
+
+            if (starter) league.starterIds[slot] = athleteId ?? "";
+            else league.reserveIds[slot] = athleteId ?? "";
+            Commit();
         }
 
         /// <summary>
-        /// Character creation: lock in an archetype. Applies the rating
-        /// template and the archetype's daily action budget, and refreshes
-        /// today's remaining actions to the new budget.
+        /// Fill every open slot with the best unassigned athlete by a rough
+        /// overall (average of the general ratings). Starters first, then
+        /// reserves — Skip's F-grades put him last in line, as he'd insist.
         /// </summary>
-        public void ApplyArchetype(ArchetypeDefinition archetype)
+        public void AutoFillLineup()
         {
-            var pc = club.PlayerCharacter;
-            pc.archetypeId = archetype.id;
-            for (int i = 0; i < pc.generalRatings.Length; i++)
-                pc.generalRatings[i] = new TraitEntry(archetype.generalRatingValue, revealed: true);
+            if (league == null) return;
 
-            actionsPerDay = archetype.actionsPerDay;
-            actionsRemaining = actionsPerDay;
-            StateChanged?.Invoke();
+            var candidates = new List<CareerAthlete>(club.pool);
+            candidates.RemoveAll(a => league.LineupTagOf(a.id) != null);
+            candidates.Sort((a, b) => Overall(b).CompareTo(Overall(a)));
+
+            int next = 0;
+            for (int i = 0; i < league.starterIds.Length && next < candidates.Count; i++)
+                if (league.starterIds[i].Length == 0) league.starterIds[i] = candidates[next++].id;
+            for (int i = 0; i < league.reserveIds.Length && next < candidates.Count; i++)
+                if (league.reserveIds[i].Length == 0) league.reserveIds[i] = candidates[next++].id;
+
+            Commit();
         }
+
+        private static float Overall(CareerAthlete a)
+        {
+            float sum = 0f;
+            foreach (var r in a.generalRatings) sum += r.value;
+            return sum / a.generalRatings.Length;
+        }
+
+        // ── Day loop ────────────────────────────────────────────────────
 
         /// <summary>Spend one action. False (and no change) when the day is spent.</summary>
         public bool TrySpendAction()
         {
             if (actionsRemaining <= 0) return false;
             actionsRemaining--;
-            StateChanged?.Invoke();
+            Commit();
             return true;
         }
 
@@ -222,13 +361,14 @@ namespace Sportland.Career
             day++;
             currentDate = currentDate.AddDays(1);
             actionsRemaining = actionsPerDay;
-            StateChanged?.Invoke();
+            Commit();
         }
+
+        // ── Building actions ────────────────────────────────────────────
 
         /// <summary>Cafe one-on-one: reveal a random hidden trait on a random athlete.</summary>
         public string RevealSomethingOverDinner()
         {
-            // Shuffle-free random start point, then scan for someone with secrets left.
             int count = club.pool.Count;
             int start = rng.Next(count);
             for (int i = 0; i < count; i++)
@@ -237,7 +377,7 @@ namespace Sportland.Career
                 string learned = athlete.RevealRandomHiddenTrait(rng);
                 if (learned != null)
                 {
-                    StateChanged?.Invoke();
+                    Commit();
                     return learned;
                 }
             }
@@ -249,7 +389,7 @@ namespace Sportland.Career
         {
             foreach (var a in club.pool)
                 a.fatigue = Mathf.Min(100f, a.fatigue + fatigueCost);
-            StateChanged?.Invoke();
+            Commit();
         }
 
         /// <summary>Hospital: treat the most tired athlete. Returns who was treated.</summary>
@@ -261,7 +401,7 @@ namespace Sportland.Career
 
             if (worst != null)
                 worst.fatigue = Mathf.Max(0f, worst.fatigue - relief);
-            StateChanged?.Invoke();
+            Commit();
             return worst;
         }
     }

@@ -13,6 +13,18 @@ namespace Sportland.Career
     }
 
     /// <summary>
+    /// Dodgeball's positions, matching the court's 3 infielders + 3 outfielders
+    /// per team (CourtSetup). Position sets are per-sport by design
+    /// (design/calendar_league.md open questions); this enum grows a shared
+    /// abstraction when a second sport needs one.
+    /// </summary>
+    public enum DodgeballPosition
+    {
+        Infielder,
+        Outfielder,
+    }
+
+    /// <summary>
     /// Roster requirements a league imposes. Dodgeball's numbers: 6 on the
     /// court, 4 reserves dressing (10 dressed), plus up to 2 inactive players
     /// (healthy scratches) — max roster 12.
@@ -28,17 +40,28 @@ namespace Sportland.Career
         public int MaxRoster => DressedSize + inactiveMax;
     }
 
-    /// <summary>One scheduled game.</summary>
+    /// <summary>One scheduled game. Date stored as ticks so JsonUtility can save it.</summary>
     [Serializable]
     public class Fixture
     {
-        public DateTime date;
+        public long dateTicks;
         public TimeSlot slot;
         public string opponent;
         public bool home;
+
+        public DateTime Date
+        {
+            get => new DateTime(dateTicks);
+            set => dateTicks = value.Ticks;
+        }
     }
 
-    /// <summary>The club's enrollment in one sport's league.</summary>
+    /// <summary>
+    /// The club's enrollment in one sport's league, including the persistent
+    /// lineup: starter slots carry positions by index (0-2 infield, 3-5
+    /// outfield), reserves dress without a position, and everyone else in the
+    /// club pool is inactive for match days.
+    /// </summary>
     [Serializable]
     public class LeagueMembership
     {
@@ -47,5 +70,46 @@ namespace Sportland.Career
         public string divisionName;
         public RosterRules rules;
         public List<Fixture> fixtures = new List<Fixture>();
+
+        // Lineup: athlete ids, "" = open slot.
+        public string[] starterIds = new string[6] { "", "", "", "", "", "" };
+        public string[] reserveIds = new string[4] { "", "", "", "" };
+
+        public static DodgeballPosition StarterPosition(int slot)
+            => slot < 3 ? DodgeballPosition.Infielder : DodgeballPosition.Outfielder;
+
+        public static string StarterSlotLabel(int slot)
+            => slot < 3 ? $"IN{slot + 1}" : $"OUT{slot - 2}";
+
+        public int StartersFilled
+        {
+            get { int n = 0; foreach (var id in starterIds) if (id.Length > 0) n++; return n; }
+        }
+
+        public int ReservesFilled
+        {
+            get { int n = 0; foreach (var id in reserveIds) if (id.Length > 0) n++; return n; }
+        }
+
+        public bool LineupComplete => StartersFilled == starterIds.Length && ReservesFilled == reserveIds.Length;
+
+        /// <summary>"IN2", "OUT1", "R3", or null when the athlete isn't in the lineup.</summary>
+        public string LineupTagOf(string athleteId)
+        {
+            for (int i = 0; i < starterIds.Length; i++)
+                if (starterIds[i] == athleteId) return StarterSlotLabel(i);
+            for (int i = 0; i < reserveIds.Length; i++)
+                if (reserveIds[i] == athleteId) return $"R{i + 1}";
+            return null;
+        }
+
+        /// <summary>Pull an athlete out of whatever slot they occupy, if any.</summary>
+        public void RemoveFromLineup(string athleteId)
+        {
+            for (int i = 0; i < starterIds.Length; i++)
+                if (starterIds[i] == athleteId) starterIds[i] = "";
+            for (int i = 0; i < reserveIds.Length; i++)
+                if (reserveIds[i] == athleteId) reserveIds[i] = "";
+        }
     }
 }

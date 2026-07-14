@@ -7,12 +7,12 @@ namespace Sportland.Hub
     /// <summary>
     /// Lives on the hub player. Finds the nearest building in range, drives
     /// the prompt, and runs the hub's screens (character creator, league
-    /// sign-up, calendar, roster & recruiting) — a small state machine over
+    /// sign-up, calendar, roster/pool/lineup) — a small state machine over
     /// HubHud's generic panel, with text built by HubScreens.
     ///
     /// Controls (keyboard / PS4 pad): confirm = E / Cross, cancel = Esc /
-    /// Circle, menu = R / Triangle. Pad buttons are read positionally
-    /// (buttonSouth/East/North), so Xbox pads map sensibly too.
+    /// Circle, menu = R / Triangle, auto-fill = F / Square. Pad buttons are
+    /// read positionally, so Xbox pads map sensibly too. F9 resets the career.
     /// </summary>
     public class HubInteractor : MonoBehaviour
     {
@@ -25,8 +25,11 @@ namespace Sportland.Hub
         private Screen screen = Screen.None;
         private int creatorIndex;
         private int calendarPage;
-        private bool rosterPoolTab;
+        private RosterTab rosterTab;
         private int poolIndex;
+        private int lineupSlot;
+        private bool assignMode;
+        private int pickIndex;
 
         public void Init(HubBuilding[] buildings, HubHud hud)
         {
@@ -53,6 +56,12 @@ namespace Sportland.Hub
         {
             var pad = Gamepad.current;
             return Input.GetKeyDown(KeyCode.R) || (pad != null && pad.buttonNorth.wasPressedThisFrame);
+        }
+
+        private static bool AutoFillPressed()
+        {
+            var pad = Gamepad.current;
+            return Input.GetKeyDown(KeyCode.F) || (pad != null && pad.buttonWest.wasPressedThisFrame);
         }
 
         private static bool NavUpPressed()
@@ -102,6 +111,14 @@ namespace Sportland.Hub
                 return;
             }
 
+            // Debug/testing: start over from nothing.
+            if (Input.GetKeyDown(KeyCode.F9))
+            {
+                career.ResetCareer();
+                hud.Toast("Fresh career started — the old save is gone.");
+                return;
+            }
+
             // Quick roster (Triangle / R) toggles anywhere in the world.
             if (MenuPressed())
             {
@@ -147,7 +164,7 @@ namespace Sportland.Hub
                 case HubBuildingType.Office:
                     if (!career.PlayerCreated) return "[E] Office — create your character";
                     if (career.league == null) return "[E] Office — league sign-up";
-                    return "[E] Office — roster & recruiting";
+                    return "[E] Office — roster, recruiting & lineup";
 
                 case HubBuildingType.Arena:
                     return career.league == null
@@ -170,6 +187,7 @@ namespace Sportland.Hub
         private void CloseScreen()
         {
             screen = Screen.None;
+            assignMode = false;
             hud.CloseScreen();
         }
 
@@ -177,10 +195,20 @@ namespace Sportland.Hub
         {
             switch (screen)
             {
-                case Screen.Creator:      hud.ShowScreen(HubScreens.Creator(creatorIndex)); break;
-                case Screen.LeagueSignup: hud.ShowScreen(HubScreens.LeagueSignup(career)); break;
-                case Screen.Calendar:     hud.ShowScreen(HubScreens.Calendar(career, calendarPage)); break;
-                case Screen.Roster:       hud.ShowScreen(HubScreens.Roster(career, rosterPoolTab, poolIndex)); break;
+                case Screen.Creator:
+                    hud.ShowScreen(HubScreens.Creator(creatorIndex));
+                    break;
+                case Screen.LeagueSignup:
+                    hud.ShowScreen(HubScreens.LeagueSignup(career));
+                    break;
+                case Screen.Calendar:
+                    hud.ShowScreen(HubScreens.Calendar(career, calendarPage));
+                    break;
+                case Screen.Roster:
+                    hud.ShowScreen(rosterTab == RosterTab.Lineup
+                        ? HubScreens.Lineup(career, lineupSlot, assignMode, pickIndex)
+                        : HubScreens.Roster(career, rosterTab, poolIndex));
+                    break;
             }
         }
 
@@ -229,7 +257,7 @@ namespace Sportland.Hub
             {
                 career.JoinDodgeballLeague();
                 hud.Toast("Skip: \"We're in the Parks League! Now let's fill this roster — I took the liberty of opening the pool.\"", 6f);
-                rosterPoolTab = true;
+                rosterTab = RosterTab.Pool;
                 poolIndex = 0;
                 OpenScreen(Screen.Roster, career);
             }
@@ -261,40 +289,112 @@ namespace Sportland.Hub
 
         private void HandleRoster(CareerManager career)
         {
+            if (assignMode)
+            {
+                HandleAssignPicker(career);
+                return;
+            }
+
             if (MenuPressed())
             {
-                rosterPoolTab = !rosterPoolTab;
+                rosterTab = (RosterTab)(((int)rosterTab + 1) % 3);
+                poolIndex = 0;
+                lineupSlot = 0;
                 RedrawScreen(career);
                 return;
             }
 
-            if (rosterPoolTab && career.freeAgents.Count > 0)
+            switch (rosterTab)
             {
-                if (NavUpPressed())
-                {
-                    poolIndex = Mathf.Max(0, poolIndex - 1);
-                    RedrawScreen(career);
-                    return;
-                }
-                if (NavDownPressed())
-                {
-                    poolIndex = Mathf.Min(career.freeAgents.Count - 1, poolIndex + 1);
-                    RedrawScreen(career);
-                    return;
-                }
-                if (ConfirmPressed())
-                {
-                    var target = career.freeAgents[poolIndex];
-                    career.TryRecruit(target, out string message);
-                    hud.Toast(message);
-                    poolIndex = Mathf.Clamp(poolIndex, 0, Mathf.Max(0, career.freeAgents.Count - 1));
-                    RedrawScreen(career);
-                    return;
-                }
+                case RosterTab.Pool:
+                    if (career.freeAgents.Count > 0)
+                    {
+                        if (NavUpPressed())
+                        {
+                            poolIndex = Mathf.Max(0, poolIndex - 1);
+                            RedrawScreen(career);
+                            return;
+                        }
+                        if (NavDownPressed())
+                        {
+                            poolIndex = Mathf.Min(career.freeAgents.Count - 1, poolIndex + 1);
+                            RedrawScreen(career);
+                            return;
+                        }
+                        if (ConfirmPressed())
+                        {
+                            var target = career.freeAgents[poolIndex];
+                            career.TryRecruit(target, out string message);
+                            hud.Toast(message);
+                            poolIndex = Mathf.Clamp(poolIndex, 0, Mathf.Max(0, career.freeAgents.Count - 1));
+                            RedrawScreen(career);
+                            return;
+                        }
+                    }
+                    break;
+
+                case RosterTab.Lineup:
+                    if (NavUpPressed())
+                    {
+                        lineupSlot = Mathf.Max(0, lineupSlot - 1);
+                        RedrawScreen(career);
+                        return;
+                    }
+                    if (NavDownPressed())
+                    {
+                        lineupSlot = Mathf.Min(9, lineupSlot + 1);
+                        RedrawScreen(career);
+                        return;
+                    }
+                    if (ConfirmPressed())
+                    {
+                        assignMode = true;
+                        pickIndex = 0;
+                        RedrawScreen(career);
+                        return;
+                    }
+                    if (AutoFillPressed())
+                    {
+                        career.AutoFillLineup();
+                        hud.Toast("Skip: \"Penciled in the best we've got. Shuffle them however you like.\"");
+                        RedrawScreen(career);
+                        return;
+                    }
+                    break;
             }
 
             if (CancelPressed())
                 CloseScreen();
+        }
+
+        private void HandleAssignPicker(CareerManager career)
+        {
+            int optionCount = career.club.pool.Count + 1; // 0 = clear slot
+
+            if (NavUpPressed())
+            {
+                pickIndex = Mathf.Max(0, pickIndex - 1);
+                RedrawScreen(career);
+            }
+            else if (NavDownPressed())
+            {
+                pickIndex = Mathf.Min(optionCount - 1, pickIndex + 1);
+                RedrawScreen(career);
+            }
+            else if (ConfirmPressed())
+            {
+                bool starter = lineupSlot < 6;
+                int slot = starter ? lineupSlot : lineupSlot - 6;
+                string id = pickIndex == 0 ? "" : career.club.pool[pickIndex - 1].id;
+                career.AssignLineupSlot(starter, slot, id);
+                assignMode = false;
+                RedrawScreen(career);
+            }
+            else if (CancelPressed())
+            {
+                assignMode = false;
+                RedrawScreen(career);
+            }
         }
 
         // ── World interactions ──────────────────────────────────────────
@@ -315,8 +415,9 @@ namespace Sportland.Hub
                     }
                     else
                     {
-                        rosterPoolTab = false;
+                        rosterTab = RosterTab.Squad;
                         poolIndex = 0;
+                        lineupSlot = 0;
                         OpenScreen(Screen.Roster, career);
                     }
                     return;

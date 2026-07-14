@@ -68,6 +68,8 @@ namespace Sportland.Hub
                 status += "\n<color=#FFD75F>→ Sign up for a league at the Office</color>";
             else if (career.club.pool.Count < career.league.rules.DressedSize)
                 status += $"\n<color=#FFD75F>→ Fill your roster at the Office ({career.club.pool.Count}/{career.league.rules.DressedSize} for a full match-day squad)</color>";
+            else if (!career.league.LineupComplete)
+                status += $"\n<color=#FFD75F>→ Set your lineup at the Office ({career.league.StartersFilled}/6 starters, {career.league.ReservesFilled}/4 reserves)</color>";
 
             hud.SetStatus(status);
         }

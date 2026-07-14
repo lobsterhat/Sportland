@@ -58,7 +58,7 @@ namespace Sportland.Hub
                 anchorMin: new Vector2(0.5f, 0f), anchorMax: new Vector2(0.5f, 0f),
                 pivot: new Vector2(0.5f, 0f), pos: new Vector2(0f, 24f),
                 size: new Vector2(1400f, 40f), align: TextAlignmentOptions.Center);
-            hud.hintText.text = "Move: WASD / left stick    Confirm: E / Cross    Cancel: Esc / Circle    Roster: R / Triangle";
+            hud.hintText.text = "Move: WASD / left stick    Confirm: E / Cross    Cancel: Esc / Circle    Roster: R / Triangle    F9: new career";
             hud.hintText.color = new Color(1f, 1f, 1f, 0.55f);
 
             // Roster panel: dark backdrop + monospaced-ish listing, hidden by default.
