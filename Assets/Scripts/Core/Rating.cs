@@ -1,10 +1,11 @@
 using UnityEngine;
 
-namespace Sportland.Sports.Dodgeball
+namespace Sportland.Core
 {
     /// <summary>
-    /// The shared 0-20 internal rating scale for rated player attributes
-    /// (Throwing Speed, and others as they're converted). The raw number is
+    /// The shared 0-20 internal rating scale for rated player attributes,
+    /// promoted from the dodgeball module to serve all sports and the career
+    /// layer (traits, chemistry, ceilings). The raw number is
     /// hidden from players and surfaced as an F..S letter grade; value/20 gives
     /// the 0..1 the gameplay math consumes.
     ///
