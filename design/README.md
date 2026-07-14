@@ -65,6 +65,7 @@ the `Effective*` values only, so abilities are felt everywhere without per-syste
 
 ## Docs
 
+### Match layer
 - [attributes.md](attributes.md) — the attribute set (0–20 / F–S), the cross-sport vs
   sport-specific split, each one's mapping to current code, and conversion status.
 - [defense.md](defense.md) — the Catch / Evade / Brace model: a zoned, skill-timed catch
@@ -73,6 +74,24 @@ the `Effective*` values only, so abilities are felt everywhere without per-syste
   built abilities as worked examples, and an idea backlog.
 - [game_flow.md](game_flow.md) — match structure, modes, win conditions, and the
   RPG / progression layer around matches.
+
+### Career / hub layer
+- [hub_world.md](hub_world.md) — the hub as home base: core loop, the Skip-guided
+  introduction, and the mentor character's full spec.
+- [character_creator.md](character_creator.md) — archetype-first character creation:
+  six archetypes on the playing-vs-managing axis, perks, creator flow.
+- [conflict_chemistry.md](conflict_chemistry.md) — the ego layer: expectation +
+  disposition traits, the ego budget, refusals, exits, and team chemistry.
+- [hub_actions.md](hub_actions.md) — the daily action economy: budgets, the building
+  action catalog, guest-list events, and the post-game address.
+- [calendar_league.md](calendar_league.md) — tiered divisions with promotion/relegation,
+  season anatomy, and the overlapping multi-sport year.
+- [athlete_development.md](athlete_development.md) — the athlete pool: ceilings,
+  growth/decline, development, familiarity, and the club-pool-vs-rosters model.
+- [rival_managers.md](rival_managers.md) — every AI club's manager-player: shared parts,
+  personality-driven club AI, and drama-without-scripts.
+- [scouting.md](scouting.md) — scouting as activity channels (matches, 1v1 invitationals,
+  interviews) and the mini-sport pipeline.
 
 ## Status
 

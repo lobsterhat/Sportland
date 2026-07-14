@@ -1,10 +1,10 @@
 # Sportland — Scouting Design
 
 **Status:** Living design document
-**Last updated:** 2026-07-11
+**Last updated:** 2026-07-14
 **Scope:** How the player learns what's hidden — the scouting channels (attending matches, 1v1 invitationals, direct contact, and more), what each reveals, and how scouting doubles as the delivery vehicle for individual sports and mini-game sports.
 
-> Code-agnostic by design. Implements the discovery rules of `ConflictChemistryDesign.md` §2.2 and `AthleteDevelopmentDesign.md` §3 (hidden expectations and ceilings); spends the actions of `HubActionsDesign.md`.
+> Part of the `design/` canvas. Implements the discovery rules of `conflict_chemistry.md` §2.2 and `athlete_development.md` §3 (hidden expectations and ceilings); spends the actions of `hub_actions.md`; code mapping in **Code alignment** below.
 
 ---
 
@@ -19,10 +19,10 @@ A lot of Sportland's most valuable information is hidden: expectation traits, pe
 Knowledge about an athlete is a per-target report that deepens with attention:
 
 - **Current ability** — stat readings sharpen from fuzzy ranges to exact values.
-- **Ceilings** — per-sport potential (`AthleteDevelopmentDesign.md` §3).
-- **Expectation traits & volatility** — the ego card (`ConflictChemistryDesign.md` §2).
+- **Ceilings** — per-sport potential (`athlete_development.md` §3).
+- **Expectation traits & volatility** — the ego card (`conflict_chemistry.md` §2).
 - **Condition** — fatigue, injury susceptibility (overlaps the Hospital checkup).
-- **Tendencies** — for rival teams and managers: play-calling habits, in-game patterns (`RivalManagersDesign.md`), feeding Skip's pre-game intel.
+- **Tendencies** — for rival teams and managers: play-calling habits, in-game patterns (`rival_managers.md`), feeding Skip's pre-game intel.
 - **Willingness signals** — how receptive a target would be to a pitch.
 
 Scouting yield scales with the scouting management stat, the Developer's *Growth Eye*, and Skip's presence. Repeated scouting through different channels assembles the full picture — no single channel reveals everything.
@@ -52,7 +52,7 @@ Invite a target to something casual and competitive: **golf, bowling, table tenn
 
 ### 3.3 Direct contact (A)
 
-The interview/schmooze from `HubActionsDesign.md` — sit down and talk. Best for **intentions**: willingness, role hopes, a chance at an expectation trait. Cheapest and most direct, least good at anything the athlete would rather you not know; people manage their own image in interviews in a way they can't mid-bowling-meltdown. Disposition-gated (`ConflictChemistryDesign.md` §2.3): high-Openness athletes spill readily; private ones are nearly interview-proof — take *them* bowling, and note that a high-Competitive target rarely turns down a 1v1 challenge.
+The interview/schmooze from `hub_actions.md` — sit down and talk. Best for **intentions**: willingness, role hopes, a chance at an expectation trait. Cheapest and most direct, least good at anything the athlete would rather you not know; people manage their own image in interviews in a way they can't mid-bowling-meltdown. Disposition-gated (`conflict_chemistry.md` §2.3): high-Openness athletes spill readily; private ones are nearly interview-proof — take *them* bowling, and note that a high-Competitive target rarely turns down a 1v1 challenge.
 
 ### 3.4 Additional channels (proposed)
 
@@ -65,7 +65,7 @@ The interview/schmooze from `HubActionsDesign.md` — sit down and talk. Best fo
 The 1v1 roster (golf, bowling, table tennis) and mini-game sports (**rowing, rock climbing**) are deliberately cheap to build relative to team sports — and every one pays multiple ways:
 
 1. **Scouting venue** (Section 3.2) — their entry point into the package.
-2. **Team events.** The Cafe's chemistry-building event (`HubActionsDesign.md` §4) gets real: bowling night *is* the bowling module with the guest list and pizza. The guest-list rules apply — small gatherings can double as individual scouting reads; big parties are chemistry-broad and information-shallow.
+2. **Team events.** The Cafe's chemistry-building event (`hub_actions.md` §4) gets real: bowling night *is* the bowling module with the guest list and pizza. The guest-list rules apply — small gatherings can double as individual scouting reads; big parties are chemistry-broad and information-shallow.
 3. **Training minigames.** Rowing is a conditioning session you can actually play; rock climbing reads as strength/agility work — individual training sessions with hands on the controller.
 4. **Their own competitions, later.** Nothing stops a bowling ladder or a climbing meet becoming a real fixture on the calendar wheel eventually — the module's already built, and athletes carry ratings in these sports like any other (a fun tell: your point guard is a secret table-tennis monster).
 
@@ -73,7 +73,7 @@ This is the scope-engineering play: team sports are expensive; mini-sports let t
 
 ## 5. System Dependencies
 
-1. **A per-athlete knowledge model** — what the player knows about each athlete/manager, with per-fact reveal state and sharpening precision (extends the reveal-state dependency of `ConflictChemistryDesign.md` §8).
+1. **A per-athlete knowledge model** — what the player knows about each athlete/manager, with per-fact reveal state and sharpening precision (extends the reveal-state dependency of `conflict_chemistry.md` §8).
 2. **Channel actions in the action economy** — attend-match, 1v1 invitational, and interview as costed actions; film room and word of mouth as passive feeds.
 3. **Attendable league fixtures** — other divisions' games exist as calendar events the player can spend a day at (the AI league already simulates them; this makes them destinations).
 4. **A lightweight mini-sport module framework** — the sport-module pattern scaled down: quick setup, 1–2 participants (or a small group for events), minutes-long sessions, reusable across scouting/events/training.
@@ -88,3 +88,9 @@ This is the scope-engineering play: team sports are expensive; mini-sports let t
 - **Can you 1v1 your own players?** (Proposal: yes — it's a familiarity builder and re-scout, overlapping the Cafe one-on-one; may just be the same action with a venue choice.)
 - **Skip's watchlist depth.** How many athletes Skip can grind at once, and whether his film room ever reveals ego traits or only ability.
 - **Simulated match watching.** Is attending a match a playable/watchable scene (even a stylized recap) or a report with flavor text? Big presentation cost either way — worth deciding late.
+
+## Code Alignment (2026-07)
+
+- **The hiding philosophy is already in the code**: `Rating.cs` hides raw 0–20 values behind coarse grades on purpose. Scouting fog extends the same idea one level up — hiding the *grade* behind `?` until discovered.
+- **Mini-sports** are the sport-module pattern scaled down; dodgeball's `GameMode` presets show how one module hosts many rule variants cheaply.
+- **Attend-a-match needs a simulated league** — AI-vs-AI fixtures with results don't exist yet; the scouting channel arrives with the league sim (`calendar_league.md`).

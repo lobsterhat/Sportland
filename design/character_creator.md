@@ -1,10 +1,10 @@
 # Sportland — Player Character Creator Design
 
 **Status:** Living design document
-**Last updated:** 2026-07-10
+**Last updated:** 2026-07-14
 **Scope:** Creating the player's character — identity, archetype selection, and the trade-offs that define how they'll play and manage.
 
-> Code-agnostic by design: this describes what the creator must do, not how the current codebase implements it. See `HubWorldDesign.md` for where character creation sits in the introduction flow (Skip guides it, step 2 of the intro).
+> Part of the `design/` canvas. See `hub_world.md` for where character creation sits in the introduction flow (Skip guides it, step 2 of the intro); code mapping in **Code alignment** below.
 
 ---
 
@@ -29,7 +29,7 @@ Every archetype is described against the same two meters, so cards are instantly
 - **Playing** — the character's own on-field ability: athletic stats, sport-skill ceilings, and any in-game abilities. Governs how much you personally tip games you play in.
 - **Management** — power over everything between games: how many daily actions you get, how effective training is, team morale, scouting accuracy, tactical options.
 
-Grades use the same letter scale as athletes (S/A/B/C/D/F), so the player is learning to read a Sportland stat card while building their own.
+Grades use the game's shared rating scale (hidden 0–20 internal values surfaced as coarse **F–S** letter grades — see `attributes.md` and `Rating.cs`), so the player is learning to read a Sportland stat card while building their own.
 
 ## 4. Proposed Archetype Roster
 
@@ -61,10 +61,10 @@ Skip and the management archetypes deliberately don't overlap: **Skip gives info
 
 Stated as requirements, not implementation:
 
-1. **Archetype definitions as data.** Name, fantasy text, stat template, meter grades, perk identifier, and modifier set — authorable without code changes so the roster can grow/rebalance. The same definitions power rival managers (`RivalManagersDesign.md`), so the creator and the rival generator share one source of truth.
+1. **Archetype definitions as data.** Name, fantasy text, stat template, meter grades, perk identifier, and modifier set — authorable without code changes so the roster can grow/rebalance. The same definitions power rival managers (`rival_managers.md`), so the creator and the rival generator share one source of truth.
 2. **A persistent player-character record.** Identity + chosen archetype + bonus-point allocation, saved for the whole career.
 3. **Modifier hooks.** Places where archetype effects land: daily action count, training-gain multiplier, team morale, in-game ability/play-call availability, scouting accuracy, conflict-resolution chance.
-4. **A teammate conflict & chemistry system.** The Mediator requires conflicts to exist as real events with a resolution mechanic whose odds archetypes can modify, and a team-chemistry value that resolutions can raise. Full design in `ConflictChemistryDesign.md`.
+4. **A teammate conflict & chemistry system.** The Mediator requires conflicts to exist as real events with a resolution mechanic whose odds archetypes can modify, and a team-chemistry value that resolutions can raise. Full design in `conflict_chemistry.md`.
 5. **Creator UI sequence.** Card picker + stat allocation + summary, embeddable inside the Skip-guided introduction (and skippable rails for repeat players are worth considering).
 
 ## 6. Open Questions
@@ -76,3 +76,10 @@ Stated as requirements, not implementation:
 - **Respec & growth.** Is the archetype locked for a career? Can it evolve (Superstar aging into Player-Coach), or hybridize via unlocks?
 - **Archetype-flavored dialogue.** Do Skip and other NPCs react differently to your archetype (Superstar gets fan attention, Motivator gets teammate confessions)?
 - **Perk tuning.** Numbers for *Take Over*, aura strength, training multiplier, etc. are all placeholder concepts pending playtesting.
+
+## Code Alignment (2026-07)
+
+- **Archetype perks are Special Abilities.** The built engine (`special_abilities.md`, `SpecialAbility.cs` — ScriptableObject definitions, conditional multipliers, trigger rules) is exactly the shape perks need: *Take Over* is an event-latched ability à la Hot Head; *Clear the Air*/*Growth Eye*/*Double Shift* are the same data shape with hub-side triggers instead of match triggers.
+- **The two meters ride the Rating scale** (`Rating.cs`, 0–20 → F–S); management stats become rated attributes alongside the general set in `attributes.md`.
+- **`Core/Player/PlayerCharacter.cs` is a legacy placeholder** (pre-dates this design and the rating scale) — supersede it rather than extend it; the persistent character record belongs on the `PlayerProfile` thread.
+- Archetype definitions as assets mirror the established authoring pattern (abilities, game modes are already ScriptableObjects).

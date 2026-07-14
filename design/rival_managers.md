@@ -1,10 +1,10 @@
 # Sportland — Rival Managers
 
 **Status:** Living design document
-**Last updated:** 2026-07-11
+**Last updated:** 2026-07-14
 **Scope:** The manager-players who run every AI club — built from the same parts as the player's character, with their own abilities, skills, and personalities that drive both their club's behavior and their presence on the field.
 
-> Code-agnostic by design. Companion to `CharacterCreatorDesign.md` (the shared archetype system), `CalendarLeagueDesign.md` (the leagues rivals populate), and `AthleteDevelopmentDesign.md` (AI club roster behavior).
+> Part of the `design/` canvas. Companion to `character_creator.md` (the shared archetype system), `calendar_league.md` (the leagues rivals populate), and `athlete_development.md` (AI club roster behavior); code mapping in **Code alignment** below.
 
 ---
 
@@ -16,7 +16,7 @@ This is deliberate symmetry: whatever the player's character can be, a rival can
 
 ## 2. Built From the Same Parts
 
-A rival manager is assembled from the same data the character creator uses (`CharacterCreatorDesign.md`):
+A rival manager is assembled from the same data the character creator uses (`character_creator.md`):
 
 - **An archetype** — from the same roster (Superstar, Player-Coach, Tactician, Motivator, Mediator, Developer), with the same perks. The archetype system being data-driven pays off here: one definition set serves both the creator and the rival generator.
 - **Athletic skills** — real per-sport stats; the rival is a genuine athlete on their team's roster, fielded (or benched) like anyone else.
@@ -32,7 +32,7 @@ Personality is what turns one archetype into many different rivals. Proposed dim
 | Dimension | What it drives |
 |---|---|
 | **Recruiting style** | Star collector vs. youth developer vs. bargain hunter — what their roster looks like over time |
-| **Aggression** | Poaching appetite: how actively they court *your* discontented players (the visible-poaching answer from `ConflictChemistryDesign.md` §9 — a high-aggression rival is who comes knocking) |
+| **Aggression** | Poaching appetite: how actively they court *your* discontented players (the visible-poaching answer from `conflict_chemistry.md` §9 — a high-aggression rival is who comes knocking) |
 | **Loyalty** | Roster churn rate: some rivals keep a core for years (familiarity powerhouses), others flip rosters every season |
 | **Temperament** | Rivalry flavor: gracious, fiery, trash-talking; how they react to wins, losses, and being knocked down a division |
 | **Risk appetite** | In-game: gambles and trick plays vs. percentage calls; in the hub: dual-rostering multi-sport athletes, playing volatile egos |
@@ -86,7 +86,7 @@ Persistent managers + a promotion ladder = rivalry arcs for free:
 ## 8. System Dependencies
 
 1. **A shared manager-player data model** — the player character and rivals are the same shape (archetype + athletic skills + management stats + personality), differing only in who controls them.
-2. **Personality-driven club AI** — recruiting, retention, development, poaching, and roster churn decisions parameterized by the manager's personality and management stats (this implements `AthleteDevelopmentDesign.md` §7's "AI club roster behavior").
+2. **Personality-driven club AI** — recruiting, retention, development, poaching, and roster churn decisions parameterized by the manager's personality and management stats (this implements `athlete_development.md` §7's "AI club roster behavior").
 3. **Rivals as fieldable athletes** — sport modules treat a rival manager as a normal athlete on the opposing roster, with their archetype's in-game expression (especially Tactician play-calling and Superstar usage).
 4. **Authored-content pipeline** — signature rivals defined as data (identity, look, dialogue flavor, fixed archetype/personality) layered over the procedural generator.
 5. **Persistence** — rival managers survive across seasons with their clubs, promotions, relegations, and roster history.
@@ -101,3 +101,9 @@ Persistent managers + a promotion ladder = rivalry arcs for free:
 - **How much history is surfaced?** Head-to-head records only, or a real rivalry meter with escalating flavor (special pre-game scenes for old enemies in a promotion decider)?
 - **Authored rival count.** How many signature rivals per sport, and are any *cross-sport* characters (a manager you battle in two leagues)?
 - **The player's own vacancy.** Rivals are player-shaped; is the reverse true — when the player's club plays a sport the player doesn't personally suit up for, does the symmetry hold or is the player-character special?
+
+## Code Alignment (2026-07)
+
+- **The shared manager-player model** = the `PlayerProfile` thread + archetype assets (`character_creator.md` Code Alignment); rivals add a personality parameter block on top. Nothing rival-specific is built.
+- **Dodgeball's AI stack** (`DodgeballAI.cs` and friends) is the first opponent-behavior layer — personality-parameterized play-calling eventually hooks into per-sport AI like it.
+- **Signature rivals as authored assets** follow the same data-asset pattern as abilities and archetypes.
