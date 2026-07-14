@@ -58,8 +58,17 @@ namespace Sportland.Hub
         {
             string status = $"<b>{career.club.clubName}</b>    Day {career.day} — {career.currentDate:ddd, MMM d}    " +
                             $"Actions: {career.actionsRemaining}/{career.actionsPerDay}";
+
+            if (career.league != null)
+                status += $"    <alpha=#AA>{career.league.leagueName}, {career.league.divisionName} ({career.league.sport})</alpha>";
+
             if (!career.PlayerCreated)
                 status += "\n<color=#FFD75F>→ Visit the Office to create your character</color>";
+            else if (career.league == null)
+                status += "\n<color=#FFD75F>→ Sign up for a league at the Office</color>";
+            else if (career.club.pool.Count < career.league.rules.DressedSize)
+                status += $"\n<color=#FFD75F>→ Fill your roster at the Office ({career.club.pool.Count}/{career.league.rules.DressedSize} for a full match-day squad)</color>";
+
             hud.SetStatus(status);
         }
 

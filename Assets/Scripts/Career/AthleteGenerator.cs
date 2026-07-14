@@ -25,10 +25,19 @@ namespace Sportland.Career
             "Costa", "Baptiste", "Lindqvist", "Ortiz", "Grady", "Ellison", "Vance",
         };
 
-        /// <summary>Roll one athlete. Talent 0..1 skews both ratings and egos.</summary>
+        /// <summary>Roll one athlete with talent anywhere on the 0..1 range.</summary>
         public static CareerAthlete Generate(System.Random rng, int index)
+            => Generate(rng, index, 0f, 1f);
+
+        /// <summary>
+        /// Roll one athlete. Talent (bounded by min/max) skews both ratings
+        /// and egos — a bottom-division free-agent pool passes a low band
+        /// (design/athlete_development.md §2: churn is the lower divisions'
+        /// weather).
+        /// </summary>
+        public static CareerAthlete Generate(System.Random rng, int index, float talentMin, float talentMax)
         {
-            float talent = (float)rng.NextDouble();
+            float talent = talentMin + (float)rng.NextDouble() * (talentMax - talentMin);
 
             var a = new CareerAthlete
             {

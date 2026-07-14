@@ -1,4 +1,5 @@
 using System;
+using System.Collections.Generic;
 using UnityEngine;
 
 namespace Sportland.Career
@@ -26,6 +27,13 @@ namespace Sportland.Career
         [Header("Club")]
         public Club club;
 
+        [Header("League")]
+        [Tooltip("The club's league enrollment. Null until the player signs up at the Office. One sport for now; becomes a list when the calendar wheel turns.")]
+        public LeagueMembership league;
+
+        [Tooltip("The signable free-agent pool. Bottom-division quality — low-skill journeymen, per the churn ecology.")]
+        public List<CareerAthlete> freeAgents = new List<CareerAthlete>();
+
         [Tooltip("Seed for the starting pool, so a career is reproducible while there's no save system.")]
         public int generationSeed = 20260901;
 
@@ -49,17 +57,121 @@ namespace Sportland.Career
                 StartNewCareer();
         }
 
-        /// <summary>Bootstraps a fresh club: you, Skip, and a starting pool.</summary>
+        /// <summary>
+        /// Bootstraps a fresh career: the club is just you and Skip — the
+        /// squad gets recruited from the free-agent pool after joining a
+        /// league (design/hub_world.md §3, "build a team").
+        /// </summary>
         public void StartNewCareer()
         {
             club = new Club { clubName = "Sportland FC" };
             club.pool.Add(AthleteGenerator.GeneratePlayerCharacter());
             club.pool.Add(AthleteGenerator.GenerateSkip());
-            for (int i = 0; i < 8; i++)
-                club.pool.Add(AthleteGenerator.Generate(rng, i));
 
+            // Bottom-division free agents: a low talent band, always signable.
+            freeAgents.Clear();
+            for (int i = 0; i < 20; i++)
+                freeAgents.Add(AthleteGenerator.Generate(rng, i, 0f, 0.35f));
+
+            league = null;
             actionsRemaining = actionsPerDay;
             StateChanged?.Invoke();
+        }
+
+        // ── League ──────────────────────────────────────────────────────
+
+        private static readonly string[] OpponentNames =
+        {
+            "Harbor Hawks", "Dockside Eels", "Northgate Owls", "Cannery Cats",
+            "Redline Foxes", "Old Mill Bears", "Parkside Ravens",
+        };
+
+        /// <summary>
+        /// Sign up for the (only, for now) league: Dodgeball, bottom division.
+        /// Generates the season's fixtures — double round-robin against the
+        /// division's seven AI clubs, one game every three days, each with a
+        /// time slot.
+        /// </summary>
+        public void JoinDodgeballLeague()
+        {
+            league = new LeagueMembership
+            {
+                sport = "Dodgeball",
+                leagueName = "Parks League",
+                divisionName = "Division 4",
+                rules = new RosterRules(), // dodgeball defaults: 6 court + 4 reserve + 2 inactive
+            };
+
+            // Double round-robin: every opponent twice, once home once away.
+            var slate = new List<Fixture>();
+            foreach (var name in OpponentNames)
+            {
+                slate.Add(new Fixture { opponent = name, home = true });
+                slate.Add(new Fixture { opponent = name, home = false });
+            }
+            for (int i = slate.Count - 1; i > 0; i--)
+            {
+                int j = rng.Next(i + 1);
+                (slate[i], slate[j]) = (slate[j], slate[i]);
+            }
+
+            // Slot weighting: league dodgeball is mostly an evening affair.
+            TimeSlot[] slotBag =
+            {
+                TimeSlot.Morning,
+                TimeSlot.Afternoon, TimeSlot.Afternoon,
+                TimeSlot.Evening, TimeSlot.Evening, TimeSlot.Evening,
+                TimeSlot.Night, TimeSlot.Night,
+            };
+
+            DateTime gameDate = currentDate.AddDays(7); // one week of preseason
+            foreach (var fixture in slate)
+            {
+                fixture.date = gameDate;
+                fixture.slot = slotBag[rng.Next(slotBag.Length)];
+                league.fixtures.Add(fixture);
+                gameDate = gameDate.AddDays(3);
+            }
+
+            StateChanged?.Invoke();
+        }
+
+        /// <summary>
+        /// Fixtures that clash with the given one: same date and time slot in
+        /// another enrollment, or a shared athlete booked elsewhere. With one
+        /// league and one club this is always empty — the seam exists so the
+        /// calendar can flag conflicts the moment a second sport arrives.
+        /// </summary>
+        public List<Fixture> ConflictsWith(Fixture fixture)
+        {
+            return new List<Fixture>();
+        }
+
+        // ── Recruiting ──────────────────────────────────────────────────
+
+        /// <summary>
+        /// Sign a free agent. Slice rule: everyone always accepts — the
+        /// willingness/interview loop (design/hub_actions.md) comes later.
+        /// Only the league's max-roster cap can refuse.
+        /// </summary>
+        public bool TryRecruit(CareerAthlete athlete, out string message)
+        {
+            int cap = league != null ? league.rules.MaxRoster : 12;
+            if (club.pool.Count >= cap)
+            {
+                message = $"Roster full ({cap} max, including inactive spots).";
+                return false;
+            }
+            if (!freeAgents.Remove(athlete))
+            {
+                message = "They're no longer available.";
+                return false;
+            }
+
+            club.pool.Add(athlete);
+            message = $"{athlete.FullName} signs with {club.clubName}!";
+            StateChanged?.Invoke();
+            return true;
         }
 
         /// <summary>Has the player been through character creation yet?</summary>

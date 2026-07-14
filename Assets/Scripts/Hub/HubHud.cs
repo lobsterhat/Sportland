@@ -20,8 +20,8 @@ namespace Sportland.Hub
         private TextMeshProUGUI hintText;
         private GameObject rosterPanel;
         private TextMeshProUGUI rosterText;
-        private GameObject creatorPanel;
-        private TextMeshProUGUI creatorText;
+        private GameObject screenPanel;
+        private TextMeshProUGUI screenText;
         private Coroutine toastRoutine;
 
         public static HubHud Create()
@@ -79,23 +79,24 @@ namespace Sportland.Hub
                 size: new Vector2(-60f, -50f), align: TextAlignmentOptions.TopLeft);
             hud.rosterPanel.SetActive(false);
 
-            // Character creator panel: same construction as the roster.
-            hud.creatorPanel = new GameObject("CreatorPanel");
-            hud.creatorPanel.transform.SetParent(canvasGo.transform, false);
-            var creatorBg = hud.creatorPanel.AddComponent<Image>();
-            creatorBg.color = new Color(0.02f, 0.05f, 0.10f, 0.92f);
-            var creatorRect = hud.creatorPanel.GetComponent<RectTransform>();
-            creatorRect.anchorMin = new Vector2(0.5f, 0.5f);
-            creatorRect.anchorMax = new Vector2(0.5f, 0.5f);
-            creatorRect.pivot = new Vector2(0.5f, 0.5f);
-            creatorRect.anchoredPosition = Vector2.zero;
-            creatorRect.sizeDelta = new Vector2(1300f, 820f);
+            // Generic full-screen panel: character creator, league sign-up,
+            // calendar, roster & recruiting all render into this one surface.
+            hud.screenPanel = new GameObject("ScreenPanel");
+            hud.screenPanel.transform.SetParent(canvasGo.transform, false);
+            var screenBg = hud.screenPanel.AddComponent<Image>();
+            screenBg.color = new Color(0.02f, 0.05f, 0.10f, 0.92f);
+            var screenRect = hud.screenPanel.GetComponent<RectTransform>();
+            screenRect.anchorMin = new Vector2(0.5f, 0.5f);
+            screenRect.anchorMax = new Vector2(0.5f, 0.5f);
+            screenRect.pivot = new Vector2(0.5f, 0.5f);
+            screenRect.anchoredPosition = Vector2.zero;
+            screenRect.sizeDelta = new Vector2(1500f, 880f);
 
-            hud.creatorText = MakeText(hud.creatorPanel.transform, "CreatorText", 28f,
+            hud.screenText = MakeText(hud.screenPanel.transform, "ScreenText", 27f,
                 anchorMin: Vector2.zero, anchorMax: Vector2.one,
                 pivot: new Vector2(0.5f, 0.5f), pos: Vector2.zero,
                 size: new Vector2(-70f, -50f), align: TextAlignmentOptions.TopLeft);
-            hud.creatorPanel.SetActive(false);
+            hud.screenPanel.SetActive(false);
 
             return hud;
         }
@@ -141,46 +142,17 @@ namespace Sportland.Hub
 
         public void CloseRoster() => rosterPanel.SetActive(false);
 
-        // ── Character creator ───────────────────────────────────────────
+        // ── Generic full-screen panel ───────────────────────────────────
 
-        public bool CreatorVisible => creatorPanel.activeSelf;
+        public bool ScreenVisible => screenPanel.activeSelf;
 
-        public void ShowCreator(int selectedIndex)
+        public void ShowScreen(string text)
         {
-            creatorText.text = BuildCreatorText(selectedIndex);
-            creatorPanel.SetActive(true);
+            screenText.text = text;
+            screenPanel.SetActive(true);
         }
 
-        public void CloseCreator() => creatorPanel.SetActive(false);
-
-        private static string BuildCreatorText(int selected)
-        {
-            var all = Archetypes.All;
-            var sb = new System.Text.StringBuilder();
-            sb.AppendLine("<b>CREATE YOUR CHARACTER</b> — choose an archetype");
-            sb.AppendLine("<alpha=#88>The trade-off is the choice: playing yourself vs. running the club.</alpha>");
-            sb.AppendLine();
-
-            for (int i = 0; i < all.Length; i++)
-            {
-                var a = all[i];
-                if (i == selected)
-                    sb.AppendLine($"<color=#FFD75F>>  {a.displayName}</color>   <alpha=#AA>Playing {a.playingGrade} · Management {a.managementGrade} · {a.actionsPerDay} actions/day</alpha>");
-                else
-                    sb.AppendLine($"<alpha=#66>   {a.displayName}</alpha>");
-            }
-
-            var sel = all[selected];
-            sb.AppendLine();
-            sb.AppendLine($"<b>{sel.displayName}</b> — <i>{sel.fantasy}</i>");
-            sb.AppendLine($"Perk: <b>{sel.perkName}</b> — {sel.perkDescription}");
-            sb.AppendLine($"The catch: {sel.theCatch}");
-            sb.AppendLine();
-            sb.AppendLine($"<color=#7FDBFF>Skip:</color> {sel.skipLine}");
-            sb.AppendLine();
-            sb.AppendLine("<alpha=#88>W/S or D-Pad: select    E/Cross: confirm    Esc/Circle: decide later</alpha>");
-            return sb.ToString();
-        }
+        public void CloseScreen() => screenPanel.SetActive(false);
 
         public void ToggleRoster(Club club)
         {

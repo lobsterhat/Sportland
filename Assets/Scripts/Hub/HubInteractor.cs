@@ -6,8 +6,9 @@ namespace Sportland.Hub
 {
     /// <summary>
     /// Lives on the hub player. Finds the nearest building in range, drives
-    /// the prompt, and executes interactions against CareerManager — this is
-    /// where the slice's action catalog lives (design/hub_actions.md §4).
+    /// the prompt, and runs the hub's screens (character creator, league
+    /// sign-up, calendar, roster & recruiting) — a small state machine over
+    /// HubHud's generic panel, with text built by HubScreens.
     ///
     /// Controls (keyboard / PS4 pad): confirm = E / Cross, cancel = Esc /
     /// Circle, menu = R / Triangle. Pad buttons are read positionally
@@ -15,10 +16,17 @@ namespace Sportland.Hub
     /// </summary>
     public class HubInteractor : MonoBehaviour
     {
+        private enum Screen { None, Creator, LeagueSignup, Calendar, Roster }
+
         private HubBuilding[] buildings;
         private HubHud hud;
         private HubPlayerController movement;
+
+        private Screen screen = Screen.None;
         private int creatorIndex;
+        private int calendarPage;
+        private bool rosterPoolTab;
+        private int poolIndex;
 
         public void Init(HubBuilding[] buildings, HubHud hud)
         {
@@ -26,6 +34,8 @@ namespace Sportland.Hub
             this.hud = hud;
             movement = GetComponent<HubPlayerController>();
         }
+
+        // ── Input helpers ───────────────────────────────────────────────
 
         private static bool ConfirmPressed()
         {
@@ -59,6 +69,22 @@ namespace Sportland.Hub
                 || (pad != null && pad.dpad.down.wasPressedThisFrame);
         }
 
+        private static bool NavLeftPressed()
+        {
+            var pad = Gamepad.current;
+            return Input.GetKeyDown(KeyCode.A) || Input.GetKeyDown(KeyCode.LeftArrow)
+                || (pad != null && pad.dpad.left.wasPressedThisFrame);
+        }
+
+        private static bool NavRightPressed()
+        {
+            var pad = Gamepad.current;
+            return Input.GetKeyDown(KeyCode.D) || Input.GetKeyDown(KeyCode.RightArrow)
+                || (pad != null && pad.dpad.right.wasPressedThisFrame);
+        }
+
+        // ── Frame loop ──────────────────────────────────────────────────
+
         private void Update()
         {
             if (buildings == null || hud == null) return;
@@ -66,20 +92,17 @@ namespace Sportland.Hub
             var career = CareerManager.Instance;
             if (career == null) return;
 
-            // Walking pauses while any panel is up — panels own the inputs.
-            bool anyPanel = hud.RosterVisible || hud.CreatorVisible;
+            bool anyPanel = screen != Screen.None || hud.RosterVisible;
             if (movement != null) movement.enabled = !anyPanel;
 
-            // Character creator is the most modal thing there is.
-            if (hud.CreatorVisible)
+            if (screen != Screen.None)
             {
                 hud.SetPrompt("");
-                UpdateCreator(career);
+                HandleScreen(career);
                 return;
             }
 
-            // Menu (Triangle / R) toggles the roster anywhere; cancel (Circle /
-            // Esc) closes it. While it's open it's modal: no world interaction.
+            // Quick roster (Triangle / R) toggles anywhere in the world.
             if (MenuPressed())
             {
                 hud.ToggleRoster(career.club);
@@ -101,41 +124,6 @@ namespace Sportland.Hub
                 Interact(nearest, career);
         }
 
-        private static string PromptFor(HubBuilding building, CareerManager career)
-        {
-            if (building.type == HubBuildingType.Office && !career.PlayerCreated)
-                return "[E] Office — create your character";
-            return building.PromptText;
-        }
-
-        private void UpdateCreator(CareerManager career)
-        {
-            int count = Archetypes.All.Length;
-
-            if (NavUpPressed())
-            {
-                creatorIndex = (creatorIndex - 1 + count) % count;
-                hud.ShowCreator(creatorIndex);
-            }
-            else if (NavDownPressed())
-            {
-                creatorIndex = (creatorIndex + 1) % count;
-                hud.ShowCreator(creatorIndex);
-            }
-            else if (ConfirmPressed())
-            {
-                var chosen = Archetypes.All[creatorIndex];
-                career.ApplyArchetype(chosen);
-                hud.CloseCreator();
-                hud.Toast($"Skip: \"A {chosen.displayName}! Good choice. {chosen.actionsPerDay} actions a day, coach — spend them well.\"", 6f);
-            }
-            else if (CancelPressed())
-            {
-                hud.CloseCreator();
-                hud.Toast("Skip: \"No rush — come back to the Office whenever you're ready.\"");
-            }
-        }
-
         private HubBuilding FindNearest()
         {
             HubBuilding best = null;
@@ -152,26 +140,203 @@ namespace Sportland.Hub
             return best;
         }
 
+        private static string PromptFor(HubBuilding building, CareerManager career)
+        {
+            switch (building.type)
+            {
+                case HubBuildingType.Office:
+                    if (!career.PlayerCreated) return "[E] Office — create your character";
+                    if (career.league == null) return "[E] Office — league sign-up";
+                    return "[E] Office — roster & recruiting";
+
+                case HubBuildingType.Arena:
+                    return career.league == null
+                        ? "[E] Arena — no league yet (sign up at the Office)"
+                        : "[E] Arena — schedule & calendar";
+
+                default:
+                    return building.PromptText;
+            }
+        }
+
+        // ── Screens ─────────────────────────────────────────────────────
+
+        private void OpenScreen(Screen s, CareerManager career)
+        {
+            screen = s;
+            RedrawScreen(career);
+        }
+
+        private void CloseScreen()
+        {
+            screen = Screen.None;
+            hud.CloseScreen();
+        }
+
+        private void RedrawScreen(CareerManager career)
+        {
+            switch (screen)
+            {
+                case Screen.Creator:      hud.ShowScreen(HubScreens.Creator(creatorIndex)); break;
+                case Screen.LeagueSignup: hud.ShowScreen(HubScreens.LeagueSignup(career)); break;
+                case Screen.Calendar:     hud.ShowScreen(HubScreens.Calendar(career, calendarPage)); break;
+                case Screen.Roster:       hud.ShowScreen(HubScreens.Roster(career, rosterPoolTab, poolIndex)); break;
+            }
+        }
+
+        private void HandleScreen(CareerManager career)
+        {
+            switch (screen)
+            {
+                case Screen.Creator:      HandleCreator(career); break;
+                case Screen.LeagueSignup: HandleLeagueSignup(career); break;
+                case Screen.Calendar:     HandleCalendar(career); break;
+                case Screen.Roster:       HandleRoster(career); break;
+            }
+        }
+
+        private void HandleCreator(CareerManager career)
+        {
+            int count = Archetypes.All.Length;
+
+            if (NavUpPressed())
+            {
+                creatorIndex = (creatorIndex - 1 + count) % count;
+                RedrawScreen(career);
+            }
+            else if (NavDownPressed())
+            {
+                creatorIndex = (creatorIndex + 1) % count;
+                RedrawScreen(career);
+            }
+            else if (ConfirmPressed())
+            {
+                var chosen = Archetypes.All[creatorIndex];
+                career.ApplyArchetype(chosen);
+                CloseScreen();
+                hud.Toast($"Skip: \"A {chosen.displayName}! Good choice. {chosen.actionsPerDay} actions a day, coach — spend them well.\"", 6f);
+            }
+            else if (CancelPressed())
+            {
+                CloseScreen();
+                hud.Toast("Skip: \"No rush — come back to the Office whenever you're ready.\"");
+            }
+        }
+
+        private void HandleLeagueSignup(CareerManager career)
+        {
+            if (ConfirmPressed())
+            {
+                career.JoinDodgeballLeague();
+                hud.Toast("Skip: \"We're in the Parks League! Now let's fill this roster — I took the liberty of opening the pool.\"", 6f);
+                rosterPoolTab = true;
+                poolIndex = 0;
+                OpenScreen(Screen.Roster, career);
+            }
+            else if (CancelPressed())
+            {
+                CloseScreen();
+            }
+        }
+
+        private void HandleCalendar(CareerManager career)
+        {
+            int months = HubScreens.CalendarMonthCount(career.league);
+
+            if (NavLeftPressed() && calendarPage > 0)
+            {
+                calendarPage--;
+                RedrawScreen(career);
+            }
+            else if (NavRightPressed() && calendarPage < months - 1)
+            {
+                calendarPage++;
+                RedrawScreen(career);
+            }
+            else if (CancelPressed())
+            {
+                CloseScreen();
+            }
+        }
+
+        private void HandleRoster(CareerManager career)
+        {
+            if (MenuPressed())
+            {
+                rosterPoolTab = !rosterPoolTab;
+                RedrawScreen(career);
+                return;
+            }
+
+            if (rosterPoolTab && career.freeAgents.Count > 0)
+            {
+                if (NavUpPressed())
+                {
+                    poolIndex = Mathf.Max(0, poolIndex - 1);
+                    RedrawScreen(career);
+                    return;
+                }
+                if (NavDownPressed())
+                {
+                    poolIndex = Mathf.Min(career.freeAgents.Count - 1, poolIndex + 1);
+                    RedrawScreen(career);
+                    return;
+                }
+                if (ConfirmPressed())
+                {
+                    var target = career.freeAgents[poolIndex];
+                    career.TryRecruit(target, out string message);
+                    hud.Toast(message);
+                    poolIndex = Mathf.Clamp(poolIndex, 0, Mathf.Max(0, career.freeAgents.Count - 1));
+                    RedrawScreen(career);
+                    return;
+                }
+            }
+
+            if (CancelPressed())
+                CloseScreen();
+        }
+
+        // ── World interactions ──────────────────────────────────────────
+
         private void Interact(HubBuilding building, CareerManager career)
         {
             switch (building.type)
             {
+                case HubBuildingType.Office:
+                    if (!career.PlayerCreated)
+                    {
+                        creatorIndex = 0;
+                        OpenScreen(Screen.Creator, career);
+                    }
+                    else if (career.league == null)
+                    {
+                        OpenScreen(Screen.LeagueSignup, career);
+                    }
+                    else
+                    {
+                        rosterPoolTab = false;
+                        poolIndex = 0;
+                        OpenScreen(Screen.Roster, career);
+                    }
+                    return;
+
+                case HubBuildingType.Arena:
+                    if (career.league == null)
+                    {
+                        hud.Toast("Skip: \"Nothing on the books yet — the Office handles league sign-ups.\"");
+                    }
+                    else
+                    {
+                        calendarPage = 0;
+                        OpenScreen(Screen.Calendar, career);
+                    }
+                    return;
+
                 case HubBuildingType.Home:
                     career.EndDay();
                     hud.Toast($"You sleep. Day {career.day} — everyone recovered overnight.");
                     return;
-
-                case HubBuildingType.Arena:
-                    hud.Toast("No games scheduled yet — league play arrives with the calendar system.");
-                    return;
-            }
-
-            // Character creation lives at the Office and is always free.
-            if (building.type == HubBuildingType.Office && !career.PlayerCreated)
-            {
-                creatorIndex = 0;
-                hud.ShowCreator(creatorIndex);
-                return;
             }
 
             // Everything below costs an action.
@@ -183,10 +348,6 @@ namespace Sportland.Hub
 
             switch (building.type)
             {
-                case HubBuildingType.Office:
-                    hud.Toast("Front-office work done. (Scouting and league business plug in here.)");
-                    break;
-
                 case HubBuildingType.Practice:
                     career.RunPractice();
                     hud.Toast("Practice run — the squad worked hard and picked up some fatigue.");
