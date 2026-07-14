@@ -1,10 +1,10 @@
 # Sportland — Conflict & Chemistry Design
 
 **Status:** Living design document
-**Last updated:** 2026-07-10
+**Last updated:** 2026-07-14
 **Scope:** The ego layer — personality expectations that generate friction, the conflicts that friction produces, how conflicts get resolved, and team chemistry as the resource the whole loop feeds.
 
-> Code-agnostic by design. Referenced by `CharacterCreatorDesign.md` (Motivator/Mediator archetypes) and `HubWorldDesign.md` (Skip, hub workflow).
+> Part of the `design/` canvas. Referenced by `character_creator.md` (Motivator/Mediator archetypes) and `hub_world.md` (Skip, hub workflow); code mapping in **Code alignment** below.
 
 ---
 
@@ -16,7 +16,7 @@ This system is what makes roster construction a personality puzzle on top of a t
 
 ## 2. Expectation Traits
 
-Every athlete has a rating (0–100, displayed as the standard S–F letter grades) for each trait in a shared set. The rating expresses **how much they expect and how strongly they react** when they don't get it. A rating of 0/F means no ego on that axis at all.
+Every athlete has a rating for each trait in a shared set, on the game's standard scale (hidden 0–20 internal value, surfaced as a coarse **F–S** letter grade — `attributes.md` / `Rating.cs`). The rating expresses **how much they expect and how strongly they react** when they don't get it. An F-grade expectation means essentially no ego on that axis.
 
 Proposed starting set:
 
@@ -41,7 +41,7 @@ The trait set is data, not code — it should be extensible as sports and system
 
 - They carry no expectation ratings (all axes at zero *by rule*, not merely by value — nothing that raises egos over a career can touch them).
 - They never generate discontent or conflicts, never demand minutes, positions, praise, or rest.
-- Skip's penalty-free release/rejoin contract (see `HubWorldDesign.md` §4.4) is really a special case of this immunity.
+- Skip's penalty-free release/rejoin contract (see `hub_world.md` §4.4) is really a special case of this immunity.
 
 Design intent: the player character is the coach's avatar and Skip is the tutorial's warmth — neither should ever be a management problem. They're also the pressure valve: benching yourself or Skip is always free, which gives the player two guaranteed-safe roster levers when the ego budget gets tight. And because refusal (Section 5) is an ego behavior, **they never refuse a command** — when you take direct control of them, they always do exactly what you ask.
 
@@ -56,7 +56,7 @@ This makes the first season with any new athlete a genuine discovery arc: who th
 
 ### 2.3 Disposition traits — how they like to live
 
-Alongside expectations, each athlete carries a small set of **disposition traits** (same 0–100 ratings, same letter grades): personality dimensions that shape **willingness to do or avoid activities and interactions**. Where expectations are *claims* (unmet ones breed conflict), dispositions are *styles* — they don't generate grievances on their own; they decide how the athlete engages with everything social.
+Alongside expectations, each athlete carries a small set of **disposition traits** (same 0–20/F–S rating scale): personality dimensions that shape **willingness to do or avoid activities and interactions**. Where expectations are *claims* (unmet ones breed conflict), dispositions are *styles* — they don't generate grievances on their own; they decide how the athlete engages with everything social.
 
 Proposed starting set:
 
@@ -66,7 +66,7 @@ Proposed starting set:
 | **Competitive** | Jumps at 1v1 invitationals, wants extra practice, takes losses hard | Coasts; casual about challenges and results alike |
 | **Openness** | Easy to read — interviews and one-on-ones reveal traits readily | Private; declines direct contact, hard to scout socially — actions must speak |
 
-Dispositions plug into existing systems as modifiers: event attendance willingness and exclusion sting (the guest list, `HubActionsDesign.md`), channel yield in scouting (`ScoutingDesign.md` — a private athlete is nearly interview-proof but can't hide at the bowling alley), and reception of the post-game address (`HubActionsDesign.md` §2). They're discovered through the same hidden-until-scouted-or-revealed machinery as expectations (§2.2).
+Dispositions plug into existing systems as modifiers: event attendance willingness and exclusion sting (the guest list, `hub_actions.md`), channel yield in scouting (`scouting.md` — a private athlete is nearly interview-proof but can't hide at the bowling alley), and reception of the post-game address (`hub_actions.md` §2). They're discovered through the same hidden-until-scouted-or-revealed machinery as expectations (§2.2).
 
 ## 3. The Ego Budget
 
@@ -74,7 +74,7 @@ Expectations are claims on **finite resources**: there are only so many minutes,
 
 - A roster of five Playing Time-A athletes cannot all be satisfied — someone's expectation *will* go unmet every game.
 - Two athletes who both expect the same position are a built-in collision, regardless of talent.
-- High-talent athletes will often carry high expectations (via generation/flags), so stacking stars has a hidden cost.
+- High-talent athletes will often carry high expectations (via generation), so stacking stars has a hidden cost.
 
 The interesting decisions fall out naturally: sign the weaker athlete with no ego, or the star who demands the position your captain already claims? A Mediator player can deliberately run a volatile roster that no one else could hold together.
 
@@ -90,7 +90,7 @@ Each athlete's unmet expectations accumulate into **discontent**, evaluated at n
 **Conflict events** are discrete, dated things that happen and must be dealt with:
 
 - **Athlete ↔ coach** — the athlete confronts the player character about the unmet expectation.
-- **Athlete ↔ athlete** — collisions (both want the same position/spot/spotlight) or spillover (an Upset athlete snaps at a teammate; the flag system's personalities — tempers, ball hogs — make this more likely).
+- **Athlete ↔ athlete** — collisions (both want the same position/spot/spotlight) or spillover (an Upset athlete snaps at a teammate; personality traits and Special Abilities — tempers, ball hogs — make this more likely).
 - **In-game flare-ups** — fights/blow-ups during games surface back in the hub as conflicts to handle (game modules already emit significant events; this consumes them).
 
 Meeting expectations, conversely, slowly rebuilds contentment — and consistently satisfied athletes contribute small chemistry gains.
@@ -146,7 +146,7 @@ When a conflict event is live, the player chooses how to handle it (a hub action
 |---|---|---|
 | **Talk it down** | Chance-based resolution. Success: conflict cleared, **chemistry rises above where it started**. Failure: discontent worsens. | Costs a daily action; odds depend on management stats — the Mediator's *Clear the Air* is a large bonus here |
 | **Concede** | Give them what they want (minutes, the position, the start). Guaranteed peace on that axis. | Lineup optimality — you're now playing their ego, not the best five |
-| **Hold firm** | Refuse. The athlete stays upset. | Ongoing chemistry drain, performance dip, possible escalation or a lasting flag (e.g., *Disgruntled*) |
+| **Hold firm** | Refuse. The athlete stays upset. | Ongoing chemistry drain, performance dip, possible escalation or a lasting negative Special Ability (e.g., *Disgruntled*) |
 | **Move on** | Trade/release the athlete. | Roster cost; possible chemistry shock to close teammates |
 
 The "resolution builds past neutral" rule (from the Mediator spec) applies to **successful talk-downs by anyone** — the Mediator just succeeds far more often. A team that fights and reconciles ends up tighter than one that never fought.
@@ -164,15 +164,15 @@ The player isn't the only one with agency. An athlete who isn't playing, or isn'
 
 **Season's end: jumping ship.** Every athlete runs a stay/go evaluation in the offseason. Chronic unmet expectations push toward the door; **familiarity, team chemistry, and a winning trajectory pull toward staying** (promotion papers over a lot of grievances; relegation sharpens all of them). Departing athletes leave for free agency or a rival club — the roster you neglected socially is the roster you lose in the spring.
 
-**The retention pitch.** During the offseason window, the interview/schmooze action (`HubActionsDesign.md`) points inward: sit down with a wavering player and make the case to stay — same action, same conversation mechanics, same chance of revealing something you didn't know about him. Recruiting and retention are one skill.
+**The retention pitch.** During the offseason window, the interview/schmooze action (`hub_actions.md`) points inward: sit down with a wavering player and make the case to stay — same action, same conversation mechanics, same chance of revealing something you didn't know about him. Recruiting and retention are one skill.
 
 **Skip and the player character never leave** — ego immunity extends here. Skip departs only when released, per his contract.
 
-Design intent: exits give every ignored warning a real deadline. "I'll deal with Jackson's minutes after the playoff push" is now a bet with his departure as the table stakes — and lower-division churn (see `AthleteDevelopmentDesign.md` §2) gets one more engine: unhappy athletes don't just sit, they *move*.
+Design intent: exits give every ignored warning a real deadline. "I'll deal with Jackson's minutes after the playoff push" is now a bet with his departure as the table stakes — and lower-division churn (see `athlete_development.md` §2) gets one more engine: unhappy athletes don't just sit, they *move*.
 
 ## 7. Team Chemistry
 
-A single team-level value (0–100, letter-graded like everything else).
+A single team-level value on the standard 0–20/F–S scale, graded like everything else.
 
 **Rises from:** winning, expectations being met over time, successfully resolved conflicts (past neutral), team-building events (Cafe/hub events), a Motivator's *Locker Room Aura*.
 
@@ -194,7 +194,7 @@ That second effect makes chemistry self-reinforcing in both directions — prote
 
 ## 8. System Dependencies
 
-1. **Expectation trait ratings on athlete data** — a universal, extensible set of rated traits (plus Volatility), distinct from the acquired/situational flag system, though flags feed conflict likelihood and can be produced by outcomes.
+1. **Expectation trait ratings on athlete data** — a universal, extensible set of rated traits (plus Volatility), distinct from the Special Abilities layer (`special_abilities.md` — acquired/conditional stat modifiers), though abilities feed conflict likelihood and conflict outcomes can grant them.
 2. **An ego-immunity rule** — a hard exemption for the player character and the mentor that no career system can override.
 3. **Lineup/rotation data per game** — minutes, positions, and starter status must be recorded so expectations can be evaluated against what actually happened.
 4. **A conflict-event queue in the hub loop** — conflicts created at checkpoints, surfaced in the hub, resolved via daily actions.
@@ -215,6 +215,14 @@ That second effect makes chemistry self-reinforcing in both directions — prote
 - **Poaching.** Do AI clubs actively court your discontented players (visible approaches you can counter), or do departures just resolve to destinations invisibly?
 - **Expectation growth.** Do egos change over a career — a breakout youngster's Playing Time expectation rising with his stats, a veteran mellowing? (Strong candidate: yes, driven by performance and age.)
 - **Split "how much" from "how hard."** One rating currently covers both the size of the expectation and the reaction strength (with Volatility as a global modifier). Is a per-trait split worth the complexity?
-- **Pairwise chemistry.** Team-level only for now; individual friendships/rivalries as links or flags could layer on later.
+- **Pairwise chemistry.** Team-level only for now; individual friendships/rivalries as links could layer on later.
 - **Position mapping per sport.** "Position" expectations need each sport to declare its position set; multi-sport athletes may hold different positional egos per sport.
 - **Tuning.** Stage thresholds, drain/gain rates, talk-down base odds, and the size of the past-neutral bonus are all playtest-driven placeholders.
+
+## Code Alignment (2026-07)
+
+- **Traits are a new rated data family** on the athlete profile using `Rating.cs` (0–20/F–S) — parallel to, but distinct from, `attributes.md`'s attributes: traits don't feed the `Effective*` stat pipeline.
+- **Discontent performance dips and *Disgruntled* fit the built Special Ability engine** as predicate-triggered negative abilities (the Sole Survivor archetype: "while Upset → penalty multipliers"). No new mechanical layer needed.
+- **Chemistry's cooperative-play effect** fits the `Effective*` multiplier pipeline — a team-scoped multiplier on cooperation-relevant stats.
+- **The ego-veto (refusal) hook** belongs at the shared input/command seam when input handling promotes cross-sport (dodgeball currently routes player commands through its own controller).
+- **Flare-ups and behavior reveals** ride the existing `GameEvent`/significant-events pipe in `ISportModule`.

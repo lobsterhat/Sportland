@@ -1,10 +1,10 @@
 # Sportland — Hub Actions & the Daily Economy
 
 **Status:** Living design document
-**Last updated:** 2026-07-10
+**Last updated:** 2026-07-14
 **Scope:** The day as the management layer's currency — the action budget, what actions exist, where they live in the hub, and the pressure that makes spending them interesting.
 
-> Code-agnostic by design. Companion to `HubWorldDesign.md` (buildings, core loop), `CharacterCreatorDesign.md` (archetype action modifiers), and `ConflictChemistryDesign.md` (conflicts as action sinks).
+> Part of the `design/` canvas. Companion to `hub_world.md` (buildings, core loop), `character_creator.md` (archetype action modifiers), and `conflict_chemistry.md` (conflicts as action sinks); code mapping in **Code alignment** below.
 
 ---
 
@@ -32,18 +32,18 @@ After the final whistle, before the recap closes the day, the coach speaks — a
 
 | Option | What it does | The fine print |
 |---|---|---|
-| **Motivate / praise** | Contentment and morale up; **the main feeder of the Recognition trait** (`ConflictChemistryDesign.md` §2) — big performers who go unpraised here are the ones who sour | Praise has to land: a rousing speech after a gutless blowout loss rings hollow (reduced or no effect); the Motivator archetype's words land harder |
+| **Motivate / praise** | Contentment and morale up; **the main feeder of the Recognition trait** (`conflict_chemistry.md` §2) — big performers who go unpraised here are the ones who sour | Praise has to land: a rousing speech after a gutless blowout loss rings hollow (reduced or no effect); the Motivator archetype's words land harder |
 | **Chastise** | The risk/reward read: can sharpen focus (a performance edge next game) when the team *knows* it deserved it and chemistry can absorb it | Backfires into discontent against volatile players or after games they actually played well; punishing effort is how locker rooms are lost |
 | **Call practice** | Books tomorrow as an enhanced team practice (focus chosen now, small efficiency bonus for striking while the iron's hot) | Spends one of tomorrow's actions tonight; Workload egos grumble on the spot |
 | **Team building** | Books a team event for tomorrow (guest-list flow as normal) | After a **loss**, this is the spiral-breaker: the event lands with a morale-repair bonus — the designed answer to bad-night momentum |
 | **Rest day** | Tomorrow is off: everyone (including you) recovers extra fatigue, Workload egos are pleased | Tomorrow's entire action budget is forfeit — recovery is bought with a management day |
 
-Two design notes: **the address is free but rarely neutral** — most options mortgage tomorrow, so the post-game choice is really a calendar commitment made in an emotional moment; and **reception is filtered through who's listening** — dispositions (`ConflictChemistryDesign.md` §2.3), expectation traits, volatility, and the actual result all shape how each athlete takes the same words. Skip and the player character, as ever, take everything well.
+Two design notes: **the address is free but rarely neutral** — most options mortgage tomorrow, so the post-game choice is really a calendar commitment made in an emotional moment; and **reception is filtered through who's listening** — dispositions (`conflict_chemistry.md` §2.3), expectation traits, volatility, and the actual result all shape how each athlete takes the same words. Skip and the player character, as ever, take everything well.
 
 ## 3. The Action Budget
 
 - **Base budget: 3 actions per day** *(placeholder number, like all numbers here)*.
-- **Archetype modifiers** (from `CharacterCreatorDesign.md`): the Player-Coach's *Double Shift* grants +1; the Superstar's management D manifests as a smaller budget (2). Other archetypes sit at base.
+- **Archetype modifiers** (from `character_creator.md`): the Player-Coach's *Double Shift* grants +1; the Superstar's management D manifests as a smaller budget (2). Other archetypes sit at base.
 - **Your own fatigue costs actions.** The player character is a playable athlete; playing heavy minutes builds personal fatigue like anyone else, and a sufficiently exhausted coach loses an action the next day. This makes the play-vs-manage tension *mechanical*: a Superstar who takes over games personally is spending tomorrow's management on tonight's heroics.
 - **Time Management** (management stat) is the tuning dial for occasional bonus actions or discounts — exact mechanism open.
 
@@ -53,10 +53,10 @@ The catalog is data-driven and will grow; this is the starting set. **(A)** = co
 
 ### Office — the front desk of the franchise
 - **Set lineup / rotation** (F) — never charge for the basic job of coaching.
-- **Talk it down** (A) — resolve a live conflict event (`ConflictChemistryDesign.md` §6).
-- **Assign scouting** (A) — investigate an athlete (own roster or target): reveals expectation traits, condition, potential. Results may take days; depth scales with scouting stat / *Growth Eye*. Scouting is done through activity channels — attending matches, 1v1 invitationals, interviews — see `ScoutingDesign.md`.
+- **Talk it down** (A) — resolve a live conflict event (`conflict_chemistry.md` §6).
+- **Assign scouting** (A) — investigate an athlete (own roster or target): reveals expectation traits, condition, potential. Results may take days; depth scales with scouting stat / *Growth Eye*. Scouting is done through activity channels — attending matches, 1v1 invitationals, interviews — see `scouting.md`.
 - **Sign / release** (F) — the paperwork is free. Once an athlete is willing to join, signing them costs nothing; releasing anyone costs nothing. Roster churn is limited by *willingness*, not clerical friction.
-- **Interview / schmooze** (A) — the recruiting pitch: sit down with a signable athlete to entice them onto the team. Raises their **willingness to sign**, and — being a conversation — has a chance to reveal an expectation trait (`ConflictChemistryDesign.md` §2.2), so recruiting doubles as due diligence. Low-profile athletes may sign without any courtship; stars expect to be wooed, possibly across multiple sittings. In the offseason the same action points inward as a **retention pitch** to a wavering player (`ConflictChemistryDesign.md` §6.1) — recruiting and retention are one skill. Skip never needs schmoozing — he is always willing, per his contract.
+- **Interview / schmooze** (A) — the recruiting pitch: sit down with a signable athlete to entice them onto the team. Raises their **willingness to sign**, and — being a conversation — has a chance to reveal an expectation trait (`conflict_chemistry.md` §2.2), so recruiting doubles as due diligence. Low-profile athletes may sign without any courtship; stars expect to be wooed, possibly across multiple sittings. In the offseason the same action points inward as a **retention pitch** to a wavering player (`conflict_chemistry.md` §6.1) — recruiting and retention are one skill. Skip never needs schmoozing — he is always willing, per his contract.
 - **League business** (F to view; A for commitments like joining a league or scheduling a friendly).
 
 ### Practice Facility — where the weeks are won
@@ -79,7 +79,7 @@ The catalog is data-driven and will grow; this is the starting set. **(A)** = co
 One action buys the event; the player decides who's on the list and on what terms:
 
 - **Invite anyone, from two players to the whole pool.** The guest list is the design space — an intimate dinner and a full-club bowling night are the same action with very different shapes.
-- **Depth dilutes with size.** The event's benefits spread across attendees: a small gathering gives strong per-person contentment/chemistry gains and a real chance of learning something about an individual (an expectation-trait read, per the scouting discovery rules — `ScoutingDesign.md`); a big party gives everyone a little and reveals almost nothing about anyone. Broad-and-shallow or narrow-and-deep is the core choice.
+- **Depth dilutes with size.** The event's benefits spread across attendees: a small gathering gives strong per-person contentment/chemistry gains and a real chance of learning something about an individual (an expectation-trait read, per the scouting discovery rules — `scouting.md`); a big party gives everyone a little and reveals almost nothing about anyone. Broad-and-shallow or narrow-and-deep is the core choice.
 - **Exclusion has a social cost.** Every player left off the list has a *chance to feel left out* — a contentment hit scaled by how big the party was (nobody resents missing a quiet dinner for two; being one of three names left off the whole-team night out stings), and by who they are: Recognition and Spotlight egos take exclusion hardest, high familiarity shrugs it off.
 - **Optional or mandatory attendance.** Invited players don't always want to come:
   - **Optional** — reluctant invitees (tired, low contentment, unfamiliar newcomers, private personalities) simply decline, no harm done. You get a willing room and a pure vibe, but no guarantee the players who *need* to be there show up.
@@ -87,7 +87,7 @@ One action buys the event; the player decides who's on the list and on what term
 - **Skip and the player character** are always happy to attend and never feel left out — ego immunity extends to party invitations.
 
 ### Skip — everywhere, always free
-Consulting Skip is **never an action**: his warnings, suggestions, and explanations are ambient (per `HubWorldDesign.md` §4.3). He tells you *where* the fires are; putting them out is what actions are for.
+Consulting Skip is **never an action**: his warnings, suggestions, and explanations are ambient (per `hub_world.md` §4.3). He tells you *where* the fires are; putting them out is what actions are for.
 
 ## 5. Pressure — What Makes the Budget Interesting
 
@@ -113,6 +113,12 @@ Consulting Skip is **never an action**: his warnings, suggestions, and explanati
 - **Banking and overdraft.** Use-it-or-lose-it is the proposal; any exceptions (bank exactly 1? borrow 1 against tomorrow at a morale cost?) or is the hard edge better?
 - **Delegation/staff.** Can hired staff (or Skip?) execute actions autonomously later in a career — auto-scouting, assistant-run practices? Big lever for late-game scale; out of scope for the first pass.
 - **Batch actions.** Does a multi-day training camp exist (spend several days' actions at once for efficiency), or is everything day-granular?
-- ~~Event attendance willingness~~ **Resolved:** disposition traits (Social, Competitive, Openness — `ConflictChemistryDesign.md` §2.3) drive activity willingness, layered on contentment, fatigue, and familiarity.
+- ~~Event attendance willingness~~ **Resolved:** disposition traits (Social, Competitive, Openness — `conflict_chemistry.md` §2.3) drive activity willingness, layered on contentment, fatigue, and familiarity.
 - ~~Event timing plays~~ **Resolved:** the post-game address (§2.1) books next-day events, and post-loss team building carries a morale-repair bonus.
 - **Numbers.** Base 3 / Superstar 2 / Player-Coach 4, one pre-game action, fatigue thresholds, dilution curves and exclusion odds — all placeholders pending playtesting.
+
+## Code Alignment (2026-07)
+
+- **`CoreGameManager.AdvanceDay()` is the overnight tick's seed** — currently a stub that increments the date and recovers fatigue; the calendar/budget system grows around it.
+- **Actions-as-data** follows the repo's established ScriptableObject authoring pattern (Special Abilities and dodgeball `GameMode` presets are the precedents).
+- **Nothing hub-side is built yet** — the `HubWorld/` and `Management/` script folders are empty placeholders; this doc plus `hub_world.md` define what goes in them.

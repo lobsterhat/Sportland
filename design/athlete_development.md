@@ -1,10 +1,10 @@
 # Sportland — Athlete Pool, Development & the Club Roster
 
 **Status:** Living design document
-**Last updated:** 2026-07-11
+**Last updated:** 2026-07-14
 **Scope:** The athlete lifecycle — where players come from, ceilings and decline, how development works and why it pays, familiarity, multi-sport aptitude vs. specialization, and how one club's pool of players maps onto its many sport rosters.
 
-> Code-agnostic by design. Companion to `CalendarLeagueDesign.md` (the league ecosystem this pool populates), `ConflictChemistryDesign.md` (egos and discovery), and `HubActionsDesign.md` (training and recruiting actions).
+> Part of the `design/` canvas. Companion to `calendar_league.md` (the league ecosystem this pool populates), `conflict_chemistry.md` (egos and discovery), and `hub_actions.md` (training and recruiting actions); code mapping in **Code alignment** below.
 
 ---
 
@@ -36,7 +36,7 @@ Practical consequence: a bottom-division club can always fill a roster cheaply, 
 ## 3. Ceilings, Multi-Sport Aptitude & Specialization
 
 - **Per-sport ceilings.** Every athlete has a hidden ceiling in each sport — how good they could become with full development. Current stats show where they are; the ceiling is where they could go.
-- **Hidden until scouted.** Ceilings follow the discovery rules (`ConflictChemistryDesign.md` §2.2): scouting, *Growth Eye*, and time reveal them. A lower-division roster spot is a bet on information.
+- **Hidden until scouted.** Ceilings follow the discovery rules (`conflict_chemistry.md` §2.2): scouting, *Growth Eye*, and time reveal them. A lower-division roster spot is a bet on information.
 - **Aptitude profiles differ.** Some athletes are genuine multi-sport talents (respectable ceilings in several sports); others are born specialists (one tall ceiling, the rest low). Neither is strictly better — the profile shapes the right plan for that athlete.
 - **Specialization is a development choice, not just a trait.** Development effort spread across two sports splits its effect; focusing one sport pushes toward that ceiling fastest. A dual-sport talent can be worth developing in both (flexible, fills two rosters) — or better served specializing, trading versatility for a higher realized peak. The player makes this call per athlete, and re-makes it as ceilings reveal themselves.
 
@@ -44,10 +44,10 @@ Practical consequence: a bottom-division club can always fill a roster cheaply, 
 
 Building players up must be a winning strategy, not flavor:
 
-- **Training raises stats toward the ceiling.** Team practice lifts the group; individual sessions (`HubActionsDesign.md` §4) push one athlete hard. The **Developer** archetype's *Growth Eye* multiplies gains and reveals hidden potential — this doc is that archetype's home turf.
+- **Training raises stats toward the ceiling.** Team practice lifts the group; individual sessions (`hub_actions.md` §4) push one athlete hard. The **Developer** archetype's *Growth Eye* multiplies gains and reveals hidden potential — this doc is that archetype's home turf.
 - **Minutes are food.** Game time develops players — prospects need real games to grow, especially in their growth years. Which creates the game's best staffing tension: **the minutes your prospect needs are the minutes your veteran's ego claims.** Playing the kid means managing the vet (concede, talk down, or trade away) — development and the conflict system feed each other by design.
 - **Age gates the return.** Growth-phase athletes gain fast; peak athletes plateau near their ceiling; declining athletes can slow the slide with conditioning but not reverse it. Developing a 19-year-old and a 31-year-old are different investments and should feel like it.
-- **The alternative is buying.** Signing ready-made stars always works — but stars carry big egos, big willingness costs (courtship, `HubActionsDesign.md`), no familiarity, and the decline clock. Homegrown-vs-bought is the strategic axis, and homegrown's edge is Section 5.
+- **The alternative is buying.** Signing ready-made stars always works — but stars carry big egos, big willingness costs (courtship, `hub_actions.md`), no familiarity, and the decline clock. Homegrown-vs-bought is the strategic axis, and homegrown's edge is Section 5.
 
 ## 5. Familiarity — Why Keeping Players Pays
 
@@ -64,11 +64,11 @@ Together with development, familiarity makes the intended fantasy work: the club
 
 The club signs athletes into **one club pool**; each sport team the club operates fields a **roster drawn from that pool**:
 
-- **Nobody has to be everywhere.** A pool athlete can be rostered on one sport's team, several (the dual-sport high-wire act, `CalendarLeagueDesign.md` §4), or **none**.
+- **Nobody has to be everywhere.** A pool athlete can be rostered on one sport's team, several (the dual-sport high-wire act, `calendar_league.md` §4), or **none**.
 - **Unrostered athletes are the development squad.** They train, build familiarity, and wait — the natural home for growth-phase prospects not ready for league minutes.
 - **Egos apply where relevant.** Playing Time/Starter/Spotlight expectations are evaluated per sport roster an athlete is on. Being left *entirely* unrostered frustrates a strong Playing Time ego eventually — low-ego youngsters sit happily in the development squad; a proud veteran will not. Roster assignment is itself an ego-budget decision.
-- **And it's not a one-way street.** An athlete stuck out of the games or the role he wants can demand a trade/release mid-season or jump ship at season's end (`ConflictChemistryDesign.md` §6.1) — the development squad only holds players who accept being there.
-- **Assignment is free.** Like lineups, moving pool athletes onto and off sport rosters costs no actions (`HubActionsDesign.md`: the paperwork is free) — though league rules may impose windows/deadlines for competition integrity (open question).
+- **And it's not a one-way street.** An athlete stuck out of the games or the role he wants can demand a trade/release mid-season or jump ship at season's end (`conflict_chemistry.md` §6.1) — the development squad only holds players who accept being there.
+- **Assignment is free.** Like lineups, moving pool athletes onto and off sport rosters costs no actions (`hub_actions.md`: the paperwork is free) — though league rules may impose windows/deadlines for competition integrity (open question).
 
 ## 7. System Dependencies
 
@@ -78,7 +78,7 @@ The club signs athletes into **one club pool**; each sport team the club operate
 4. **A development model** — training and game minutes converting into stat gains, scaled by age phase, ceiling headroom, focus/specialization choices, and archetype/stat multipliers.
 5. **Familiarity value per athlete** — accumulation sources, its team-play/volatility/training effects, and loss on departure.
 6. **Club pool ↔ sport roster separation** — one signed pool, per-sport roster assignment (including none), with per-roster ego evaluation.
-7. **AI club roster behavior** — AI teams signing, developing, and releasing so the league's churn (especially lower divisions) actually happens in the world, not just in flavor text. Steered by each club's rival manager-player personality (`RivalManagersDesign.md`).
+7. **AI club roster behavior** — AI teams signing, developing, and releasing so the league's churn (especially lower divisions) actually happens in the world, not just in flavor text. Steered by each club's rival manager-player personality (`rival_managers.md`).
 
 ## 8. Open Questions
 
@@ -89,3 +89,9 @@ The club signs athletes into **one club pool**; each sport team the club operate
 - **Roster limits & windows.** Pool size caps, per-sport roster sizes, and whether transfers/assignments lock during a season's stretch run.
 - **Aging visibility.** Do players see decline coming (scouting-readable curves) or is a veteran's cliff a surprise?
 - **AI development fidelity.** Do AI clubs really develop players (a rival's homegrown star you regret not signing at 18), or approximate it statistically? The former is expensive and wonderful.
+
+## Code Alignment (2026-07)
+
+- **`Core/Athlete/Athlete.cs` is legacy** (0–100 stats, six-grade helper, string flag list) — the athlete record should rebuild on the `PlayerProfile` thread with `Rating`-scale attributes. `attributes.md`'s general/sport-specific split is exactly the per-sport stats structure this doc's ceilings attach to.
+- **Ceilings and aptitude** are additional hidden rated values per sport; development moves base ratings toward them — the same numbers whose per-stat floor→ceiling mappings `attributes.md` defines.
+- **The "F is a playable floor" tenet** (`design/README.md`) is load-bearing here: lower divisions are full of F/E athletes, and the churn ecology only works if their games are still real games.

@@ -1,10 +1,10 @@
 # Sportland — Hub World Design
 
 **Status:** Living design document
-**Last updated:** 2026-07-10
+**Last updated:** 2026-07-14
 **Scope:** The hub world experience — game introduction, character creation, and team/player management outside of scheduled games.
 
-> This document is intentionally code-agnostic. It describes what the systems must do, not how the current codebase implements them. Implementation mapping happens when each piece is built against the latest code.
+> Part of the `design/` canvas (see `README.md` for the chat → docs → memory loop). Design-first: describes what the systems must do; code mapping lives in each doc's **Code alignment** section.
 
 ---
 
@@ -16,7 +16,7 @@ The hub world is the player's home base and the connective tissue of Sportland. 
 - **Character creation** — building the player's own character (identity, class, skill vs. management trade-offs).
 - **Team & player management** — rosters, training, scouting, scheduling, and recovery between games.
 
-Scheduled games themselves are owned by the individual sport modules; the hub hands off to them on game day and receives the results (stats, fatigue, flags, consequences) when the player returns.
+Scheduled games themselves are owned by the individual sport modules; the hub hands off to them on game day and receives the results (stats, fatigue, triggered Special Abilities, consequences) when the player returns.
 
 ## 2. Core Loop
 
@@ -26,22 +26,22 @@ Scheduled games themselves are owned by the individual sport modules; the hub ha
    - **Office** — roster and team management, league standings, scheduling.
    - **Hospital** — fatigue and injury management.
    - **Cafe / Home** — morale, social events, and advancing to the next day.
-3. **Between-game management.** Days between scheduled games are spent on management actions — training, scouting, roster moves — each consuming time until the next game day arrives. Full design of the daily action economy in `HubActionsDesign.md`.
-4. **Game day round trip.** The hub launches the sport, the game plays out, and the player returns to the hub where results are surfaced: stat changes, new flags earned, fatigue accrued, and anything else with consequences for the days ahead.
+3. **Between-game management.** Days between scheduled games are spent on management actions — training, scouting, roster moves — each consuming time until the next game day arrives. Full design of the daily action economy in `hub_actions.md`.
+4. **Game day round trip.** The hub launches the sport, the game plays out, and the player returns to the hub where results are surfaced: stat changes, Special Abilities gained or triggered, fatigue accrued, and anything else with consequences for the days ahead.
 
 ## 3. Introduction Flow
 
 The introduction is not a menu-driven tutorial overlay — it is a guided first play-through of the real loop, led by the mentor. Every step teaches by doing:
 
 1. **Welcome.** The mentor greets the new player and frames Sportland: a city of sports where you play *and* manage.
-2. **Character creation.** The mentor walks the player through building their character — name, look, and archetype choice, with the skill-vs-management trade-off explained in plain terms. Full design in `CharacterCreatorDesign.md`.
+2. **Character creation.** The mentor walks the player through building their character — name, look, and archetype choice, with the skill-vs-management trade-off explained in plain terms. Full design in `character_creator.md`.
 3. **Build a team.** Guided first roster construction: what the stats and letter grades mean, how to read an athlete, how to sign one.
-4. **Join a league.** Picking a league/competition, what the schedule commitment means, and how the season calendar works. Full design in `CalendarLeagueDesign.md`.
+4. **Join a league.** Picking a league/competition, what the schedule commitment means, and how the season calendar works. Full design in `calendar_league.md`.
 5. **Schedule practice.** First management action: setting up practice, what training does, and the cost of a day.
 6. **First game.**
    - **Pre-game:** lineup selection, opponent scouting intel from the mentor.
    - **In-game:** the mentor's hint system (Section 4.3) is live from the bench.
-   - **Post-game:** results recap — what the stats mean, what flags/fatigue were earned, and what to do about it tomorrow.
+   - **Post-game:** results recap — what the stats mean, what abilities/fatigue were earned, and what to do about it tomorrow.
 7. **Hub freedom.** The guided rails come off. The mentor remains available but the player now drives.
 
 Tutorial progress is recorded persistently per step, so the introduction never repeats — including across the mentor being released and rejoining (Section 4.4).
@@ -96,7 +96,7 @@ This makes Skip a knob the player turns freely: keep him for the coaching layer,
 What the mentor design requires from the architecture, stated as requirements (not mapped to current code — the latest implementation lives ahead of this session's checkout):
 
 1. **A team/roster concept.** "Release from the team" and "rejoin" only mean something once the player's team is a real entity with sign/release operations.
-2. **A mentor trait on athlete data.** A permanent flag/trait that marks Skip as the mentor, so hint and tutorial systems can key off it without sports special-casing him.
+2. **A mentor trait on athlete data.** A permanent trait that marks Skip as the mentor, so hint and tutorial systems can key off it without sports special-casing him.
 3. **Persistent tutorial-progress record.** Per-step completion state that survives sessions and survives Skip being released/re-signed.
 4. **A hint-delivery hook in the game loop.** Pre-game, in-game, and post-game moments where the hint system can surface Skip's tips when he's on the team.
 5. **A free-agency (or equivalent) pool.** Somewhere Skip lives while released, always signable at no cost.
@@ -111,3 +111,10 @@ Deferred decisions, to be settled as the design conversation continues:
 - **Dialogue system.** What drives his conversations — a simple linear script per tutorial step, or a reusable dialogue system other NPCs will share?
 - **Hint content sourcing.** Are tips hand-authored per situation, generated from live game state, or both?
 - **Does Skip scale?** Whether his scouting/tips improve over the course of a career, or he stays deliberately static as a baseline advisor.
+
+## Code Alignment (2026-07)
+
+- **The hub scene exists as a placeholder**: `Assets/Scenes/HubWorld.unity` is a button menu driven by `HubMenuController.cs` — to be replaced by the walkable hub. The movement/rendering stack built for the sport prototypes (`Movement/BaseMovementController` + `MovementProfile`, the `Rendering/` sprite tools, `World/SurfaceZone`) reuses directly for hub navigation.
+- **`CoreGameManager` (Core/GameManagement) is the loop's anchor**: it already owns additive sport-scene loading, `ReturnToHub()`, result processing, and an `AdvanceDay()` stub. It predates the dodgeball conventions, so expect a refit rather than a rewrite.
+- **Skip is data, not code**: an athlete on the shared player-profile thread (see `game_flow.md` — the `PlayerProfile` asset is the likely home) with a permanent mentor trait. Sports never special-case him — consistent with dodgeball reading only `Effective*` stats.
+- **Hint hooks** ride the existing `ISportModule` seams (`GameContext` in, `GameResult`/significant events out).

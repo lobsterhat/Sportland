@@ -41,12 +41,23 @@ Questions the multi-sport layer needs to answer. Spitball below.
   every sport specializes?
 
 ### The RPG / career layer
-- What wraps a match — season, tournament, story mode, exhibition?
-- Roster management: draft, trade, train between matches?
-- How do players grow — XP, attribute training, ability unlocks, aging/decline?
+
+> **Largely answered by the career/hub docs** (see README): seasons & leagues →
+> [calendar_league.md](calendar_league.md); roster management & the day loop →
+> [hub_actions.md](hub_actions.md) + [athlete_development.md](athlete_development.md);
+> growth/aging → [athlete_development.md](athlete_development.md); the wrap-around
+> world → [hub_world.md](hub_world.md). Remaining open threads below.
+
+- What wraps a match — season, tournament, story mode, exhibition? *(→ league seasons
+  plus friendlies; cups/tournaments still open in calendar_league.md)*
+- Roster management: draft, trade, train between matches? *(→ club pool + willingness-gated
+  signing; draft/trade mechanics still open)*
+- How do players grow — XP, attribute training, ability unlocks, aging/decline? *(→ training
+  + minutes toward hidden ceilings, growth/peak/decline arcs; ability unlocks still open)*
 - Persistence: how is the player pool stored across matches and sports? (The
   `PlayerProfile` asset thread — see special_abilities.md / Claude memory — is the
-  likely home for a character's stats + abilities across sports.)
+  likely home for a character's stats + abilities across sports; the career docs assume
+  this thread and add traits, ceilings, familiarity, and reveal states to it.)
 
 ### How abilities surface in flow
 - Earned/unlocked through play, or chosen at character creation?
