@@ -42,7 +42,11 @@ namespace Sportland.Hub
             career = CareerManager.Instance;
             career.StateChanged += RefreshStatus;
             RefreshStatus();
-            hud.Toast($"Welcome to {career.club.clubName}. Skip: \"Have a wander — try the Cafe, and check the roster with R.\"");
+
+            if (!career.PlayerCreated)
+                hud.Toast($"Skip: \"Welcome to {career.club.clubName}, coach! First things first — head to the Office and we'll figure out who you are.\"", 8f);
+            else
+                hud.Toast($"Welcome back to {career.club.clubName}. Skip: \"Have a wander — try the Cafe, and check the roster with R.\"");
         }
 
         private void OnDestroy()
@@ -52,8 +56,11 @@ namespace Sportland.Hub
 
         private void RefreshStatus()
         {
-            hud.SetStatus($"<b>{career.club.clubName}</b>    Day {career.day} — {career.currentDate:ddd, MMM d}    " +
-                          $"Actions: {career.actionsRemaining}/{career.actionsPerDay}");
+            string status = $"<b>{career.club.clubName}</b>    Day {career.day} — {career.currentDate:ddd, MMM d}    " +
+                            $"Actions: {career.actionsRemaining}/{career.actionsPerDay}";
+            if (!career.PlayerCreated)
+                status += "\n<color=#FFD75F>→ Visit the Office to create your character</color>";
+            hud.SetStatus(status);
         }
 
         private void DisableLegacyMenu()

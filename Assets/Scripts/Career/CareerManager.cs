@@ -62,6 +62,33 @@ namespace Sportland.Career
             StateChanged?.Invoke();
         }
 
+        /// <summary>Has the player been through character creation yet?</summary>
+        public bool PlayerCreated
+        {
+            get
+            {
+                var pc = club?.PlayerCharacter;
+                return pc != null && !string.IsNullOrEmpty(pc.archetypeId);
+            }
+        }
+
+        /// <summary>
+        /// Character creation: lock in an archetype. Applies the rating
+        /// template and the archetype's daily action budget, and refreshes
+        /// today's remaining actions to the new budget.
+        /// </summary>
+        public void ApplyArchetype(ArchetypeDefinition archetype)
+        {
+            var pc = club.PlayerCharacter;
+            pc.archetypeId = archetype.id;
+            for (int i = 0; i < pc.generalRatings.Length; i++)
+                pc.generalRatings[i] = new TraitEntry(archetype.generalRatingValue, revealed: true);
+
+            actionsPerDay = archetype.actionsPerDay;
+            actionsRemaining = actionsPerDay;
+            StateChanged?.Invoke();
+        }
+
         /// <summary>Spend one action. False (and no change) when the day is spent.</summary>
         public bool TrySpendAction()
         {

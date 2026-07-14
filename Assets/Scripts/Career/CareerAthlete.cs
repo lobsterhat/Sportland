@@ -24,6 +24,9 @@ namespace Sportland.Career
         [Tooltip("Marks the player's own character. Ego-immune by rule.")]
         public bool isPlayerCharacter;
 
+        [Tooltip("Player character only: chosen archetype id. Empty until character creation.")]
+        public string archetypeId = "";
+
         [Tooltip("Marks the mentor (Skip). Ego-immune by rule; always willing to (re)join.")]
         public bool isMentor;
 

@@ -17,11 +17,14 @@ namespace Sportland.Hub
     {
         private HubBuilding[] buildings;
         private HubHud hud;
+        private HubPlayerController movement;
+        private int creatorIndex;
 
         public void Init(HubBuilding[] buildings, HubHud hud)
         {
             this.buildings = buildings;
             this.hud = hud;
+            movement = GetComponent<HubPlayerController>();
         }
 
         private static bool ConfirmPressed()
@@ -42,12 +45,38 @@ namespace Sportland.Hub
             return Input.GetKeyDown(KeyCode.R) || (pad != null && pad.buttonNorth.wasPressedThisFrame);
         }
 
+        private static bool NavUpPressed()
+        {
+            var pad = Gamepad.current;
+            return Input.GetKeyDown(KeyCode.W) || Input.GetKeyDown(KeyCode.UpArrow)
+                || (pad != null && pad.dpad.up.wasPressedThisFrame);
+        }
+
+        private static bool NavDownPressed()
+        {
+            var pad = Gamepad.current;
+            return Input.GetKeyDown(KeyCode.S) || Input.GetKeyDown(KeyCode.DownArrow)
+                || (pad != null && pad.dpad.down.wasPressedThisFrame);
+        }
+
         private void Update()
         {
             if (buildings == null || hud == null) return;
 
             var career = CareerManager.Instance;
             if (career == null) return;
+
+            // Walking pauses while any panel is up — panels own the inputs.
+            bool anyPanel = hud.RosterVisible || hud.CreatorVisible;
+            if (movement != null) movement.enabled = !anyPanel;
+
+            // Character creator is the most modal thing there is.
+            if (hud.CreatorVisible)
+            {
+                hud.SetPrompt("");
+                UpdateCreator(career);
+                return;
+            }
 
             // Menu (Triangle / R) toggles the roster anywhere; cancel (Circle /
             // Esc) closes it. While it's open it's modal: no world interaction.
@@ -66,10 +95,45 @@ namespace Sportland.Hub
             }
 
             HubBuilding nearest = FindNearest();
-            hud.SetPrompt(nearest != null ? nearest.PromptText : "");
+            hud.SetPrompt(nearest != null ? PromptFor(nearest, career) : "");
 
             if (nearest != null && ConfirmPressed())
                 Interact(nearest, career);
+        }
+
+        private static string PromptFor(HubBuilding building, CareerManager career)
+        {
+            if (building.type == HubBuildingType.Office && !career.PlayerCreated)
+                return "[E] Office — create your character";
+            return building.PromptText;
+        }
+
+        private void UpdateCreator(CareerManager career)
+        {
+            int count = Archetypes.All.Length;
+
+            if (NavUpPressed())
+            {
+                creatorIndex = (creatorIndex - 1 + count) % count;
+                hud.ShowCreator(creatorIndex);
+            }
+            else if (NavDownPressed())
+            {
+                creatorIndex = (creatorIndex + 1) % count;
+                hud.ShowCreator(creatorIndex);
+            }
+            else if (ConfirmPressed())
+            {
+                var chosen = Archetypes.All[creatorIndex];
+                career.ApplyArchetype(chosen);
+                hud.CloseCreator();
+                hud.Toast($"Skip: \"A {chosen.displayName}! Good choice. {chosen.actionsPerDay} actions a day, coach — spend them well.\"", 6f);
+            }
+            else if (CancelPressed())
+            {
+                hud.CloseCreator();
+                hud.Toast("Skip: \"No rush — come back to the Office whenever you're ready.\"");
+            }
         }
 
         private HubBuilding FindNearest()
@@ -100,6 +164,14 @@ namespace Sportland.Hub
                 case HubBuildingType.Arena:
                     hud.Toast("No games scheduled yet — league play arrives with the calendar system.");
                     return;
+            }
+
+            // Character creation lives at the Office and is always free.
+            if (building.type == HubBuildingType.Office && !career.PlayerCreated)
+            {
+                creatorIndex = 0;
+                hud.ShowCreator(creatorIndex);
+                return;
             }
 
             // Everything below costs an action.
