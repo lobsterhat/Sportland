@@ -348,8 +348,82 @@ namespace Sportland.Career
         }
 
         /// <summary>
-        /// Play today's fixture as a simulation — a stand-in until the real
-        /// dodgeball bridge: team strength from starters (empty slots hurt),
+        /// Fill the match context for a playable fixture: our starters by
+        /// lineup slot, the rival's best six in the same shape, and who the
+        /// human controls — the player character if they're starting,
+        /// otherwise the centre infielder. The dodgeball scene's career
+        /// director consumes this on load.
+        /// </summary>
+        public void PrepareCareerMatch()
+        {
+            var fixture = TodayFixture;
+            if (fixture == null) return;
+
+            CareerMatchContext.Clear();
+            CareerMatchContext.ourClubName = club.clubName;
+            CareerMatchContext.theirClubName = fixture.opponent;
+
+            foreach (var id in league.starterIds)
+                CareerMatchContext.ourStarters.Add(string.IsNullOrEmpty(id) ? null : AthleteById(id));
+
+            var theirBench = new List<CareerAthlete>();
+            RivalMatchSquad(fixture.opponent, CareerMatchContext.theirStarters, theirBench);
+
+            var pc = club.PlayerCharacter;
+            bool pcStarts = CareerMatchContext.ourStarters.Exists(a => a != null && a.isPlayerCharacter);
+            CareerMatchContext.controlledAthleteId = pcStarts
+                ? pc.id
+                : (CareerMatchContext.ourStarters[1] ?? CareerMatchContext.ourStarters[0])?.id;
+
+            CareerMatchContext.Active = true;
+        }
+
+        /// <summary>
+        /// Consume a played match's result from the context: mark the
+        /// fixture, fatigue the match-day squad, persist. Returns the fixture
+        /// (or null when there was nothing to apply).
+        /// </summary>
+        public Fixture ApplyCareerMatchResult()
+        {
+            if (!CareerMatchContext.ResultReady)
+            {
+                CareerMatchContext.Clear();
+                return null;
+            }
+
+            var fixture = TodayFixture;
+            if (fixture == null)
+            {
+                CareerMatchContext.Clear();
+                return null;
+            }
+
+            fixture.ourScore = CareerMatchContext.ourScore;
+            fixture.theirScore = CareerMatchContext.theirScore;
+            fixture.played = true;
+            FatigueMatchDaySquad();
+            CareerMatchContext.Clear();
+            Commit();
+            return fixture;
+        }
+
+        private void FatigueMatchDaySquad()
+        {
+            foreach (var id in league.starterIds)
+            {
+                var a = string.IsNullOrEmpty(id) ? null : AthleteById(id);
+                if (a != null) a.fatigue = Mathf.Min(100f, a.fatigue + 25f);
+            }
+            foreach (var id in league.reserveIds)
+            {
+                var a = string.IsNullOrEmpty(id) ? null : AthleteById(id);
+                if (a != null) a.fatigue = Mathf.Min(100f, a.fatigue + 10f);
+            }
+        }
+
+        /// <summary>
+        /// Play today's fixture as a simulation — the quick alternative to
+        /// taking the court: team strength from starters (empty slots hurt),
         /// bench depth, fatigue, and home court, plus honest randomness.
         /// Marks the fixture played and fatigues the match-day squad.
         /// </summary>
@@ -409,16 +483,7 @@ namespace Sportland.Career
             fixture.played = true;
 
             // The match-day squad worked for it.
-            foreach (var id in league.starterIds)
-            {
-                var a = string.IsNullOrEmpty(id) ? null : AthleteById(id);
-                if (a != null) a.fatigue = Mathf.Min(100f, a.fatigue + 25f);
-            }
-            foreach (var id in league.reserveIds)
-            {
-                var a = string.IsNullOrEmpty(id) ? null : AthleteById(id);
-                if (a != null) a.fatigue = Mathf.Min(100f, a.fatigue + 10f);
-            }
+            FatigueMatchDaySquad();
 
             Commit();
             return fixture;

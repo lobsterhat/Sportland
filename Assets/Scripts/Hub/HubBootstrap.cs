@@ -17,6 +17,7 @@ namespace Sportland.Hub
     {
         private HubHud hud;
         private CareerManager career;
+        private HubInteractor interactor;
 
         private struct BuildingSpec
         {
@@ -42,6 +43,18 @@ namespace Sportland.Hub
             career = CareerManager.Instance;
             career.StateChanged += RefreshStatus;
             RefreshStatus();
+
+            // Back from a played fixture: apply the score and show full time.
+            if (CareerMatchContext.ResultReady)
+            {
+                var fixture = career.ApplyCareerMatchResult();
+                if (fixture != null)
+                {
+                    interactor.ShowMatchResult(fixture);
+                    return;
+                }
+            }
+            CareerMatchContext.Clear(); // never leave a stale context lying around
 
             if (!career.PlayerCreated)
                 hud.Toast($"Skip: \"Welcome to {career.club.clubName}, coach! First things first — head to the Office and we'll figure out who you are.\"", 8f);
@@ -130,7 +143,8 @@ namespace Sportland.Hub
             var player = MakeSpriteObject("HubPlayer", new Color(0.95f, 0.85f, 0.30f), Vector2.zero, sortingOrder: 5);
             player.transform.localScale = new Vector3(0.7f, 1f, 1f);
             player.AddComponent<HubPlayerController>();
-            player.AddComponent<HubInteractor>().Init(buildings, hud);
+            interactor = player.AddComponent<HubInteractor>();
+            interactor.Init(buildings, hud);
 
             // Camera.
             var cam = Camera.main;

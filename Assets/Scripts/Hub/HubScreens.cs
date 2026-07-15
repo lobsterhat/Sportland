@@ -194,8 +194,14 @@ namespace Sportland.Hub
             sb.AppendLine($"<b>Your squad</b>: {league.StartersFilled}/6 starters, {league.ReservesFilled}/4 reserves set" +
                           (league.StartersFilled < 6 ? "   <color=#FF6B6B>— thin! empty slots play as dead weight</color>" : ""));
             sb.AppendLine();
-            sb.AppendLine($"{Hint}The match is simulated for now — the playable dodgeball bridge is next on the list.</alpha>");
-            sb.AppendLine($"{Hint}E/Cross: play the game    Esc/Circle: not yet (the day can't end until you do)</alpha>");
+            var pc = career.club.PlayerCharacter;
+            bool pcStarts = false;
+            foreach (var id in league.starterIds)
+                if (pc != null && id == pc.id) { pcStarts = true; break; }
+            sb.AppendLine(pcStarts
+                ? $"{Hint}You're starting — you'll control yourself on the court (control passes on caught passes).</alpha>"
+                : $"{Hint}You're coaching from the sideline — you'll control your centre infielder.</alpha>");
+            sb.AppendLine($"{Hint}E/Cross: take the court    F/Square: simulate instead    Esc/Circle: not yet (the day can't end until you do)</alpha>");
             return sb.ToString();
         }
 

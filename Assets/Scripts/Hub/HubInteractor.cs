@@ -1,5 +1,6 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using UnityEngine.SceneManagement;
 using Sportland.Career;
 
 namespace Sportland.Hub
@@ -303,6 +304,14 @@ namespace Sportland.Hub
         {
             if (ConfirmPressed())
             {
+                // Take the court: hand the rosters to the dodgeball scene.
+                career.PrepareCareerMatch();
+                CloseScreen();
+                SceneManager.LoadScene("Dodgeball");
+            }
+            else if (AutoFillPressed())
+            {
+                // Simulate instead — the quick option.
                 lastResult = career.PlayTodayFixtureSimulated();
                 if (lastResult == null)
                 {
@@ -316,6 +325,14 @@ namespace Sportland.Hub
             {
                 CloseScreen();
             }
+        }
+
+        /// <summary>Open the full-time screen for a fixture played in the sport scene (called by HubBootstrap on return).</summary>
+        public void ShowMatchResult(Fixture fixture)
+        {
+            lastResult = fixture;
+            screen = Screen.MatchResult;
+            RedrawScreen(CareerManager.Instance);
         }
 
         private void HandleMatchResult()

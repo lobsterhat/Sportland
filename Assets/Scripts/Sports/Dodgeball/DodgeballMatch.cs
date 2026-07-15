@@ -93,6 +93,12 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>Live time remaining (seconds). Settable so the match-controls slider can extend/shorten the current period.</summary>
         public float TimeRemaining { get => timeRemaining; set => timeRemaining = Mathf.Max(0f, value); }
+
+        /// <summary>True once the match has resolved (clock expiry or wipeout).</summary>
+        public bool IsOver => matchOver;
+
+        /// <summary>The winning team once the match is over; null for a tie (or while running).</summary>
+        public Team? WinnerTeam => winner;
         /// <summary>True if the active mode runs a clock.</summary>
         public bool IsTimed => mode != null && mode.isTimed;
 

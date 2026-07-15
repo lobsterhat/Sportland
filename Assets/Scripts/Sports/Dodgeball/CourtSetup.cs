@@ -149,6 +149,9 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>True if all players are CPU-controlled (no human input).</summary>
         public bool AllAIControlled => allAIControlled;
 
+        /// <summary>Every spawned player root, for systems that post-process the field (e.g. the career director).</summary>
+        public System.Collections.Generic.IReadOnlyList<GameObject> SpawnedPlayers => spawnedPlayers;
+
         /// <summary>Toggle pure AI-vs-AI play live. On: remove the human input wherever it currently lives. Off: re-attach it to the spawn-time controlled player (or any active player if that one's eliminated).</summary>
         public void SetAllAI(bool value)
         {
@@ -215,6 +218,11 @@ namespace Sportland.Sports.Dodgeball
             obliqueView.enabled = obliqueViewSpike;
 
             if (attackLabMode) gameObject.AddComponent<DodgeballAttackLab>();
+
+            // League fixture from the hub: the career director re-stats the
+            // field from the real rosters and returns the result afterward.
+            if (Sportland.Career.CareerMatchContext.Active)
+                gameObject.AddComponent<CareerMatchDirector>();
         }
 
         private void Update()
@@ -230,7 +238,8 @@ namespace Sportland.Sports.Dodgeball
                 Debug.Log($"[Dodgeball] Oblique view {(obliqueView.enabled ? "ON" : "off")}");
             }
 
-            if (!allowRuntimeModeSwitch || match == null) return;
+            // No mode-hopping in the middle of a league fixture.
+            if (!allowRuntimeModeSwitch || match == null || Sportland.Career.CareerMatchContext.Active) return;
 
             if (kb.f1Key.wasPressedThisFrame)      SwitchMode(GameMode.Preset.RunningHits);
             else if (kb.f2Key.wasPressedThisFrame) SwitchMode(GameMode.Preset.Elimination);
