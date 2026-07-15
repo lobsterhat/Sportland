@@ -635,8 +635,17 @@ namespace Sportland.Sports.Dodgeball
         {
             if (t.HasBall) return false;
 
-            bool live = state == State.Thrown || state == State.Passing
-                        || rb.linearVelocity.sqrMagnitude > skillSpeedThreshold * skillSpeedThreshold;
+            // Once the ball has touched the ground (or otherwise gone dead —
+            // a bobble/deflect also flags this immediately) since it was last
+            // released, it can no longer hit anyone for score: a fast skip or
+            // a still-bouncing carom can reach a SECOND player before it
+            // fully settles, and without this gate that contact would run the
+            // catch/carom machinery again — including a fresh scoring hit —
+            // off a ball real dodgeball would already call dead. Any contact
+            // after grounding is a plain pickup, whoever gets there first.
+            bool live = !groundedSinceRelease
+                        && (state == State.Thrown || state == State.Passing
+                            || rb.linearVelocity.sqrMagnitude > skillSpeedThreshold * skillSpeedThreshold);
 
             if (!live)
             {
