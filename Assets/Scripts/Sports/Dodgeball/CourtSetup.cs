@@ -188,6 +188,21 @@ namespace Sportland.Sports.Dodgeball
 
         private void Awake()
         {
+            // League fixture from the hub: normalize away whatever lab/debug
+            // toggles the scene was saved with BEFORE anything spawns — the
+            // attack lab in particular culls the field to attacker-vs-dummy
+            // in its own Awake, far too late to strip afterward.
+            if (Sportland.Career.CareerMatchContext.Active)
+            {
+                attackLabMode = false;
+                allAIControlled = false;
+                spawnDebugCannon = false;
+                showDiagnosticsHud = false;
+                showTuningPanel = false;
+                showMatchControls = false;
+                runMatch = true;
+            }
+
             DodgeballUI.Font = uiFont;   // shared with the runtime-added IMGUI overlays
             BuildCourt();
             SpawnAllPlayers();

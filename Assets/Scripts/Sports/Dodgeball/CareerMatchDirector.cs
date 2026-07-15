@@ -28,6 +28,7 @@ namespace Sportland.Sports.Dodgeball
 
         private CourtSetup court;
         private DodgeballMatch match;
+        private Ball ball;
         private bool finished;
         private float returnAt;
 
@@ -38,6 +39,28 @@ namespace Sportland.Sports.Dodgeball
 
             StripDebugTooling();
             ApplyRosters();
+
+            // Arcade control rule for league play: possession IS control.
+            // The moment the ball attaches to anyone on our team, the human
+            // is that player.
+            ball = Object.FindFirstObjectByType<Ball>();
+            if (ball != null) ball.OnAttached += OnBallAttached;
+        }
+
+        private void OnDestroy()
+        {
+            if (ball != null) ball.OnAttached -= OnBallAttached;
+        }
+
+        private void OnBallAttached(PlayerZoneTracker carrier)
+        {
+            if (carrier == null || !CareerMatchContext.Active) return;
+            if (carrier.Spawn.team != Team.A) return;
+
+            var current = DodgeballPlayerInput.Current;
+            if (current != null && current.gameObject == carrier.gameObject) return;
+
+            DodgeballPlayerInput.TransferControl(carrier.gameObject);
         }
 
         /// <summary>League games aren't the tuning lab: remove the debug kit.</summary>
@@ -88,11 +111,7 @@ namespace Sportland.Sports.Dodgeball
             // Hand the sticks to the chosen athlete (CourtSetup attached input
             // to its default spawn id before we ran).
             if (controlTarget != null && controlTarget.GetComponent<DodgeballPlayerInput>() == null)
-            {
-                if (DodgeballPlayerInput.Current != null)
-                    Destroy(DodgeballPlayerInput.Current);
-                controlTarget.AddComponent<DodgeballPlayerInput>();
-            }
+                DodgeballPlayerInput.TransferControl(controlTarget);
         }
 
         /// <summary>Spawn id (e.g. "A_In_2", "B_Out_3") → starter slot 0-5.</summary>
