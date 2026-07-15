@@ -148,7 +148,7 @@ namespace Sportland.Hub
             if (!any) sb.AppendLine($"{Dim}  No games this month.</alpha>");
 
             sb.AppendLine();
-            sb.AppendLine($"{Hint}<color=#7FDBFF>today</color> · <color=#FFD75F>game day</color>    A/D or D-Pad ◄ ►: month    Esc/Circle: close</alpha>");
+            sb.AppendLine($"{Hint}<color=#7FDBFF>today</color> · <color=#FFD75F>game day</color>    A/D or D-Pad ◄ ►: month    R/Triangle: division    Esc/Circle: close</alpha>");
             return sb.ToString();
         }
 
@@ -157,6 +157,56 @@ namespace Sportland.Hub
             foreach (var f in league.fixtures)
                 if (f.Date.Date == date.Date) return true;
             return false;
+        }
+
+        // ── Division (rival clubs & their rosters) ──────────────────────
+
+        public static string Division(CareerManager career, int selectedIndex)
+        {
+            var league = career.league;
+            var sb = new StringBuilder();
+            sb.AppendLine($"<b>DIVISION</b> — {league.leagueName}, {league.divisionName} ({league.sport})");
+            sb.AppendLine();
+            sb.AppendLine($"  {career.club.clubName}   <color=#7FDBFF>(you)</color>   {Dim}squad {career.club.pool.Count}</alpha>");
+            sb.AppendLine();
+
+            for (int i = 0; i < league.rivals.Count; i++)
+            {
+                var rival = league.rivals[i];
+                var captain = rival.Captain;
+                string captainNote = captain != null
+                    ? $"{Dim}capt. {captain.FullName} ({Archetypes.NameOf(captain.archetypeId)}) · squad {rival.roster.Count}</alpha>"
+                    : $"{Dim}squad {rival.roster.Count}</alpha>";
+
+                sb.AppendLine(i == selectedIndex
+                    ? $"<color=#FFD75F>> {rival.clubName,-18}</color>   {captainNote}"
+                    : $"{Dim}  {rival.clubName,-18}</alpha>   {captainNote}");
+            }
+
+            sb.AppendLine();
+            sb.AppendLine($"{Hint}Every rival player — captains included — can be poached once the season ends.</alpha>");
+            sb.AppendLine($"{Hint}W/S: select club    E/Cross: view roster    R/Triangle: schedule    Esc/Circle: close</alpha>");
+            return sb.ToString();
+        }
+
+        public static string RivalRoster(CareerManager career, int clubIndex)
+        {
+            var rival = career.league.rivals[clubIndex];
+            var sb = new StringBuilder();
+            sb.AppendLine($"<b>{rival.clubName.ToUpperInvariant()}</b> — {career.league.divisionName}, squad of {rival.roster.Count}");
+            sb.AppendLine();
+
+            var captain = rival.Captain;
+            if (captain != null)
+                sb.AppendLine("  " + AthleteLine(captain));
+            foreach (var a in rival.roster)
+                if (!a.isCaptain)
+                    sb.AppendLine("  " + AthleteLine(a));
+
+            sb.AppendLine();
+            sb.AppendLine($"{Hint}The captain is their manager-player — same parts as you, different choices.</alpha>");
+            sb.AppendLine($"{Hint}Poaching opens in the offseason. Esc/Circle: back to division</alpha>");
+            return sb.ToString();
         }
 
         // ── Roster, recruiting & lineup ─────────────────────────────────
@@ -301,10 +351,11 @@ namespace Sportland.Hub
 
         private static string AthleteLine(CareerAthlete a)
         {
-            string archetypeName = a.isPlayerCharacter ? Archetypes.NameOf(a.archetypeId) : "";
+            string archetypeName = Archetypes.NameOf(a.archetypeId);
             string tag = a.isPlayerCharacter
                 ? (archetypeName.Length > 0 ? $" <color=#7FDBFF>(you — {archetypeName})</color>" : " <color=#7FDBFF>(you)</color>")
-                : a.isMentor ? " <color=#7FDBFF>(mentor)</color>" : "";
+                : a.isMentor ? " <color=#7FDBFF>(mentor)</color>"
+                : a.isCaptain ? $" <color=#FFD75F>(captain — {archetypeName})</color>" : "";
 
             return $"{a.FullName,-18}{tag}  {a.age,2}   " +
                    $"SPD {a.GetGeneral(GeneralRating.Speed).DisplayGrade} · " +

@@ -24,8 +24,11 @@ namespace Sportland.Career
         [Tooltip("Marks the player's own character. Ego-immune by rule.")]
         public bool isPlayerCharacter;
 
-        [Tooltip("Player character only: chosen archetype id. Empty until character creation.")]
+        [Tooltip("Chosen archetype id — set for the player character (via the creator) and for rival captains (rolled at generation). Empty otherwise.")]
         public string archetypeId = "";
+
+        [Tooltip("Marks a rival club's captain: their manager-player, built from the same parts as yours. Poachable in the offseason like any player.")]
+        public bool isCaptain;
 
         [Tooltip("Marks the mentor (Skip). Ego-immune by rule; always willing to (re)join.")]
         public bool isMentor;

@@ -97,6 +97,21 @@ namespace Sportland.Career
         }
 
         /// <summary>
+        /// A rival club's captain: the manager-player running that club,
+        /// rolled from the same parts as everyone else plus a random
+        /// archetype (design/rival_managers.md). Better than the division's
+        /// journeymen — the best player on most bottom-division rosters.
+        /// </summary>
+        public static CareerAthlete GenerateRivalCaptain(System.Random rng, int index)
+        {
+            var captain = Generate(rng, index, 0.35f, 0.65f);
+            captain.isCaptain = true;
+            captain.age = 26 + rng.Next(12); // captains skew veteran
+            captain.archetypeId = Archetypes.All[rng.Next(Archetypes.All.Length)].id;
+            return captain;
+        }
+
+        /// <summary>
         /// Rough bell around <paramref name="mean"/>: average of two uniform
         /// rolls, clamped to the 0-20 rating scale.
         /// </summary>

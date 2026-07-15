@@ -57,6 +57,21 @@ namespace Sportland.Career
     }
 
     /// <summary>
+    /// A rival club in the division: a name and a real roster. The captain
+    /// (marked on the athlete) is the club's manager-player — a rival built
+    /// from the same parts as the player's character (design/rival_managers.md).
+    /// Every rival player, captain included, is poachable in the offseason.
+    /// </summary>
+    [Serializable]
+    public class RivalClub
+    {
+        public string clubName;
+        public List<CareerAthlete> roster = new List<CareerAthlete>();
+
+        public CareerAthlete Captain => roster.Find(a => a.isCaptain);
+    }
+
+    /// <summary>
     /// The club's enrollment in one sport's league, including the persistent
     /// lineup: starter slots carry positions by index (0-2 infield, 3-5
     /// outfield), reserves dress without a position, and everyone else in the
@@ -70,6 +85,7 @@ namespace Sportland.Career
         public string divisionName;
         public RosterRules rules;
         public List<Fixture> fixtures = new List<Fixture>();
+        public List<RivalClub> rivals = new List<RivalClub>();
 
         // Lineup: athlete ids, "" = open slot.
         public string[] starterIds = new string[6] { "", "", "", "", "", "" };

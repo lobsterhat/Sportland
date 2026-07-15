@@ -120,6 +120,10 @@ namespace Sportland.Career
                 freeAgents = data.freeAgents ?? new List<CareerAthlete>();
                 league = data.inLeague ? data.league : null;
 
+                // Migration: saves from before rival rosters existed.
+                if (league != null && (league.rivals == null || league.rivals.Count == 0))
+                    PopulateRivalRosters();
+
                 Debug.Log($"Career loaded: {club.clubName}, day {day}.");
                 return true;
             }
@@ -247,7 +251,31 @@ namespace Sportland.Career
                 gameDate = gameDate.AddDays(3);
             }
 
+            PopulateRivalRosters();
             Commit();
+        }
+
+        /// <summary>
+        /// Give every rival club a real roster: a captain (their
+        /// manager-player, archetype and all) plus a squad of division-level
+        /// journeymen. Id ranges are offset per club so poached players can
+        /// join the pool without colliding with existing ids.
+        /// </summary>
+        private void PopulateRivalRosters()
+        {
+            league.rivals.Clear();
+            for (int c = 0; c < OpponentNames.Length; c++)
+            {
+                var rival = new RivalClub { clubName = OpponentNames[c] };
+                int idBase = 100 + c * 20;
+
+                rival.roster.Add(AthleteGenerator.GenerateRivalCaptain(rng, idBase));
+                int squadSize = 9 + rng.Next(3); // 10-12 including the captain
+                for (int i = 1; i < squadSize; i++)
+                    rival.roster.Add(AthleteGenerator.Generate(rng, idBase + i, 0f, 0.35f));
+
+                league.rivals.Add(rival);
+            }
         }
 
         /// <summary>

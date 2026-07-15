@@ -25,6 +25,9 @@ namespace Sportland.Hub
         private Screen screen = Screen.None;
         private int creatorIndex;
         private int calendarPage;
+        private bool arenaDivisionTab;
+        private int divisionIndex;
+        private bool viewingRivalRoster;
         private RosterTab rosterTab;
         private int poolIndex;
         private int lineupSlot;
@@ -202,7 +205,12 @@ namespace Sportland.Hub
                     hud.ShowScreen(HubScreens.LeagueSignup(career));
                     break;
                 case Screen.Calendar:
-                    hud.ShowScreen(HubScreens.Calendar(career, calendarPage));
+                    if (viewingRivalRoster)
+                        hud.ShowScreen(HubScreens.RivalRoster(career, divisionIndex));
+                    else if (arenaDivisionTab)
+                        hud.ShowScreen(HubScreens.Division(career, divisionIndex));
+                    else
+                        hud.ShowScreen(HubScreens.Calendar(career, calendarPage));
                     break;
                 case Screen.Roster:
                     hud.ShowScreen(rosterTab == RosterTab.Lineup
@@ -269,6 +277,49 @@ namespace Sportland.Hub
 
         private void HandleCalendar(CareerManager career)
         {
+            // Drilled into a rival's roster: cancel backs out to the division list.
+            if (viewingRivalRoster)
+            {
+                if (CancelPressed())
+                {
+                    viewingRivalRoster = false;
+                    RedrawScreen(career);
+                }
+                return;
+            }
+
+            if (MenuPressed())
+            {
+                arenaDivisionTab = !arenaDivisionTab;
+                RedrawScreen(career);
+                return;
+            }
+
+            if (arenaDivisionTab)
+            {
+                int count = career.league.rivals.Count;
+                if (count > 0 && NavUpPressed())
+                {
+                    divisionIndex = Mathf.Max(0, divisionIndex - 1);
+                    RedrawScreen(career);
+                }
+                else if (count > 0 && NavDownPressed())
+                {
+                    divisionIndex = Mathf.Min(count - 1, divisionIndex + 1);
+                    RedrawScreen(career);
+                }
+                else if (count > 0 && ConfirmPressed())
+                {
+                    viewingRivalRoster = true;
+                    RedrawScreen(career);
+                }
+                else if (CancelPressed())
+                {
+                    CloseScreen();
+                }
+                return;
+            }
+
             int months = HubScreens.CalendarMonthCount(career.league);
 
             if (NavLeftPressed() && calendarPage > 0)
@@ -430,6 +481,9 @@ namespace Sportland.Hub
                     else
                     {
                         calendarPage = 0;
+                        arenaDivisionTab = false;
+                        viewingRivalRoster = false;
+                        divisionIndex = 0;
                         OpenScreen(Screen.Calendar, career);
                     }
                     return;
