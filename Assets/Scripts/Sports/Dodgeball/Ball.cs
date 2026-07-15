@@ -241,7 +241,7 @@ namespace Sportland.Sports.Dodgeball
         // ball touches the floor. If the victim's team catches it before then,
         // every pending hit is wiped — the "caught before it hit the ground"
         // rule. Repeated touches of the same player still count once.
-        private struct PendingHit { public PlayerZoneTracker victim; public float speed; public bool victimOutOfZone; }
+        private struct PendingHit { public PlayerZoneTracker victim; public float speed; public bool victimOutOfZone; public PlayerZoneTracker attacker; }
         private readonly List<PendingHit> pendingHits = new List<PendingHit>();
 
         // True once the ball has touched the floor since the last release. A
@@ -891,6 +891,11 @@ namespace Sportland.Sports.Dodgeball
                         // deals CHIP damage (it glanced off you); re-grabbable by the catcher or
                         // a teammate after the brief cooldown.
                     OnImpact?.Invoke(catcher, v.magnitude, catchTuning.bobbleDamageMul);
+                    // Mishandled + hits the ground scores for the attacker
+                    // (design/defense.md row 3) — defer it exactly like Carom
+                    // does, BEFORE recentThrower below is reassigned to the
+                    // catcher, so AddPendingHit snapshots the real attacker.
+                    AddPendingHit(catcher, v.magnitude);
                     rb.linearVelocity = (-v.normalized + Random.insideUnitCircle * 0.8f).normalized
                                         * v.magnitude * catchTuning.bobbleKeepFraction * Random.Range(0.7f, 1.3f);
                     rb.linearDamping = groundDamping;            // high drag → settles loose, not flung far
@@ -903,6 +908,11 @@ namespace Sportland.Sports.Dodgeball
                 default: // deflect backward — the ball still CONNECTED (beat the hands), so it
                          // deals full connect damage; the backward glance is only direction.
                     OnImpact?.Invoke(catcher, v.magnitude, 1f);
+                    // Connects + hits the ground scores for the attacker
+                    // (design/defense.md row 1) — same deferred-hit treatment
+                    // as Carom, and for the same reason: must run before
+                    // recentThrower is reassigned just below.
+                    AddPendingHit(catcher, v.magnitude);
                     rb.linearVelocity = -v * 0.5f;
                     heightVelocity = Mathf.Max(heightVelocity, 2.5f);
                     groundedSinceRelease = true;                 // full (snappy) gravity, like a bobble
@@ -957,6 +967,12 @@ namespace Sportland.Sports.Dodgeball
 
         // Record a strike as a pending (airborne) hit — one entry per distinct
         // player, so repeated touches of the same player still count once.
+        // Snapshots the CURRENT thrower as the credited attacker: ResolveMiss's
+        // bobble/deflect outcomes reassign recentThrower to the victim right
+        // after this call (so a loose ball at their feet isn't treated as an
+        // instant re-catch of their own throw) — if scoring read
+        // ball.RecentThrower fresh when the hit is confirmed later, it would
+        // credit the victim instead of whoever actually threw it.
         private void AddPendingHit(PlayerZoneTracker victim, float speed)
         {
             if (victim == null) return;
@@ -966,18 +982,24 @@ namespace Sportland.Sports.Dodgeball
             {
                 victim = victim, speed = speed,
                 victimOutOfZone = !victim.IsInZone,   // hit while out of their area can't be saved by a catch
+                attacker = recentThrower,
             });
         }
 
         // Flight ended on the floor (or the thrower's own team recovered the
         // ricochet) without the victim's team catching it: every pending hit
-        // stands — fire OnHit once per distinct player.
+        // stands — fire OnHit once per distinct player, crediting whoever threw
+        // it at the time of the hit (not whatever recentThrower has become since).
         private void ConfirmPendingHits()
         {
             for (int i = 0; i < pendingHits.Count; i++)
             {
                 var h = pendingHits[i];
-                if (h.victim != null) OnHit?.Invoke(h.victim, h.speed);
+                if (h.victim == null) continue;
+                var savedThrower = recentThrower;
+                recentThrower = h.attacker;
+                OnHit?.Invoke(h.victim, h.speed);
+                recentThrower = savedThrower;
             }
             pendingHits.Clear();
         }
@@ -996,7 +1018,13 @@ namespace Sportland.Sports.Dodgeball
                 var h = pendingHits[i];
                 if (h.victimOutOfZone)
                 {
-                    if (h.victim != null) OnHit?.Invoke(h.victim, h.speed);   // stands — no save
+                    if (h.victim != null)
+                    {
+                        var savedThrower = recentThrower;
+                        recentThrower = h.attacker;
+                        OnHit?.Invoke(h.victim, h.speed);   // stands — no save
+                        recentThrower = savedThrower;
+                    }
                 }
                 else
                 {
