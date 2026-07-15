@@ -60,9 +60,17 @@ namespace Sportland.Hub
                             $"Actions: {career.actionsRemaining}/{career.actionsPerDay}";
 
             if (career.league != null)
+            {
                 status += $"    <alpha=#AA>{career.league.leagueName}, {career.league.divisionName} ({career.league.sport})</alpha>";
+                string record = career.RecordString;
+                if (record.Length > 0)
+                    status += $"    <alpha=#AA>{record}</alpha>";
+            }
 
-            if (!career.PlayerCreated)
+            var todayGame = career.TodayFixture;
+            if (todayGame != null)
+                status += $"\n<color=#FFD75F>GAME DAY — {(todayGame.home ? "vs" : "at")} {todayGame.opponent} ({todayGame.slot}). The Arena is waiting.</color>";
+            else if (!career.PlayerCreated)
                 status += "\n<color=#FFD75F>→ Visit the Office to create your character</color>";
             else if (career.league == null)
                 status += "\n<color=#FFD75F>→ Sign up for a league at the Office</color>";

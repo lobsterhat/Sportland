@@ -16,7 +16,7 @@ namespace Sportland.Hub
     /// </summary>
     public class HubInteractor : MonoBehaviour
     {
-        private enum Screen { None, Creator, LeagueSignup, Calendar, Roster }
+        private enum Screen { None, Creator, LeagueSignup, Calendar, Roster, PreGame, MatchResult }
 
         private HubBuilding[] buildings;
         private HubHud hud;
@@ -33,6 +33,7 @@ namespace Sportland.Hub
         private int lineupSlot;
         private bool assignMode;
         private int pickIndex;
+        private Fixture lastResult;
 
         public void Init(HubBuilding[] buildings, HubHud hud)
         {
@@ -170,9 +171,24 @@ namespace Sportland.Hub
                     return "[E] Office — roster, recruiting & lineup";
 
                 case HubBuildingType.Arena:
-                    return career.league == null
-                        ? "[E] Arena — no league yet (sign up at the Office)"
+                    if (career.league == null)
+                        return "[E] Arena — no league yet (sign up at the Office)";
+                    var todays = career.TodayFixture;
+                    return todays != null
+                        ? $"<color=#FFD75F>[E] Arena — GAME DAY: {(todays.home ? "vs" : "at")} {todays.opponent} ({todays.slot})</color>"
                         : "[E] Arena — schedule & calendar";
+
+                case HubBuildingType.Home:
+                    return career.TodayFixture != null
+                        ? "[E] Home — no sleeping on a game day!"
+                        : building.PromptText;
+
+                case HubBuildingType.Practice:
+                case HubBuildingType.Hospital:
+                case HubBuildingType.Cafe:
+                    return career.GameDayLockdown
+                        ? $"{building.displayName} — closed until after the game"
+                        : building.PromptText;
 
                 default:
                     return building.PromptText;
@@ -217,6 +233,12 @@ namespace Sportland.Hub
                         ? HubScreens.Lineup(career, lineupSlot, assignMode, pickIndex)
                         : HubScreens.Roster(career, rosterTab, poolIndex));
                     break;
+                case Screen.PreGame:
+                    hud.ShowScreen(HubScreens.PreGame(career));
+                    break;
+                case Screen.MatchResult:
+                    hud.ShowScreen(HubScreens.MatchResult(career, lastResult));
+                    break;
             }
         }
 
@@ -228,6 +250,8 @@ namespace Sportland.Hub
                 case Screen.LeagueSignup: HandleLeagueSignup(career); break;
                 case Screen.Calendar:     HandleCalendar(career); break;
                 case Screen.Roster:       HandleRoster(career); break;
+                case Screen.PreGame:      HandlePreGame(career); break;
+                case Screen.MatchResult:  HandleMatchResult(); break;
             }
         }
 
@@ -273,6 +297,31 @@ namespace Sportland.Hub
             {
                 CloseScreen();
             }
+        }
+
+        private void HandlePreGame(CareerManager career)
+        {
+            if (ConfirmPressed())
+            {
+                lastResult = career.PlayTodayFixtureSimulated();
+                if (lastResult == null)
+                {
+                    CloseScreen();
+                    return;
+                }
+                screen = Screen.MatchResult;
+                RedrawScreen(career);
+            }
+            else if (CancelPressed())
+            {
+                CloseScreen();
+            }
+        }
+
+        private void HandleMatchResult()
+        {
+            if (ConfirmPressed() || CancelPressed())
+                CloseScreen();
         }
 
         private void HandleCalendar(CareerManager career)
@@ -478,6 +527,15 @@ namespace Sportland.Hub
                     {
                         hud.Toast("Skip: \"Nothing on the books yet — the Office handles league sign-ups.\"");
                     }
+                    else if (career.TodayFixture != null)
+                    {
+                        if (career.league.StartersFilled < 6)
+                        {
+                            hud.Toast("Skip: \"The refs need a full six on the sheet — set the lineup at the Office. F auto-fills.\"");
+                            return;
+                        }
+                        OpenScreen(Screen.PreGame, career);
+                    }
                     else
                     {
                         calendarPage = 0;
@@ -489,12 +547,23 @@ namespace Sportland.Hub
                     return;
 
                 case HubBuildingType.Home:
+                    if (career.TodayFixture != null)
+                    {
+                        hud.Toast("Skip: \"Sleep? There's a game today! The Arena's waiting, coach.\"");
+                        return;
+                    }
                     career.EndDay();
                     hud.Toast($"You sleep. Day {career.day} — everyone recovered overnight.");
                     return;
             }
 
-            // Everything below costs an action.
+            // Everything below costs an action — and game day closes these
+            // buildings once the pre-game allowance is spent.
+            if (career.GameDayLockdown)
+            {
+                hud.Toast("Closed for game day — everything else happens after the game.");
+                return;
+            }
             if (!career.TrySpendAction())
             {
                 hud.Toast("You're out of actions for today. Head Home to end the day.");

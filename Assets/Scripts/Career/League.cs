@@ -49,11 +49,17 @@ namespace Sportland.Career
         public string opponent;
         public bool home;
 
+        public bool played;
+        public int ourScore;
+        public int theirScore;
+
         public DateTime Date
         {
             get => new DateTime(dateTicks);
             set => dateTicks = value.Ticks;
         }
+
+        public bool Won => played && ourScore > theirScore;
     }
 
     /// <summary>

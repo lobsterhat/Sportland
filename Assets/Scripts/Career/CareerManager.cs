@@ -289,6 +289,141 @@ namespace Sportland.Career
             return new List<Fixture>();
         }
 
+        // ── Game day ────────────────────────────────────────────────────
+
+        /// <summary>Today's unplayed fixture, or null. Non-null means game day rules apply.</summary>
+        public Fixture TodayFixture
+            => league?.fixtures.Find(f => !f.played && f.Date.Date == currentDate.Date);
+
+        /// <summary>
+        /// How many actions fit before a game in the given slot: a morning
+        /// game closes the whole day; a night game leaves most of it open.
+        /// </summary>
+        public static int SlotAllowance(TimeSlot slot)
+        {
+            switch (slot)
+            {
+                case TimeSlot.Morning:   return 0;
+                case TimeSlot.Afternoon: return 1;
+                case TimeSlot.Evening:   return 2;
+                default:                 return 3;
+            }
+        }
+
+        /// <summary>
+        /// Game-day lockdown: an unplayed fixture today and no pre-game
+        /// actions left — the time-consuming buildings are closed until
+        /// the game is played.
+        /// </summary>
+        public bool GameDayLockdown => TodayFixture != null && actionsRemaining <= 0;
+
+        /// <summary>"3W-2L" across played fixtures, or empty before the first game.</summary>
+        public string RecordString
+        {
+            get
+            {
+                if (league == null) return "";
+                int w = 0, l = 0;
+                foreach (var f in league.fixtures)
+                {
+                    if (!f.played) continue;
+                    if (f.Won) w++; else l++;
+                }
+                return (w + l) == 0 ? "" : $"{w}W-{l}L";
+            }
+        }
+
+        /// <summary>The rival's match squad: best 6 start, next 4 dress as reserves.</summary>
+        public void RivalMatchSquad(string clubName, List<CareerAthlete> starters, List<CareerAthlete> bench)
+        {
+            starters.Clear();
+            bench.Clear();
+            var rival = league.rivals.Find(r => r.clubName == clubName);
+            if (rival == null) return;
+
+            var sorted = new List<CareerAthlete>(rival.roster);
+            sorted.Sort((a, b) => Overall(b).CompareTo(Overall(a)));
+            for (int i = 0; i < sorted.Count && i < 6; i++) starters.Add(sorted[i]);
+            for (int i = 6; i < sorted.Count && i < 10; i++) bench.Add(sorted[i]);
+        }
+
+        /// <summary>
+        /// Play today's fixture as a simulation — a stand-in until the real
+        /// dodgeball bridge: team strength from starters (empty slots hurt),
+        /// bench depth, fatigue, and home court, plus honest randomness.
+        /// Marks the fixture played and fatigues the match-day squad.
+        /// </summary>
+        public Fixture PlayTodayFixtureSimulated()
+        {
+            var fixture = TodayFixture;
+            if (fixture == null) return null;
+
+            // Our strength: starters carry it, empty slots are dead weight.
+            float ourSum = 0f;
+            int dressed = 0;
+            float fatigueSum = 0f;
+            foreach (var id in league.starterIds)
+            {
+                var a = string.IsNullOrEmpty(id) ? null : AthleteById(id);
+                if (a == null) continue;
+                ourSum += Overall(a);
+                fatigueSum += a.fatigue;
+                dressed++;
+            }
+            float benchSum = 0f;
+            int benchCount = 0;
+            foreach (var id in league.reserveIds)
+            {
+                var a = string.IsNullOrEmpty(id) ? null : AthleteById(id);
+                if (a == null) continue;
+                benchSum += Overall(a);
+                benchCount++;
+            }
+
+            float ourStrength = ourSum / 6f + (benchCount > 0 ? benchSum / benchCount * 0.25f : 0f);
+            float avgFatigue = dressed > 0 ? fatigueSum / dressed : 0f;
+            ourStrength *= 1f - avgFatigue / 250f;          // tired legs cost up to ~40%
+            if (fixture.home) ourStrength *= 1.05f;         // home court
+
+            // Their strength: best six plus bench depth, always fresh.
+            var theirStarters = new List<CareerAthlete>();
+            var theirBench = new List<CareerAthlete>();
+            RivalMatchSquad(fixture.opponent, theirStarters, theirBench);
+            float theirSum = 0f;
+            foreach (var a in theirStarters) theirSum += Overall(a);
+            float theirBenchSum = 0f;
+            foreach (var a in theirBench) theirBenchSum += Overall(a);
+            float theirStrength = theirSum / 6f + (theirBench.Count > 0 ? theirBenchSum / theirBench.Count * 0.25f : 0f);
+
+            // Scores: strength sets the base, dice keep it a sport.
+            int ours = Mathf.Max(0, Mathf.RoundToInt(4f + ourStrength * 0.7f + rng.Next(0, 5)));
+            int theirs = Mathf.Max(0, Mathf.RoundToInt(4f + theirStrength * 0.7f + rng.Next(0, 5)));
+            if (ours == theirs)
+            {
+                if (ourStrength >= theirStrength) ours++;
+                else theirs++;
+            }
+
+            fixture.ourScore = ours;
+            fixture.theirScore = theirs;
+            fixture.played = true;
+
+            // The match-day squad worked for it.
+            foreach (var id in league.starterIds)
+            {
+                var a = string.IsNullOrEmpty(id) ? null : AthleteById(id);
+                if (a != null) a.fatigue = Mathf.Min(100f, a.fatigue + 25f);
+            }
+            foreach (var id in league.reserveIds)
+            {
+                var a = string.IsNullOrEmpty(id) ? null : AthleteById(id);
+                if (a != null) a.fatigue = Mathf.Min(100f, a.fatigue + 10f);
+            }
+
+            Commit();
+            return fixture;
+        }
+
         // ── Recruiting ──────────────────────────────────────────────────
 
         /// <summary>
@@ -359,7 +494,7 @@ namespace Sportland.Career
             Commit();
         }
 
-        private static float Overall(CareerAthlete a)
+        public static float Overall(CareerAthlete a)
         {
             float sum = 0f;
             foreach (var r in a.generalRatings) sum += r.value;
@@ -389,6 +524,13 @@ namespace Sportland.Career
             day++;
             currentDate = currentDate.AddDays(1);
             actionsRemaining = actionsPerDay;
+
+            // Waking up on a game day: the slot decides how much day exists
+            // before the game — the rest of it belongs to the Arena.
+            var fixture = TodayFixture;
+            if (fixture != null)
+                actionsRemaining = Mathf.Min(actionsPerDay, SlotAllowance(fixture.slot));
+
             Commit();
         }
 

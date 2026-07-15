@@ -140,6 +140,10 @@ namespace Sportland.Hub
                 any = true;
                 string venue = f.home ? "vs" : "at";
                 string line = $"  {f.Date:MMM d (ddd)} — {venue} {f.opponent} — {f.slot}";
+                if (f.played)
+                    line += f.Won
+                        ? $"   <color=#7FE87F>W {f.ourScore}-{f.theirScore}</color>"
+                        : $"   <color=#FF6B6B>L {f.ourScore}-{f.theirScore}</color>";
                 var conflicts = career.ConflictsWith(f);
                 if (conflicts.Count > 0)
                     line += "   <color=#FF6B6B>! conflict</color>";
@@ -157,6 +161,62 @@ namespace Sportland.Hub
             foreach (var f in league.fixtures)
                 if (f.Date.Date == date.Date) return true;
             return false;
+        }
+
+        // ── Game day ────────────────────────────────────────────────────
+
+        public static string PreGame(CareerManager career)
+        {
+            var f = career.TodayFixture;
+            var league = career.league;
+            var sb = new StringBuilder();
+
+            sb.AppendLine($"<b>GAME DAY</b> — {league.leagueName}, {league.divisionName}");
+            sb.AppendLine($"{(f.home ? "vs" : "at")} <b>{f.opponent}</b> — {f.slot}{(f.home ? "   (home court)" : "")}");
+            sb.AppendLine();
+
+            var starters = new System.Collections.Generic.List<CareerAthlete>();
+            var bench = new System.Collections.Generic.List<CareerAthlete>();
+            career.RivalMatchSquad(f.opponent, starters, bench);
+
+            sb.AppendLine($"<b>Their starting lineup</b>");
+            for (int i = 0; i < starters.Count; i++)
+            {
+                string pos = i < 3 ? "IN" : "OUT";
+                sb.AppendLine($"  {Dim}{pos,-4}</alpha>{AthleteLine(starters[i])}");
+            }
+            sb.AppendLine();
+            sb.AppendLine("<b>Their bench</b>");
+            foreach (var a in bench)
+                sb.AppendLine($"  {Dim}RES </alpha>{AthleteLine(a)}");
+            sb.AppendLine();
+
+            sb.AppendLine($"<b>Your squad</b>: {league.StartersFilled}/6 starters, {league.ReservesFilled}/4 reserves set" +
+                          (league.StartersFilled < 6 ? "   <color=#FF6B6B>— thin! empty slots play as dead weight</color>" : ""));
+            sb.AppendLine();
+            sb.AppendLine($"{Hint}The match is simulated for now — the playable dodgeball bridge is next on the list.</alpha>");
+            sb.AppendLine($"{Hint}E/Cross: play the game    Esc/Circle: not yet (the day can't end until you do)</alpha>");
+            return sb.ToString();
+        }
+
+        public static string MatchResult(CareerManager career, Fixture f)
+        {
+            var sb = new StringBuilder();
+            bool won = f.Won;
+            sb.AppendLine($"<b>FULL TIME</b> — {(f.home ? "vs" : "at")} {f.opponent} ({f.slot})");
+            sb.AppendLine();
+            sb.AppendLine(won
+                ? $"<size=140%><color=#7FE87F>WIN  {f.ourScore} — {f.theirScore}</color></size>"
+                : $"<size=140%><color=#FF6B6B>LOSS  {f.ourScore} — {f.theirScore}</color></size>");
+            sb.AppendLine();
+            sb.AppendLine($"Record: <b>{career.RecordString}</b>");
+            sb.AppendLine();
+            sb.AppendLine(won
+                ? "<color=#7FDBFF>Skip:</color> \"That's how it's done! Get some rest — recovery is tomorrow's problem, and also tomorrow's solution.\""
+                : "<color=#7FDBFF>Skip:</color> \"We'll take our lumps and learn. Check who's gassed before next practice.\"");
+            sb.AppendLine();
+            sb.AppendLine($"{Hint}The match-day squad picked up fatigue. E/Cross or Esc/Circle: back to the hub</alpha>");
+            return sb.ToString();
         }
 
         // ── Division (rival clubs & their rosters) ──────────────────────
