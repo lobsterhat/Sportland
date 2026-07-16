@@ -974,6 +974,23 @@ namespace Sportland.Sports.Dodgeball
             AddPendingHit(hit, incoming.magnitude);
         }
 
+        /// <summary>
+        /// A hit has landed on an opposing player and the ball is still live —
+        /// the point is pending, awaiting the ball touching the floor (point
+        /// stands) or being caught (throwing team → stands; victim's team →
+        /// save). Clears the instant the ball grounds or the hit resolves.
+        /// </summary>
+        public bool PointPending => pendingHits.Count > 0;
+
+        // The team being scored against while a hit is pending: the victims'
+        // team (all victims in a segment share it). Null when nothing pends.
+        private Team? PendingVictimTeam()
+        {
+            for (int i = 0; i < pendingHits.Count; i++)
+                if (pendingHits[i].victim != null) return pendingHits[i].victim.Spawn.team;
+            return null;
+        }
+
         // Record a strike as a pending (airborne) hit — one entry per distinct
         // player, so repeated touches of the same player still count once.
         // Snapshots the CURRENT thrower as the credited attacker: ResolveMiss's
@@ -1072,20 +1089,42 @@ namespace Sportland.Sports.Dodgeball
                 return;
             }
 
-            bool fromOpponent = recentThrower != null && recentThrower.Spawn.team != t.Spawn.team;
-            // A scoring catch must take the ball out of the air: a live state AND
-            // the ball hasn't touched the floor since release (a pickup off the
-            // hop is possession only, not a catch).
-            bool airborneCatch = fromOpponent && !groundedSinceRelease
-                           && (state == State.Thrown || state == State.Passing || state == State.Bouncing);
-
-            // Resolve any still-airborne hits. An airborne catch by the victim's
-            // team saves in-zone victims (nullifies their hit) but NOT victims who
-            // were out of their area when hit — those hits stand and the catch
-            // scores no credit for them. Any other secure (the thrower's own team
-            // recovers it, or a post-bounce pickup) lets all pending hits stand.
-            bool countsAsCatch = airborneCatch && ResolveAirborneCatch();
-            if (!airborneCatch) ConfirmPendingHits();
+            // Resolve the pending scoring hit ("point pending"), if one is
+            // live. Its very presence proves the ball hasn't touched the floor
+            // since the hit — every floor contact clears pending hits via
+            // ConfirmPendingHits — so THIS catch decides the outcome, keyed off
+            // the snapshotted victim team. We deliberately do NOT consult
+            // recentThrower (a bobble/deflect reassigns it to the victim) or
+            // groundedSinceRelease (a mishandle sets it for gravity even though
+            // the ball never hit the floor); both would misread the save.
+            bool countsAsCatch;
+            Team? victimTeam = PendingVictimTeam();
+            if (victimTeam.HasValue)
+            {
+                if (t.Spawn.team == victimTeam.Value)
+                {
+                    // The victim's own team caught it before it grounded → save:
+                    // in-zone victims are nullified, out-of-zone hits still stand.
+                    countsAsCatch = ResolveAirborneCatch();
+                }
+                else
+                {
+                    // The throwing team recovered their own live carom → the hit
+                    // stands and they score (caught by the throwing team). Not a
+                    // defensive catch, so it earns no catch credit.
+                    ConfirmPendingHits();
+                    countsAsCatch = false;
+                }
+            }
+            else
+            {
+                // No point pending: catch credit goes only to a clean airborne
+                // interception of a live opponent throw — receiving a teammate's
+                // pass or grabbing a dead ball is possession, not a catch.
+                bool fromOpponent = recentThrower != null && recentThrower.Spawn.team != t.Spawn.team;
+                countsAsCatch = fromOpponent && !groundedSinceRelease
+                    && (state == State.Thrown || state == State.Passing || state == State.Bouncing);
+            }
 
             AttachTo(t);
             if (countsAsCatch)
