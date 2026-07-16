@@ -433,36 +433,39 @@ namespace Sportland.Sports.Dodgeball
 
             if (!neutered)
             {
-                if (mode.pointsPerHit != 0)
+                // Outfielders neither score nor get scored on: a hit only puts
+                // points on the board when BOTH the thrower and the victim are
+                // infielders. Outfielders still catch to complete or negate a
+                // pending point (that's resolved ball-side, in Ball.Attach) —
+                // this governs only whether a landed hit scores. (Retires the
+                // old outfielder-in-opposing-infield bonus, which scored
+                // against an outfielder, now forbidden by this rule.)
+                bool scoringHit = attacker.Spawn.role == PlayerRole.Infielder
+                               && victim.Spawn.role == PlayerRole.Infielder;
+
+                if (scoringHit && mode.pointsPerHit != 0)
                 {
                     AddScore(attacker.Spawn.team, mode.pointsPerHit);
                     RecordScore(attacker.Spawn.team, mode.pointsPerHit);
                 }
 
-                // Shot clock: a hit landing on an opposing player who is
-                // physically inside their own infield counts as a "successful
-                // attack" → stop the offensive team's clock. (Hits on a victim
-                // who's wandered out of their infield don't stop it.)
-                if (shotClockTeam.HasValue && shotClockTeam.Value == attacker.Spawn.team)
+                // Shot clock: a scoring hit on an opposing infielder inside their
+                // own infield is a "successful attack" → stop the offensive
+                // team's clock. A non-scoring hit isn't an attack that counts.
+                if (scoringHit && shotClockTeam.HasValue && shotClockTeam.Value == attacker.Spawn.team)
                 {
                     Team oppOfClocked = shotClockTeam.Value == Team.A ? Team.B : Team.A;
                     if (ZoneFactory.InfieldFor(oppOfClocked).Contains(victim.transform.position))
                         StopShotClock();
                 }
 
+                // Elimination modes (2/3/4) still key off the victim's own
+                // vulnerability, independent of scoring: an infielder, or an
+                // outfielder who ventured (grounded) into the opposing infield.
                 bool outfielderInOppInfield = victim.Spawn.role == PlayerRole.Outfielder
                                            && victim.IsInOpposingInfield
                                            && victim.IsGrounded;
                 bool vulnerable = victim.Spawn.role == PlayerRole.Infielder || outfielderInOppInfield;
-
-                // Bonus rule: hitting an outfielder who's in the opposing
-                // infield is a punish for being where they shouldn't be —
-                // attacker gets extra points on top of pointsPerHit.
-                if (outfielderInOppInfield && mode.outfielderInOppInfieldBonus != 0)
-                {
-                    AddScore(attacker.Spawn.team, mode.outfielderInOppInfieldBonus);
-                    RecordScore(attacker.Spawn.team, mode.outfielderInOppInfieldBonus);
-                }
 
                 if (vulnerable)
                 {
