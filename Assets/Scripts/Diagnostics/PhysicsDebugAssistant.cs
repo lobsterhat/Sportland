@@ -1,16 +1,29 @@
 using System;
-using System.Collections;
 using System.Text;
 using UnityEngine;
+#if ANTHROPIC_SDK
+using System.Linq;
+using System.Threading;
+using System.Threading.Tasks;
+using System.Collections.Generic;
+using Anthropic;
+using Anthropic.Models.Messages;
+#else
+using System.Collections;
 using UnityEngine.Networking;
+#endif
 
 namespace Sportland.Diagnostics
 {
     /// <summary>
     /// Ask questions in plain English about what the physics just did.
     ///
-    /// Talks straight to the Anthropic Messages API over UnityWebRequest — no
-    /// SDK package, no external DLLs, nothing new in the manifest.
+    /// Two transports, one public surface (Ask / IsBusy / LastAnswer / LastError):
+    ///   - Default: the Anthropic Messages API over UnityWebRequest — zero
+    ///     dependencies, nothing in the manifest.
+    ///   - Define ANTHROPIC_SDK (after restoring the Anthropic NuGet package via
+    ///     NuGetForUnity): the official .NET SDK, with its streaming, retries,
+    ///     and typed errors available for later growth.
     ///
     /// EDITOR/DEV BUILDS ONLY. The API key lives in the environment, not in the
     /// project. Shipping a client build with an embedded key hands your key to
@@ -27,9 +40,6 @@ namespace Sportland.Diagnostics
         [Tooltip("Seconds before giving up on a response.")]
         public float timeoutSeconds = 60f;
 
-        private const string Endpoint = "https://api.anthropic.com/v1/messages";
-        private const string ApiVersion = "2023-06-01";
-
         private const string SystemPrompt =
             "You are debugging a Unity 2D arcade sports game with a developer. " +
             "You'll get a physics transcript — a rolling window of body state " +
@@ -39,6 +49,8 @@ namespace Sportland.Diagnostics
             "they're asking about, say so plainly and name what would need to be " +
             "tracked to answer it — don't speculate past the data.\n\n" +
             "Be concise. This is a debugging session, not a lecture.";
+
+        private const int MaxTokens = 2000;
 
         private string _apiKey = null;   // only ever set in editor/dev builds
 
@@ -56,7 +68,11 @@ namespace Sportland.Diagnostics
                     $"[PhysicsDebugAssistant] No API key in ${apiKeyEnvVar}. " +
                     "Assistant disabled. Set the env var and restart the editor.");
                 enabled = false;
+                return;
             }
+#if ANTHROPIC_SDK
+            _client = new AnthropicClient { ApiKey = _apiKey };
+#endif
 #else
             // Hard stop: this component has no business in a release build.
             Destroy(this);
@@ -88,10 +104,81 @@ namespace Sportland.Diagnostics
             // Snapshot before the request goes out so the transcript reflects
             // the moment the question was asked, not the moment it resolved.
             string transcript = PhysicsRecorder.Instance.BuildTranscript();
-            StartCoroutine(SendRequest(question, transcript));
+            string prompt = $"{transcript}\n\n---\n\nQuestion: {question}";
+
+#if ANTHROPIC_SDK
+            _ = AskViaSdk(question, prompt);
+#else
+            StartCoroutine(AskViaRest(question, prompt));
+#endif
         }
 
-        private IEnumerator SendRequest(string question, string transcript)
+#if ANTHROPIC_SDK
+        // ── Official SDK transport ──────────────────────────────────────
+        private AnthropicClient _client;
+        private CancellationTokenSource _cts;
+
+        void OnDestroy()
+        {
+            _cts?.Cancel();
+            _cts?.Dispose();
+            (_client as IDisposable)?.Dispose();
+        }
+
+        private async Task AskViaSdk(string question, string prompt)
+        {
+            IsBusy = true;
+            LastError = null;
+            LastAnswer = null;
+
+            _cts?.Dispose();
+            _cts = new CancellationTokenSource(TimeSpan.FromSeconds(timeoutSeconds));
+
+            try
+            {
+                var parameters = new MessageCreateParams
+                {
+                    Model = model,
+                    MaxTokens = MaxTokens,
+                    System = SystemPrompt,
+                    Thinking = new ThinkingConfigAdaptive(),
+                    Messages = new List<MessageParam>
+                    {
+                        new MessageParam { Role = Role.User, Content = prompt },
+                    },
+                };
+
+                var response = await _client.Messages.Create(parameters, cancellationToken: _cts.Token);
+
+                // ContentBlock is a union wrapper: .Value unwraps to the variant,
+                // OfType<TextBlock> keeps the text blocks (thinking etc. skipped).
+                var sb = new StringBuilder();
+                foreach (var text in response.Content.Select(b => b.Value).OfType<TextBlock>())
+                    sb.Append(text.Text);
+                LastAnswer = sb.Length > 0 ? sb.ToString() : "(no text content in response)";
+                Debug.Log($"[PhysicsDebugAssistant] Q: {question}\n\nA: {LastAnswer}");
+            }
+            catch (OperationCanceledException)
+            {
+                LastError = $"Timed out after {timeoutSeconds}s.";
+                Debug.LogWarning($"[PhysicsDebugAssistant] {LastError}");
+            }
+            catch (Exception ex)
+            {
+                LastError = ex.Message;
+                Debug.LogError($"[PhysicsDebugAssistant] Request failed: {ex.Message}");
+            }
+            finally
+            {
+                IsBusy = false;
+            }
+        }
+#else
+        // ── Dependency-free REST transport ──────────────────────────────
+        private const string Endpoint = "https://api.anthropic.com/v1/messages";
+        private const string ApiVersion = "2023-06-01";
+
+        private IEnumerator AskViaRest(string question, string prompt)
         {
             IsBusy = true;
             LastError = null;
@@ -100,12 +187,12 @@ namespace Sportland.Diagnostics
             string body = JsonUtility.ToJson(new ApiRequest
             {
                 model = model,
-                max_tokens = 2000,
+                max_tokens = MaxTokens,
                 system = SystemPrompt,
                 thinking = new ApiThinking { type = "adaptive" },
                 messages = new[]
                 {
-                    new ApiMessage { role = "user", content = $"{transcript}\n\n---\n\nQuestion: {question}" },
+                    new ApiMessage { role = "user", content = prompt },
                 },
             });
 
@@ -153,7 +240,7 @@ namespace Sportland.Diagnostics
         private string DescribeFailure(UnityWebRequest req)
         {
             if (req.result == UnityWebRequest.Result.ConnectionError && req.error != null
-                && req.error.Contains("timeout", StringComparison.OrdinalIgnoreCase))
+                && req.error.IndexOf("timeout", StringComparison.OrdinalIgnoreCase) >= 0)
                 return $"Timed out after {timeoutSeconds}s.";
 
             // API errors come back as {"type":"error","error":{"type","message"}}.
@@ -190,5 +277,6 @@ namespace Sportland.Diagnostics
 
         [Serializable] private class ApiErrorEnvelope { public ApiError error; }
         [Serializable] private class ApiError { public string type; public string message; }
+#endif
     }
 }
