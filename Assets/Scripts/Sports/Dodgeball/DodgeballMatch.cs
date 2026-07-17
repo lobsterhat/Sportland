@@ -715,6 +715,9 @@ namespace Sportland.Sports.Dodgeball
         {
             if (matchOver || player == null) return;
             bool penalize = mode == null || mode.clockExpiryEffect == ClockExpiryEffect.PointPenalty;
+            RecordDebugEvent("turnover",
+                $"{Label(player)} forced drop (return window expired){(penalize ? ", -1 point" : "")}, referee gives ball to other team",
+                player.transform.position);
             if (penalize)
             {
                 AddScore(player.Spawn.team, -1);
@@ -734,6 +737,9 @@ namespace Sportland.Sports.Dodgeball
         private void OnPlayerTurnover(PlayerZoneTracker player)
         {
             if (matchOver || player == null) return;
+            RecordDebugEvent("turnover",
+                $"{Label(player)} crossed opposing infield with the ball, ball loose",
+                player.transform.position);
             DodgeballPlayByPlay.Log($"{Label(player)} crossed opposing infield with the ball - turnover");
         }
 
@@ -796,6 +802,14 @@ namespace Sportland.Sports.Dodgeball
         private static string TeamLetter(Team t) => t == Team.A ? "A" : "B";
         private static string Label(PlayerZoneTracker p) => $"{TeamLetter(p.Spawn.team)}{p.Number}";
 
+        // Forward a discrete rules event to the physics debug recorder (dev
+        // tool; absent outside editor/dev builds — then this is a no-op).
+        private static void RecordDebugEvent(string kind, string description, Vector2 point)
+        {
+            var rec = Sportland.Diagnostics.PhysicsRecorder.Instance;
+            if (rec != null) rec.RecordEvent(kind, description, point);
+        }
+
         private static string DodgeWord(Ball.DodgeKind d) => d switch
         {
             Ball.DodgeKind.Duck => "ducks",
@@ -809,6 +823,10 @@ namespace Sportland.Sports.Dodgeball
         // the player was the one being driven, then checks for a wipeout.
         private void TakeOut(PlayerZoneTracker player, bool permanent)
         {
+            RecordDebugEvent("knockout",
+                $"{Label(player)} eliminated ({(permanent ? "out for good" : "benched, recallable on a team catch")})",
+                player.transform.position);
+
             if (player.GetComponent<DodgeballPlayerInput>() != null)
             {
                 var heir = NearestActiveTeammate(player);
