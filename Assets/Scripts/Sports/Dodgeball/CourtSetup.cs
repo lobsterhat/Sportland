@@ -202,7 +202,9 @@ namespace Sportland.Sports.Dodgeball
                 showDiagnosticsHud = false;
                 showTuningPanel = false;
                 showMatchControls = false;
-                physicsDebugAssistant = false;
+                // physicsDebugAssistant intentionally NOT disabled here — the
+                // debug assistant stays available in league fixtures too (still
+                // editor/dev-build only via the guard on SpawnPhysicsDebug).
                 runMatch = true;
             }
 
