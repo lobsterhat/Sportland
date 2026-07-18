@@ -1,15 +1,19 @@
 using UnityEngine;
+using UnityEngine.InputSystem;
 
 namespace Sportland.Diagnostics
 {
     /// <summary>
     /// Minimal IMGUI overlay. Backtick toggles it, type a question, Enter sends.
     /// IMGUI on purpose — zero prefab setup, zero scene wiring, and it's a dev tool.
+    ///
+    /// Toggle is read through the new Input System (Keyboard.current), same as
+    /// the rest of the dodgeball code — the legacy UnityEngine.Input class is
+    /// silent when the project's Active Input Handling is set to the new system.
     /// </summary>
     [RequireComponent(typeof(PhysicsDebugAssistant))]
     public class PhysicsDebugOverlay : MonoBehaviour
     {
-        public KeyCode toggleKey = KeyCode.BackQuote;
         public bool pauseWhileOpen = true;
 
         private PhysicsDebugAssistant _assistant;
@@ -29,7 +33,8 @@ namespace Sportland.Diagnostics
 
         void Update()
         {
-            if (Input.GetKeyDown(toggleKey))
+            var kb = Keyboard.current;
+            if (kb != null && kb.backquoteKey.wasPressedThisFrame)
             {
                 _open = !_open;
 
