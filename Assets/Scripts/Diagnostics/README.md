@@ -5,10 +5,11 @@ builds). `PhysicsRecorder` keeps a rolling window of body state + game
 events; `PhysicsDebugAssistant` answers plain-English questions about it via
 Claude; `PhysicsDebugOverlay` is the backtick-toggled IMGUI panel.
 
-`CourtSetup` spawns the whole kit behind its `physicsDebugAssistant` flag
-(on for the lab, off during career fixtures). Set `ANTHROPIC_API_KEY` in the
-environment before launching the editor — the assistant disables itself with
-a console warning if it's missing.
+`CourtSetup` spawns the whole kit behind its `physicsDebugAssistant` flag,
+active in every dodgeball context — the tuning lab and career/league fixtures
+alike (still editor/dev-build only via the guard on `SpawnPhysicsDebug`). Set
+`ANTHROPIC_API_KEY` in the environment before launching the editor — the
+assistant disables itself with a console warning if it's missing.
 
 ## Two transports
 
