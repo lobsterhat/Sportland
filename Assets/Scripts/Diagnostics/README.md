@@ -24,18 +24,19 @@ a console warning if it's missing.
 
 ## Switching to the official SDK
 
-The SDK and its full dependency closure are **committed** under
-`Assets/Packages/` (netstandard2.0 builds, reference-validation disabled in
-their `.meta`s so Unity loads them). No NuGet restore is needed — a plain
-`git pull` gives you everything. Switch it on in two staged steps:
+The SDK and its full dependency closure are **committed as managed plugins**
+under `Assets/Packages/` (netstandard2.0 builds; each `.dll.meta` sets
+`validateReferences: 0` so Unity's import validator loads them). There is no
+NuGetForUnity and no restore step — a plain `git pull` gives you everything.
+Switch it on in two staged steps:
 
 1. **Pull the branch and reopen the project.** Unity imports the DLLs under
    `Assets/Packages/`. Watch the Console: it should compile clean with **no**
    "will not be loaded due to errors" messages. At this point the assistant
-   is still on the REST path (the SDK code is dormant behind the define), so
-   a clean compile here proves the DLLs resolve before any of our code
-   depends on them. **If you see DLL errors, stop here and report them** —
-   don't do step 2, because enabling the define while a DLL is broken takes
+   is still on the REST path (the SDK code is dormant behind the define), so a
+   clean compile here proves the DLLs resolve before any of our code depends
+   on them. **If you see DLL errors, stop here and report them** — don't do
+   step 2, because enabling the define while a DLL is broken takes
    Assembly-CSharp (the whole game) down with it.
 2. **Edit ▸ Project Settings ▸ Player ▸ Scripting Define Symbols**, add
    `ANTHROPIC_SDK`, apply. The assistant recompiles onto the SDK path.
@@ -55,3 +56,11 @@ built-ins (duplicate types). Committed instead is only what Unity lacks:
 `System.IO.Pipelines`, `System.Net.ServerSentEvents`,
 `System.Text.Encodings.Web`, `System.Text.Json`. The project has no asmdefs,
 so all of this shares one Assembly-CSharp — hence the staged verify above.
+
+### Updating or removing the SDK
+
+These are plain committed DLLs — no package manager tracks them. To bump a
+version, swap the DLL under the matching `Assets/Packages/<id>.<ver>/lib/
+netstandard2.0/` folder (rename the folder to the new version) and re-resolve
+its dependency tree. To remove the SDK entirely, delete `Assets/Packages/` and
+the `ANTHROPIC_SDK` define; the assistant falls back to the REST path.
