@@ -24,19 +24,34 @@ a console warning if it's missing.
 
 ## Switching to the official SDK
 
-1. Open the project in Unity. NuGetForUnity (added to
-   `Packages/manifest.json`) installs automatically.
-2. **Window ▸ NuGet ▸ Restore Packages** (or let it auto-restore from
-   `Assets/packages.config`). This pulls `Anthropic` and its transitive
-   dependencies into `Assets/Packages`.
-3. **Edit ▸ Project Settings ▸ Player ▸ Scripting Define Symbols**, add
+The SDK and its full dependency closure are **committed** under
+`Assets/Packages/` (netstandard2.0 builds, reference-validation disabled in
+their `.meta`s so Unity loads them). No NuGet restore is needed — a plain
+`git pull` gives you everything. Switch it on in two staged steps:
+
+1. **Pull the branch and reopen the project.** Unity imports the DLLs under
+   `Assets/Packages/`. Watch the Console: it should compile clean with **no**
+   "will not be loaded due to errors" messages. At this point the assistant
+   is still on the REST path (the SDK code is dormant behind the define), so
+   a clean compile here proves the DLLs resolve before any of our code
+   depends on them. **If you see DLL errors, stop here and report them** —
+   don't do step 2, because enabling the define while a DLL is broken takes
+   Assembly-CSharp (the whole game) down with it.
+2. **Edit ▸ Project Settings ▸ Player ▸ Scripting Define Symbols**, add
    `ANTHROPIC_SDK`, apply. The assistant recompiles onto the SDK path.
 
-To go back, remove the define — the REST path takes over again; the restored
-DLLs are harmless when unused.
+To go back, remove the define — the REST path takes over; the DLLs are inert
+when unused.
 
-> Note: the SDK's netstandard2.0 build pulls in `System.Text.Json` and
-> `Microsoft.Extensions.AI.Abstractions`. If the restore surfaces a
-> duplicate-assembly conflict (Unity ships some of these), resolve it in the
-> NuGetForUnity window — the project has no asmdefs, so everything shares one
-> Assembly-CSharp.
+### Why these specific DLLs
+
+Unity 6's .NET Standard 2.1 profile already provides the low-level shims
+(`System.Memory`, `System.Buffers`, `System.Runtime.CompilerServices.Unsafe`,
+`System.Threading.Tasks.Extensions`, `System.Numerics.Vectors`), so those are
+deliberately **omitted** — adding the NuGet copies would collide with Unity's
+built-ins (duplicate types). Committed instead is only what Unity lacks:
+`Anthropic`, `Microsoft.Extensions.AI.Abstractions`,
+`Microsoft.Bcl.AsyncInterfaces`, `System.Collections.Immutable`,
+`System.IO.Pipelines`, `System.Net.ServerSentEvents`,
+`System.Text.Encodings.Web`, `System.Text.Json`. The project has no asmdefs,
+so all of this shares one Assembly-CSharp — hence the staged verify above.
