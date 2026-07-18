@@ -93,6 +93,12 @@ namespace Sportland.Sports.Dodgeball
 
         /// <summary>Live time remaining (seconds). Settable so the match-controls slider can extend/shorten the current period.</summary>
         public float TimeRemaining { get => timeRemaining; set => timeRemaining = Mathf.Max(0f, value); }
+
+        /// <summary>True once the match has resolved (clock expiry or wipeout).</summary>
+        public bool IsOver => matchOver;
+
+        /// <summary>The winning team once the match is over; null for a tie (or while running).</summary>
+        public Team? WinnerTeam => winner;
         /// <summary>True if the active mode runs a clock.</summary>
         public bool IsTimed => mode != null && mode.isTimed;
 
@@ -427,36 +433,39 @@ namespace Sportland.Sports.Dodgeball
 
             if (!neutered)
             {
-                if (mode.pointsPerHit != 0)
+                // Outfielders neither score nor get scored on: a hit only puts
+                // points on the board when BOTH the thrower and the victim are
+                // infielders. Outfielders still catch to complete or negate a
+                // pending point (that's resolved ball-side, in Ball.Attach) —
+                // this governs only whether a landed hit scores. (Retires the
+                // old outfielder-in-opposing-infield bonus, which scored
+                // against an outfielder, now forbidden by this rule.)
+                bool scoringHit = attacker.Spawn.role == PlayerRole.Infielder
+                               && victim.Spawn.role == PlayerRole.Infielder;
+
+                if (scoringHit && mode.pointsPerHit != 0)
                 {
                     AddScore(attacker.Spawn.team, mode.pointsPerHit);
                     RecordScore(attacker.Spawn.team, mode.pointsPerHit);
                 }
 
-                // Shot clock: a hit landing on an opposing player who is
-                // physically inside their own infield counts as a "successful
-                // attack" → stop the offensive team's clock. (Hits on a victim
-                // who's wandered out of their infield don't stop it.)
-                if (shotClockTeam.HasValue && shotClockTeam.Value == attacker.Spawn.team)
+                // Shot clock: a scoring hit on an opposing infielder inside their
+                // own infield is a "successful attack" → stop the offensive
+                // team's clock. A non-scoring hit isn't an attack that counts.
+                if (scoringHit && shotClockTeam.HasValue && shotClockTeam.Value == attacker.Spawn.team)
                 {
                     Team oppOfClocked = shotClockTeam.Value == Team.A ? Team.B : Team.A;
                     if (ZoneFactory.InfieldFor(oppOfClocked).Contains(victim.transform.position))
                         StopShotClock();
                 }
 
+                // Elimination modes (2/3/4) still key off the victim's own
+                // vulnerability, independent of scoring: an infielder, or an
+                // outfielder who ventured (grounded) into the opposing infield.
                 bool outfielderInOppInfield = victim.Spawn.role == PlayerRole.Outfielder
                                            && victim.IsInOpposingInfield
                                            && victim.IsGrounded;
                 bool vulnerable = victim.Spawn.role == PlayerRole.Infielder || outfielderInOppInfield;
-
-                // Bonus rule: hitting an outfielder who's in the opposing
-                // infield is a punish for being where they shouldn't be —
-                // attacker gets extra points on top of pointsPerHit.
-                if (outfielderInOppInfield && mode.outfielderInOppInfieldBonus != 0)
-                {
-                    AddScore(attacker.Spawn.team, mode.outfielderInOppInfieldBonus);
-                    RecordScore(attacker.Spawn.team, mode.outfielderInOppInfieldBonus);
-                }
 
                 if (vulnerable)
                 {
@@ -706,6 +715,9 @@ namespace Sportland.Sports.Dodgeball
         {
             if (matchOver || player == null) return;
             bool penalize = mode == null || mode.clockExpiryEffect == ClockExpiryEffect.PointPenalty;
+            RecordDebugEvent("turnover",
+                $"{Label(player)} forced drop (return window expired){(penalize ? ", -1 point" : "")}, referee gives ball to other team",
+                player.transform.position);
             if (penalize)
             {
                 AddScore(player.Spawn.team, -1);
@@ -725,6 +737,9 @@ namespace Sportland.Sports.Dodgeball
         private void OnPlayerTurnover(PlayerZoneTracker player)
         {
             if (matchOver || player == null) return;
+            RecordDebugEvent("turnover",
+                $"{Label(player)} crossed opposing infield with the ball, ball loose",
+                player.transform.position);
             DodgeballPlayByPlay.Log($"{Label(player)} crossed opposing infield with the ball - turnover");
         }
 
@@ -787,6 +802,14 @@ namespace Sportland.Sports.Dodgeball
         private static string TeamLetter(Team t) => t == Team.A ? "A" : "B";
         private static string Label(PlayerZoneTracker p) => $"{TeamLetter(p.Spawn.team)}{p.Number}";
 
+        // Forward a discrete rules event to the physics debug recorder (dev
+        // tool; absent outside editor/dev builds — then this is a no-op).
+        private static void RecordDebugEvent(string kind, string description, Vector2 point)
+        {
+            var rec = Sportland.Diagnostics.PhysicsRecorder.Instance;
+            if (rec != null) rec.RecordEvent(kind, description, point);
+        }
+
         private static string DodgeWord(Ball.DodgeKind d) => d switch
         {
             Ball.DodgeKind.Duck => "ducks",
@@ -800,6 +823,10 @@ namespace Sportland.Sports.Dodgeball
         // the player was the one being driven, then checks for a wipeout.
         private void TakeOut(PlayerZoneTracker player, bool permanent)
         {
+            RecordDebugEvent("knockout",
+                $"{Label(player)} eliminated ({(permanent ? "out for good" : "benched, recallable on a team catch")})",
+                player.transform.position);
+
             if (player.GetComponent<DodgeballPlayerInput>() != null)
             {
                 var heir = NearestActiveTeammate(player);

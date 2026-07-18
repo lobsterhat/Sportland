@@ -83,6 +83,8 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Show the Match controls panel (mode dropdown + Reset button) top-right.")]
         [SerializeField] private bool showMatchControls = true;
         [SerializeField] private bool showTuningPanel = true;
+        [Tooltip("Spawn the physics debug assistant (backtick opens it): records a rolling window of body state + game events and answers questions about it via the Anthropic API. Editor/dev builds only; needs ANTHROPIC_API_KEY in the environment.")]
+        [SerializeField] private bool physicsDebugAssistant = true;
 
         [Header("3/4 perspective view — toggle live with Q")]
         [Tooltip("Render the court as a receding trapezoid (3/4 perspective) and project players/ball onto it. Toggle live in-game with the Q key. Sets the INITIAL state; Q flips it at runtime. Note: perspective brings back the top/bottom spacing difference a flat field avoids.")]
@@ -149,6 +151,9 @@ namespace Sportland.Sports.Dodgeball
         /// <summary>True if all players are CPU-controlled (no human input).</summary>
         public bool AllAIControlled => allAIControlled;
 
+        /// <summary>Every spawned player root, for systems that post-process the field (e.g. the career director).</summary>
+        public System.Collections.Generic.IReadOnlyList<GameObject> SpawnedPlayers => spawnedPlayers;
+
         /// <summary>Toggle pure AI-vs-AI play live. On: remove the human input wherever it currently lives. Off: re-attach it to the spawn-time controlled player (or any active player if that one's eliminated).</summary>
         public void SetAllAI(bool value)
         {
@@ -185,6 +190,22 @@ namespace Sportland.Sports.Dodgeball
 
         private void Awake()
         {
+            // League fixture from the hub: normalize away whatever lab/debug
+            // toggles the scene was saved with BEFORE anything spawns — the
+            // attack lab in particular culls the field to attacker-vs-dummy
+            // in its own Awake, far too late to strip afterward.
+            if (Sportland.Career.CareerMatchContext.Active)
+            {
+                attackLabMode = false;
+                allAIControlled = false;
+                spawnDebugCannon = false;
+                showDiagnosticsHud = false;
+                showTuningPanel = false;
+                showMatchControls = false;
+                physicsDebugAssistant = false;
+                runMatch = true;
+            }
+
             DodgeballUI.Font = uiFont;   // shared with the runtime-added IMGUI overlays
             BuildCourt();
             SpawnAllPlayers();
@@ -195,6 +216,8 @@ namespace Sportland.Sports.Dodgeball
             if (showPlayByPlay) gameObject.AddComponent<DodgeballPlayByPlay>();
             if (showMatchControls) gameObject.AddComponent<DodgeballMatchControls>();
             if (showTuningPanel) gameObject.AddComponent<DodgeballTuningPanel>();
+            if (physicsDebugAssistant && (Application.isEditor || Debug.isDebugBuild))
+                SpawnPhysicsDebug();
             if (runMatch)
             {
                 match = gameObject.AddComponent<DodgeballMatch>();
@@ -215,6 +238,11 @@ namespace Sportland.Sports.Dodgeball
             obliqueView.enabled = obliqueViewSpike;
 
             if (attackLabMode) gameObject.AddComponent<DodgeballAttackLab>();
+
+            // League fixture from the hub: the career director re-stats the
+            // field from the real rosters and returns the result afterward.
+            if (Sportland.Career.CareerMatchContext.Active)
+                gameObject.AddComponent<CareerMatchDirector>();
         }
 
         private void Update()
@@ -230,7 +258,8 @@ namespace Sportland.Sports.Dodgeball
                 Debug.Log($"[Dodgeball] Oblique view {(obliqueView.enabled ? "ON" : "off")}");
             }
 
-            if (!allowRuntimeModeSwitch || match == null) return;
+            // No mode-hopping in the middle of a league fixture.
+            if (!allowRuntimeModeSwitch || match == null || Sportland.Career.CareerMatchContext.Active) return;
 
             if (kb.f1Key.wasPressedThisFrame)      SwitchMode(GameMode.Preset.RunningHits);
             else if (kb.f2Key.wasPressedThisFrame) SwitchMode(GameMode.Preset.Elimination);
@@ -281,6 +310,28 @@ namespace Sportland.Sports.Dodgeball
             if (ball != null) ball.ResetLoose(Vector2.zero);
             if (match != null) match.Configure(mode);
             DodgeballPlayByPlay.Clear();   // fresh log for the new match
+        }
+
+        // Physics debug assistant (dev tool): one object carrying the rolling
+        // recorder, the Claude-backed Q&A component, and its IMGUI overlay.
+        // The ball reports its gameplay events; every player body is tracked.
+        // Must run after SpawnAllPlayers/SpawnBall so the bodies exist.
+        private void SpawnPhysicsDebug()
+        {
+            var go = new GameObject("PhysicsDebug");
+            go.transform.SetParent(transform, false);
+            var recorder = go.AddComponent<Sportland.Diagnostics.PhysicsRecorder>();
+            go.AddComponent<Sportland.Diagnostics.PhysicsDebugAssistant>();
+            go.AddComponent<Sportland.Diagnostics.PhysicsDebugOverlay>();
+
+            if (ball != null && ball.GetComponent<Sportland.Diagnostics.BallCollisionReporter>() == null)
+                ball.gameObject.AddComponent<Sportland.Diagnostics.BallCollisionReporter>();
+
+            for (int i = 0; i < spawnedPlayers.Count; i++)
+            {
+                if (spawnedPlayers[i] == null) continue;
+                recorder.Track(spawnedPlayers[i].GetComponent<Rigidbody2D>());
+            }
         }
 
         private void SpawnBall()

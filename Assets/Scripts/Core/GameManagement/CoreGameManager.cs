@@ -109,10 +109,11 @@ namespace Sportland.Core.GameManagement
             currentSportModule.StartGame(context);
         }
 
-        private async Task<ISportModule> LoadSportModule(SportType sportType)
+        private Task<ISportModule> LoadSportModule(SportType sportType)
         {
-            // For now, we'll instantiate sport modules from prefabs in Resources
-            // Later this can be more sophisticated
+            // For now, we'll instantiate sport modules from prefabs in Resources.
+            // Synchronous today (hence Task.FromResult); the Task signature stays
+            // so callers won't churn when this becomes a real async load.
 
             string prefabPath = $"SportModules/{sportType}Module";
             GameObject modulePrefab = Resources.Load<GameObject>(prefabPath);
@@ -120,7 +121,7 @@ namespace Sportland.Core.GameManagement
             if (modulePrefab == null)
             {
                 Debug.LogError($"Sport module prefab not found: {prefabPath}");
-                return null;
+                return Task.FromResult<ISportModule>(null);
             }
 
             GameObject moduleObj = Instantiate(modulePrefab);
@@ -130,13 +131,13 @@ namespace Sportland.Core.GameManagement
             {
                 Debug.LogError($"GameObject does not implement ISportModule: {prefabPath}");
                 Destroy(moduleObj);
-                return null;
+                return Task.FromResult<ISportModule>(null);
             }
 
             // Make it persistent (optional, depends on design)
             DontDestroyOnLoad(moduleObj);
 
-            return module;
+            return Task.FromResult(module);
         }
 
         private async Task LoadSportScene(SportType sportType)
