@@ -83,6 +83,8 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Show the Match controls panel (mode dropdown + Reset button) top-right.")]
         [SerializeField] private bool showMatchControls = true;
         [SerializeField] private bool showTuningPanel = true;
+        [Tooltip("Spawn the physics debug assistant (backtick opens it): records a rolling window of body state + game events and answers questions about it via the Anthropic API. Editor/dev builds only; needs ANTHROPIC_API_KEY in the environment.")]
+        [SerializeField] private bool physicsDebugAssistant = true;
 
         [Header("3/4 perspective view — toggle live with Q")]
         [Tooltip("Render the court as a receding trapezoid (3/4 perspective) and project players/ball onto it. Toggle live in-game with the Q key. Sets the INITIAL state; Q flips it at runtime. Note: perspective brings back the top/bottom spacing difference a flat field avoids.")]
@@ -200,6 +202,7 @@ namespace Sportland.Sports.Dodgeball
                 showDiagnosticsHud = false;
                 showTuningPanel = false;
                 showMatchControls = false;
+                physicsDebugAssistant = false;
                 runMatch = true;
             }
 
@@ -213,6 +216,8 @@ namespace Sportland.Sports.Dodgeball
             if (showPlayByPlay) gameObject.AddComponent<DodgeballPlayByPlay>();
             if (showMatchControls) gameObject.AddComponent<DodgeballMatchControls>();
             if (showTuningPanel) gameObject.AddComponent<DodgeballTuningPanel>();
+            if (physicsDebugAssistant && (Application.isEditor || Debug.isDebugBuild))
+                SpawnPhysicsDebug();
             if (runMatch)
             {
                 match = gameObject.AddComponent<DodgeballMatch>();
@@ -305,6 +310,28 @@ namespace Sportland.Sports.Dodgeball
             if (ball != null) ball.ResetLoose(Vector2.zero);
             if (match != null) match.Configure(mode);
             DodgeballPlayByPlay.Clear();   // fresh log for the new match
+        }
+
+        // Physics debug assistant (dev tool): one object carrying the rolling
+        // recorder, the Claude-backed Q&A component, and its IMGUI overlay.
+        // The ball reports its gameplay events; every player body is tracked.
+        // Must run after SpawnAllPlayers/SpawnBall so the bodies exist.
+        private void SpawnPhysicsDebug()
+        {
+            var go = new GameObject("PhysicsDebug");
+            go.transform.SetParent(transform, false);
+            var recorder = go.AddComponent<Sportland.Diagnostics.PhysicsRecorder>();
+            go.AddComponent<Sportland.Diagnostics.PhysicsDebugAssistant>();
+            go.AddComponent<Sportland.Diagnostics.PhysicsDebugOverlay>();
+
+            if (ball != null && ball.GetComponent<Sportland.Diagnostics.BallCollisionReporter>() == null)
+                ball.gameObject.AddComponent<Sportland.Diagnostics.BallCollisionReporter>();
+
+            for (int i = 0; i < spawnedPlayers.Count; i++)
+            {
+                if (spawnedPlayers[i] == null) continue;
+                recorder.Track(spawnedPlayers[i].GetComponent<Rigidbody2D>());
+            }
         }
 
         private void SpawnBall()
