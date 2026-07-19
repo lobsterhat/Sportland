@@ -218,8 +218,11 @@ namespace Sportland.Sports.Dodgeball
             if (showPlayByPlay) gameObject.AddComponent<DodgeballPlayByPlay>();
             if (showMatchControls) gameObject.AddComponent<DodgeballMatchControls>();
             if (showTuningPanel) gameObject.AddComponent<DodgeballTuningPanel>();
+            Debug.Log($"[PhysicsDebug] spawn check: flag={physicsDebugAssistant}, isEditor={Application.isEditor}, debugBuild={Debug.isDebugBuild}");
             if (physicsDebugAssistant && (Application.isEditor || Debug.isDebugBuild))
                 SpawnPhysicsDebug();
+            else
+                Debug.Log("[PhysicsDebug] NOT spawning (flag off or non-dev build).");
             if (runMatch)
             {
                 match = gameObject.AddComponent<DodgeballMatch>();
@@ -334,6 +337,7 @@ namespace Sportland.Sports.Dodgeball
                 if (spawnedPlayers[i] == null) continue;
                 recorder.Track(spawnedPlayers[i].GetComponent<Rigidbody2D>());
             }
+            Debug.Log("[PhysicsDebug] spawned: recorder + assistant + overlay on 'PhysicsDebug'. Press F8.");
         }
 
         private void SpawnBall()
