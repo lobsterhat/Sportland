@@ -3,7 +3,9 @@
 A dev-only tool (editor/development builds; it destroys itself in release
 builds). `PhysicsRecorder` keeps a rolling window of body state + game
 events; `PhysicsDebugAssistant` answers plain-English questions about it via
-Claude; `PhysicsDebugOverlay` is the backtick-toggled IMGUI panel.
+Claude; `PhysicsDebugOverlay` is the **F8**-toggled IMGUI panel (it shows a
+small "Physics Debug: F8" tag bottom-left while closed, so you can confirm it
+spawned).
 
 `CourtSetup` spawns the whole kit behind its `physicsDebugAssistant` flag,
 active in every dodgeball context — the tuning lab and career/league fixtures

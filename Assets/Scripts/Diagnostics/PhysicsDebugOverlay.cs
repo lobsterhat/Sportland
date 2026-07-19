@@ -4,8 +4,10 @@ using UnityEngine.InputSystem;
 namespace Sportland.Diagnostics
 {
     /// <summary>
-    /// Minimal IMGUI overlay. Backtick toggles it, type a question, Enter sends.
-    /// IMGUI on purpose — zero prefab setup, zero scene wiring, and it's a dev tool.
+    /// Minimal IMGUI overlay. F8 toggles it, type a question, Enter sends. While
+    /// closed it shows a small "Physics Debug: F8" tag bottom-left so you can
+    /// confirm the tool actually spawned. IMGUI on purpose — zero prefab setup,
+    /// zero scene wiring, and it's a dev tool.
     ///
     /// Toggle is read through the new Input System (Keyboard.current), same as
     /// the rest of the dodgeball code — the legacy UnityEngine.Input class is
@@ -34,7 +36,7 @@ namespace Sportland.Diagnostics
         void Update()
         {
             var kb = Keyboard.current;
-            if (kb != null && kb.backquoteKey.wasPressedThisFrame)
+            if (kb != null && kb.f8Key.wasPressedThisFrame)
             {
                 _open = !_open;
 
@@ -55,7 +57,17 @@ namespace Sportland.Diagnostics
 
         void OnGUI()
         {
-            if (!_open || _assistant == null) return;
+            if (_assistant == null) return;
+
+            // Always-visible presence hint when the panel is closed: if you can
+            // see this, the tool spawned and is listening. Bottom-left so it
+            // clears the controlled-player nameplate at bottom-centre.
+            if (!_open)
+            {
+                var hint = new GUIStyle(GUI.skin.box) { fontSize = 12, alignment = TextAnchor.MiddleCenter };
+                GUI.Label(new Rect(10, Screen.height - 26, 150, 20), "Physics Debug: F8", hint);
+                return;
+            }
 
             const int w = 620, h = 420;
             var rect = new Rect(20, 20, w, h);
