@@ -110,6 +110,8 @@ namespace Sportland.Sports.Dodgeball
         // different ranges/angles without restarting.
         private void Update()
         {
+            if (Sportland.Diagnostics.PhysicsDebugOverlay.CapturingInput) return;
+
             if (dummy == null) return;
 
             // Deferred ball return (flagged in RecordRow when autoReturnBall is on)

@@ -252,6 +252,9 @@ namespace Sportland.Sports.Dodgeball
 
         private void Update()
         {
+            // Swallow all hotkeys while the debug console is open and typing.
+            if (Sportland.Diagnostics.PhysicsDebugOverlay.CapturingInput) return;
+
             var kb = Keyboard.current;
             if (kb == null) return;
 

@@ -50,6 +50,8 @@ namespace Sportland.Sports.Dodgeball
 
         private void Update()
         {
+            if (Sportland.Diagnostics.PhysicsDebugOverlay.CapturingInput) return;
+
             if (!cannonEnabled)
             {
                 if (marker != null) marker.gameObject.SetActive(false);

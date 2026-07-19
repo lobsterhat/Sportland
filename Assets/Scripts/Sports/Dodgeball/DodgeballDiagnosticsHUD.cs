@@ -49,6 +49,8 @@ namespace Sportland.Sports.Dodgeball
 
         private void Update()
         {
+            if (Sportland.Diagnostics.PhysicsDebugOverlay.CapturingInput) return;
+
             var kb = Keyboard.current;
             if (kb == null) return;
             // I = AI-decision panel, P = possession log, A = user-attack panel.

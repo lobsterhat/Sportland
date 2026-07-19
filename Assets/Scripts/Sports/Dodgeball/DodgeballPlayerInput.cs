@@ -178,6 +178,9 @@ namespace Sportland.Sports.Dodgeball
         {
             EnsureBallSubscription();
 
+            // Debug console open: don't drive the player while the user types.
+            if (Sportland.Diagnostics.PhysicsDebugOverlay.CapturingInput) return;
+
             Vector2 input = actions.Move.ReadValue<Vector2>();
             if (input.sqrMagnitude > 0.04f)
             {
