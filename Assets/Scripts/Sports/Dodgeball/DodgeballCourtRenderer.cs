@@ -27,17 +27,20 @@ namespace Sportland.Sports.Dodgeball
     public class DodgeballCourtRenderer : MonoBehaviour
     {
         [Header("Floor")]
-        [SerializeField] private Color teamAHalfColor = new Color(0.16f, 0.42f, 0.22f, 1f);
-        [SerializeField] private Color teamBHalfColor = new Color(0.14f, 0.38f, 0.20f, 1f);
+        [SerializeField] private Color teamAHalfColor = new Color(0.22f, 0.55f, 0.28f, 1f);
+        [SerializeField] private Color teamBHalfColor = new Color(0.19f, 0.50f, 0.25f, 1f);
         [Tooltip("The surround outside the court lines, where the outfielders stand.")]
-        [SerializeField] private Color apronColor = new Color(0.10f, 0.27f, 0.15f, 1f);
+        [SerializeField] private Color apronColor = new Color(0.14f, 0.36f, 0.19f, 1f);
         [Tooltip("Depth of one mown band, in metres. Also the subdivision step for every floor mesh.")]
         [SerializeField] private float bandDepth = 0.75f;
         [Tooltip("How strongly alternate bands darken. 0 = a flat surface with no banding.")]
-        [Range(0f, 0.5f)] [SerializeField] private float bandShade = 0.09f;
+        [Range(0f, 0.5f)] [SerializeField] private float bandShade = 0.11f;
 
         [Header("Lines")]
-        [SerializeField] private Color boundaryColor = new Color(0.92f, 0.92f, 0.92f, 0.9f);
+        [Tooltip("The court's own boundary. Kept the brightest line on the floor so the court reads as the primary shape.")]
+        [SerializeField] private Color boundaryColor = new Color(0.94f, 0.94f, 0.94f, 0.95f);
+        [Tooltip("The wall the ball bounces off, out past the outfielders. Dimmer than the court line so the two don't compete.")]
+        [SerializeField] private Color outerBoundaryColor = new Color(0.62f, 0.68f, 0.62f, 0.5f);
         [SerializeField] private Color centerLineColor = new Color(0.98f, 0.98f, 0.98f, 1f);
         [SerializeField] private float lineWidth = 0.08f;
         [Tooltip("Outline the outfielder strips. Not part of the arcade look, but the zones are a live rule.")]
@@ -241,9 +244,9 @@ namespace Sportland.Sports.Dodgeball
                 Outline("B_Bottom", -hw, 0f, -ph, -hh, teamBStripColor, StripOutlineOrder);
             }
 
-            Outline("CourtBoundary", -hw, hw, -hh, hh, boundaryColor, BoundaryOrder);
             // The wall the ball bounces off — see Ball.ReflectOffBoundaries.
-            Outline("OuterBoundary", -pw, pw, -ph, ph, boundaryColor, BoundaryOrder);
+            Outline("OuterBoundary", -pw, pw, -ph, ph, outerBoundaryColor, StripOutlineOrder);
+            Outline("CourtBoundary", -hw, hw, -hh, hh, boundaryColor, BoundaryOrder);
             Line("CenterLine", DepthRun(0f, -hh, hh), centerLineColor, CenterLineOrder, false);
         }
 

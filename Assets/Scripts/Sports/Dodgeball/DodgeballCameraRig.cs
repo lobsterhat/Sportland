@@ -37,11 +37,11 @@ namespace Sportland.Sports.Dodgeball
 
         [Header("Fit")]
         [Tooltip("Metres of breathing room past the left and right edges of the play area.")]
-        [SerializeField] private float sideMargin = 1.2f;
+        [SerializeField] private float sideMargin = 0.6f;
         [Tooltip("Screen units of apron kept below the near sideline.")]
-        [SerializeField] private float bottomMargin = 1.5f;
-        [Tooltip("Screen units kept above the far sideline for the stands. The backdrop is built taller than this on purpose so it overfills.")]
-        [SerializeField] private float headroom = 5.5f;
+        [SerializeField] private float bottomMargin = 1f;
+        [Tooltip("Minimum screen units kept above the far sideline for the stands. Any slack from fitting the court's width goes here too, and the backdrop is built taller still so it always overfills.")]
+        [SerializeField] private float headroom = 5f;
 
         [Header("Follow")]
         [SerializeField] private Transform followTarget;
@@ -77,7 +77,13 @@ namespace Sportland.Sports.Dodgeball
 
             float aspect = cam.aspect > 0.01f ? cam.aspect : 16f / 9f;
             cam.orthographicSize = Mathf.Max((top - bottom) * 0.5f, halfWidth / aspect);
-            Place(0f, (top + bottom) * 0.5f);
+
+            // Anchor the bottom of the frame rather than centring on the
+            // content. Holding 24 m of court across a 16:9 screen usually makes
+            // the fit width-limited, and the leftover height is worth more as
+            // extra sky - which the backdrop covers - than as empty void below
+            // the near sideline.
+            Place(0f, bottom + cam.orthographicSize);
         }
 
         private void Follow()
