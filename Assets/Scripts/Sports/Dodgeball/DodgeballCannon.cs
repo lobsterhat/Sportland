@@ -43,6 +43,9 @@ namespace Sportland.Sports.Dodgeball
         private Transform marker;
         private float nextAutoFireTime;
 
+        /// <summary>The on-court position marker, so the court view can project it. Null until the marker is first shown.</summary>
+        public Transform Marker => marker;
+
         // Public accessors so the panel can drive them live.
         public float FirePower { get => firePower; set => firePower = Mathf.Max(0f, value); }
         public Vector2 FirePosition { get => firePosition; set => firePosition = value; }
