@@ -1,5 +1,5 @@
 fileFormatVersion: 2
-guid: d6661c5ceb3a6eb4fa75cb17d73819bd
+guid: a4f4c379f9072ff4f89b247cdee1831d
 ScriptedImporter:
   internalIDToNameTable: []
   externalObjects: {}
@@ -125,9 +125,9 @@ ScriptedImporter:
     tessellationDetail: 0
     uvTransform: {x: 0, y: 0}
   animatedSpriteImportData:
-  - name: dodgeball
+  - name: base_head
     originalName: 
-    pivot: {x: 0.5, y: 0}
+    pivot: {x: 0.48387095, y: 0}
     alignment: 9
     border: {x: 0, y: 0, z: 0, w: 0}
     customData: 
@@ -135,9 +135,9 @@ ScriptedImporter:
       serializedVersion: 2
       x: 4
       y: 4
-      width: 24
-      height: 24
-    spriteID: 4a4f863392544d74db92f7c98b09a38e
+      width: 31
+      height: 32
+    spriteID: 97b2024d3a9058c4f9dd29435b682f48
     spriteBone: []
     spriteOutline: []
     vertices: []
@@ -151,44 +151,32 @@ ScriptedImporter:
   asepriteLayers:
   - layerIndex: 0
     uuid:
-      value0: 624889852
+      value0: 253781618
       value1: 0
       value2: 0
       value3: 0
-    guid: 624889852
-    name: dodgeball
+    guid: 0
+    name: base_head
     layerFlags: 0
     layerType: 0
     blendMode: 0
     cells:
-    - name: dodgeball
+    - name: base_head
       frameIndex: 0
       additiveSortOrder: 0
       cellRect:
-        x: 0
+        x: 1
         y: 0
-        width: 24
-        height: 24
-      spriteId: 4a4f863392544d74db92f7c98b09a38e
+        width: 31
+        height: 32
+      spriteId: 97b2024d3a9058c4f9dd29435b682f48
     linkedCells: []
     tileCells: []
     tileSetIndex: 0
     parentIndex: -1
   tileSets: []
-  platformSettings:
-  - name: Default
-    overridden: 0
-    ignorePlatformSupport: 0
-    maxTextureSize: 2048
-    resizeAlgorithm: 0
-    textureFormat: -1
-    textureCompression: 0
-    compressionQuality: 50
-    forceMaximumCompressionQuality_BC6H_BC7: 0
-    crunchedCompression: 0
-    allowsAlphaSplitting: 0
-    androidETC2FallbackOverride: 0
+  platformSettings: []
   generatePhysicsShape: 0
   secondarySpriteTextures: []
-  previousTextureSize: {x: 32, y: 32}
-  canvasSize: {x: 24, y: 24}
+  previousTextureSize: {x: 64, y: 64}
+  canvasSize: {x: 32, y: 32}
