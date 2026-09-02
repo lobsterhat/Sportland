@@ -40,6 +40,7 @@ namespace Sportland.Sports.Dodgeball
             public Transform FacingArrow;
             public Transform ControlRing;
             public PlayerMovement Movement;
+            public DodgeballPlayerVisual Visuals;
 
             // The ring is positioned once when it is built and never again, so
             // unlike everything else here it cannot restore itself when the
@@ -117,8 +118,11 @@ namespace Sportland.Sports.Dodgeball
 
             PlaceOnGround(rig.Shadow, ground);
             PlaceOnGround(rig.ControlRing, ground);
-            ProjectOrbit(rig.MovementArrow, rig.Root, ground);
-            ProjectOrbit(rig.FacingArrow, rig.Root, ground);
+            if (rig.Visuals != null)
+            {
+                ProjectOrbit(rig.MovementArrow, root, ground, rig.Visuals.MovementArrowOffset);
+                ProjectOrbit(rig.FacingArrow, root, ground, rig.Visuals.FacingArrowOffset);
+            }
         }
 
         private void ProjectBall(Ball b)
@@ -146,13 +150,15 @@ namespace Sportland.Sports.Dodgeball
         // floor. Projecting the orbit rather than the arrow squashes it into an
         // ellipse, so "forward" points the right way and covers the right
         // distance at every depth. The old spike just hid these.
-        private void ProjectOrbit(Transform arrow, Transform root, Vector2 ground)
+        //
+        // The offset is passed in rather than read off the transform, because
+        // the transform holds last frame's projected position — reading it back
+        // would feed this its own output.
+        private void ProjectOrbit(Transform arrow, Vector3 root, Vector2 ground, Vector2 offset)
         {
             if (arrow == null || !arrow.gameObject.activeSelf) return;
 
-            Vector3 offset = arrow.localPosition;
-            Vector3 rootPos = root.position;
-            Vector2 tip = CourtProjection.Ground(rootPos.x + offset.x, rootPos.y + offset.y);
+            Vector2 tip = CourtProjection.Ground(root.x + offset.x, root.y + offset.y);
             arrow.position = new Vector3(tip.x, tip.y, arrow.position.z);
 
             Vector2 dir = tip - ground;
@@ -187,6 +193,7 @@ namespace Sportland.Sports.Dodgeball
                 FacingArrow = root.Find("FacingArrow"),
                 ControlRing = root.Find("ControlRing"),
                 Movement = root.GetComponent<PlayerMovement>(),
+                Visuals = root.GetComponentInChildren<DodgeballPlayerVisual>(),
             };
             if (rig.ControlRing != null) rig.RingRestPosition = rig.ControlRing.localPosition;
             rigs[id] = rig;
@@ -204,7 +211,8 @@ namespace Sportland.Sports.Dodgeball
                 && rig.Shadow != null
                 && rig.MovementArrow != null
                 && rig.FacingArrow != null
-                && rig.ControlRing != null;
+                && rig.ControlRing != null
+                && rig.Visuals != null;
         }
 
         // Eliminated players are deactivated rather than destroyed, but career
