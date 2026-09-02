@@ -221,6 +221,31 @@ namespace Sportland.Sports.Dodgeball
         /// <inheritdoc cref="Unproject(float,float)"/>
         public static Vector2 Unproject(Vector2 screen) => Unproject(screen.x, screen.y);
 
+        /// <summary>Roughly where a standing character's body sits above their feet. Not a hitbox — just where to aim a click or hang a marker.</summary>
+        public const float StandingBodyHeight = 0.8f;
+
+        /// <summary>
+        /// Where a player standing at this sim position draws their body.
+        /// Clicking and marker-hanging happen in the projected view, where a
+        /// character is a body height above their feet, so testing against the
+        /// bare sim position would miss low.
+        /// </summary>
+        public static Vector2 BodyPoint(Vector2 simPosition) => Point(simPosition, StandingBodyHeight);
+
+        /// <summary>
+        /// Inverse of <see cref="BodyPoint"/>: which sim position is a player
+        /// standing at, given where their body is drawn. How far height lifts a
+        /// sprite depends on its depth, and depth is what this is solving for,
+        /// so it settles in two passes — well inside a pixel for a drag handle.
+        /// </summary>
+        public static Vector2 UnprojectBody(Vector2 view)
+        {
+            Vector2 sim = Unproject(view);
+            for (int i = 0; i < 2; i++)
+                sim = Unproject(view.x, view.y - Lift(StandingBodyHeight, sim.y));
+            return sim;
+        }
+
         // Depth 0..1 → screen Y. DepthBunch of 1 leaves this a straight
         // worldY * DepthSquash; above 1 it packs the far rows together.
         private static float DepthToScreenY(float t)
