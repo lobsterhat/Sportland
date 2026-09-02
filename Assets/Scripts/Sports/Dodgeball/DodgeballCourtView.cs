@@ -48,10 +48,13 @@ namespace Sportland.Sports.Dodgeball
             public Vector3 RingRestPosition;
         }
 
-        // Keyed by instance id rather than by the Transform itself: a destroyed
-        // Transform is awkward to look up again to evict, an int never is.
-        private readonly Dictionary<int, Rig> rigs = new Dictionary<int, Rig>();
-        private readonly List<int> stale = new List<int>();
+        // A flat list scanned by reference, rather than a dictionary. Keying a
+        // dictionary on a Transform is a trap here: Unity's overloaded equality
+        // reports every destroyed object as equal to every other, so two dead
+        // players would collide on one entry. Keying on an id instead would
+        // mean GetInstanceID, which Unity 6.5 rejects outright. With twelve
+        // players a reference scan costs nothing and dodges both.
+        private readonly List<Rig> rigs = new List<Rig>();
 
         private Ball ball;
         private DodgeballCannon cannon;
@@ -172,19 +175,27 @@ namespace Sportland.Sports.Dodgeball
         private void RestoreFlat()
         {
             projectedLastFrame = false;
-            foreach (var rig in rigs.Values)
+            for (int i = 0; i < rigs.Count; i++)
             {
-                if (rig.Root != null && rig.ControlRing != null)
-                    rig.ControlRing.localPosition = rig.RingRestPosition;
+                if (rigs[i].Root != null && rigs[i].ControlRing != null)
+                    rigs[i].ControlRing.localPosition = rigs[i].RingRestPosition;
             }
         }
 
         private Rig RigFor(Transform root)
         {
-            int id = root.GetInstanceID();
-            if (rigs.TryGetValue(id, out Rig rig) && IsComplete(rig)) return rig;
+            int slot = -1;
+            for (int i = 0; i < rigs.Count; i++)
+            {
+                // ReferenceEquals, not ==: we want "the same managed object",
+                // not Unity's notion of equality, which lies about dead ones.
+                if (!ReferenceEquals(rigs[i].Root, root)) continue;
+                if (IsComplete(rigs[i])) return rigs[i];
+                slot = i;
+                break;
+            }
 
-            rig = new Rig
+            var rig = new Rig
             {
                 Root = root,
                 Visual = root.childCount > 0 ? root.GetChild(0) : null,
@@ -196,7 +207,8 @@ namespace Sportland.Sports.Dodgeball
                 Visuals = root.GetComponentInChildren<DodgeballPlayerVisual>(),
             };
             if (rig.ControlRing != null) rig.RingRestPosition = rig.ControlRing.localPosition;
-            rigs[id] = rig;
+            if (slot >= 0) rigs[slot] = rig;
+            else rigs.Add(rig);
             return rig;
         }
 
@@ -219,10 +231,8 @@ namespace Sportland.Sports.Dodgeball
         // fixtures and the attack lab do tear players down, so don't leak.
         private void PruneDestroyed()
         {
-            stale.Clear();
-            foreach (var pair in rigs)
-                if (pair.Value.Root == null) stale.Add(pair.Key);
-            for (int i = 0; i < stale.Count; i++) rigs.Remove(stale[i]);
+            for (int i = rigs.Count - 1; i >= 0; i--)
+                if (rigs[i].Root == null) rigs.RemoveAt(i);
         }
     }
 }
