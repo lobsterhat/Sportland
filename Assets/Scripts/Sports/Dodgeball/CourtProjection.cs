@@ -119,11 +119,22 @@ namespace Sportland.Sports.Dodgeball
         public static void Configure(float farScale, float depthSquash, float depthBunch,
                                      float spriteDepthScale, float heightLift)
         {
-            FarScale = Mathf.Clamp(farScale, 0.2f, 1f);
-            DepthSquash = Mathf.Clamp(depthSquash, 0.1f, 1f);
-            DepthBunch = Mathf.Clamp(depthBunch, 1f, 3f);
-            SpriteDepthScale = Mathf.Clamp01(spriteDepthScale);
-            HeightLift = Mathf.Clamp(heightLift, 0.1f, 3f);
+            FarScale = Sane(farScale, DefaultFarScale, 0.2f, 1f);
+            DepthSquash = Sane(depthSquash, DefaultDepthSquash, 0.1f, 1f);
+            DepthBunch = Sane(depthBunch, DefaultDepthBunch, 1f, 3f);
+            SpriteDepthScale = Sane(spriteDepthScale, DefaultSpriteDepthScale, 0f, 1f);
+            HeightLift = Sane(heightLift, DefaultHeightLift, 0.1f, 3f);
+        }
+
+        // Mathf.Clamp passes NaN straight through, because every comparison
+        // against NaN is false. One NaN in here would poison every projected
+        // vertex, and worse, it would make the court renderer's "have the
+        // settings changed?" test never match itself — rebuilding the entire
+        // court every frame until memory ran out.
+        private static float Sane(float value, float fallback, float min, float max)
+        {
+            if (float.IsNaN(value) || float.IsInfinity(value)) return fallback;
+            return Mathf.Clamp(value, min, max);
         }
 
         /// <summary>0 at the near edge of the play area, 1 at the far edge. Not clamped — outfielders and stray balls can sit outside.</summary>

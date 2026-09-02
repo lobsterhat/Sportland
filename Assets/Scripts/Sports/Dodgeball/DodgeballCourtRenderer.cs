@@ -95,6 +95,10 @@ namespace Sportland.Sports.Dodgeball
         // keep them across rebuilds.
         private readonly Dictionary<Color, Material> materials = new Dictionary<Color, Material>();
         private readonly Dictionary<Sprite, Material> spriteMaterials = new Dictionary<Sprite, Material>();
+        // Destroying a MeshFilter does not destroy the mesh you handed it, so
+        // these have to be released by hand or every rebuild leaks a court's
+        // worth of geometry.
+        private readonly List<Mesh> meshes = new List<Mesh>();
 
         // The knob values the current geometry was built from. The projection is
         // live-tunable, so the floor has to notice when it goes out of date.
@@ -140,6 +144,7 @@ namespace Sportland.Sports.Dodgeball
                 // court now or it draws over the new one for a frame.
                 root.gameObject.SetActive(false);
                 Destroy(root.gameObject);
+                ReleaseMeshes();
             }
             root = new GameObject("Court").transform;
             root.SetParent(transform, false);
@@ -407,6 +412,7 @@ namespace Sportland.Sports.Dodgeball
             var go = new GameObject(name);
             go.transform.SetParent(root, false);
             go.AddComponent<MeshFilter>().mesh = mesh;
+            meshes.Add(mesh);
             var mr = go.AddComponent<MeshRenderer>();
             mr.sharedMaterial = material;
             mr.sortingOrder = order;
@@ -458,6 +464,13 @@ namespace Sportland.Sports.Dodgeball
             return mat;
         }
 
+        private void ReleaseMeshes()
+        {
+            for (int i = 0; i < meshes.Count; i++)
+                if (meshes[i] != null) Destroy(meshes[i]);
+            meshes.Clear();
+        }
+
         private void OnDestroy()
         {
             foreach (var mat in materials.Values)
@@ -466,6 +479,7 @@ namespace Sportland.Sports.Dodgeball
                 if (mat != null) Destroy(mat);
             materials.Clear();
             spriteMaterials.Clear();
+            ReleaseMeshes();
         }
     }
 }

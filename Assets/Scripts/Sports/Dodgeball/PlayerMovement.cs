@@ -31,7 +31,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float acceleration = 40f;
 
         [Header("Jump")]
-        [SerializeField] private float jumpHeight = 1.5f;  // peak hop height
+        [Tooltip("Peak hop height in metres. Kept well under the ~1.6 m sprite so a jump reads as a hop, but it still has to clear DodgeballAI.lowBallThreshold (0.6) or jumping stops working as evasion.")]
+        [SerializeField] private float jumpHeight = 1f;  // peak hop height
         [SerializeField] private float jumpDuration = 0.6f;
         [Tooltip("Hang-time multiplier for ATTACK jumps (jump / run-jump throws): extends the airtime so the spike floats longer. Defensive evade hops stay at 1.")]
         [SerializeField] private float attackJumpHangMul = 1.4f;
