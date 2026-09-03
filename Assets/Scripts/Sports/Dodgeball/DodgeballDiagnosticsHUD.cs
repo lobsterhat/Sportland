@@ -319,18 +319,19 @@ namespace Sportland.Sports.Dodgeball
             return lines.ToArray();
         }
 
-        // Feedback on the user-controlled player's last crow-hop attack: how
-        // well the throw was timed to the plant (early / late / perfect). The
-        // live "crow" readout on the carrier line shows the window during the
-        // hop; this shows the verdict after the release, held a few seconds.
+        // Last user attack throw: type (standing / running / jump) plus the
+        // charge and settle that went into it. Held a few seconds after release.
         private string[] BuildUserAttackLines()
         {
-            var lines = new List<string> { "== USER ATTACK (crow hop) ==" };
-            float age = Time.realtimeSinceStartup - DodgeballPlayerInput.LastCrowFeedbackTime;
-            if (string.IsNullOrEmpty(DodgeballPlayerInput.LastCrowFeedback) || age > 4f)
-                lines.Add("(run + tap jump, release on the plant)");
-            else
-                lines.Add(DodgeballPlayerInput.LastCrowFeedback);
+            var lines = new List<string> { "== USER ATTACK ==" };
+            var a = DodgeballPlayerInput.LastUserAttack;
+            if (!a.valid || Time.time - a.time > 4f)
+            {
+                lines.Add("(standing / running / jump throw)");
+                return lines.ToArray();
+            }
+            lines.Add($"{a.type}  {a.input}");
+            lines.Add($"power {a.power:F1}" + (a.aimError >= 0f ? $"  aim err {a.aimError:F2}" : ""));
             return lines.ToArray();
         }
 
@@ -354,8 +355,7 @@ namespace Sportland.Sports.Dodgeball
             var mv = carrier.GetComponent<PlayerMovement>();
             string staStr = sta != null ? $"  sta {sta.Stamina01:F2}" : "";
             string setStr = (mv != null && mv.CatchSettle01 < 0.999f) ? $"  settle {mv.CatchSettle01:F2}" : "";
-            string crowStr = (mv != null && mv.IsCrowHopping) ? $"  crow {mv.CrowHopTiming01:F2}" : "";
-            lines.Add($"{carrier.Spawn.team}{carrier.Number}  {carrier.Spawn.role}{staStr}{setStr}{crowStr}");
+            lines.Add($"{carrier.Spawn.team}{carrier.Number}  {carrier.Spawn.role}{staStr}{setStr}");
 
             var ai = carrier.GetComponent<DodgeballAI>();
             if (ai == null) { lines.Add("(human-controlled)"); return lines.ToArray(); }
