@@ -10,10 +10,9 @@ namespace Sportland.Sports.Dodgeball
     ///                 (analog magnitude respected on the stick; D-pad is digital)
     ///   Sprint      — L2 / Left Shift                  (hold)
     ///   Run         — D-pad double-tap (any direction) (sticky while D-pad held)
-    ///   Evade       — Cross / Space                    (smart evade — holding the ball: jump
-    ///                                                   to cross a line and throw; empty-handed:
-    ///                                                   a held direction dashes, neutral stick
-    ///                                                   ducks a high throw / jumps a low one)
+    ///   Jump        — Cross / Space                    (always a hop; with the ball it's an
+    ///                                                   attack jump so you can throw across a
+    ///                                                   line before landing)
     ///   Throw       — Square / Q                       (only fires while holding the ball)
     ///   Pass        — Triangle / F                     (with the ball: tap = lob,
     ///                                                   hold = chest; empty-handed:

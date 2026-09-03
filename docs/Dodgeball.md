@@ -23,7 +23,7 @@ Build a standalone: menu **Sportland → Build → Windows** (`Assets/Editor/Dod
 |---|---|---|
 | Move | Left stick / D-pad | WASD / arrows |
 | Run | hold L2, **or** double-tap a D-pad direction (second tap while moving) | hold Left Shift |
-| Evade | Cross (✕) — with the ball, jumps a line to throw; empty-handed, a held direction dashes and a neutral stick ducks or jumps to suit the throw | Space |
+| Jump | Cross (✕) — always a hop; with the ball you can throw across a line before landing | Space |
 | Throw | Square (▢) | Q |
 | Pass | Triangle (△) — tap = lob, hold = chest | F |
 | Catch | Circle (◯) | E |

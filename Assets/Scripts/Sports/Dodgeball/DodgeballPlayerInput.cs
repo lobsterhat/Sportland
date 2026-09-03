@@ -6,11 +6,10 @@ namespace Sportland.Sports.Dodgeball
     /// <summary>
     /// Routes PS4 / keyboard input into a single human-controlled Dodgeball
     /// player. Move uses analog magnitude; L2 holds sprint. Square throws,
-    /// Triangle passes (tap = lob, hold = chest), Circle catches. Cross is the
-    /// smart-evade button: holding the ball it jumps (cross a line to throw);
-    /// empty-handed, a held direction dashes off the ball's line while a neutral
-    /// stick ducks a high throw or jumps a low one. L1 force-returns the ball
-    /// for testing.
+    /// Triangle passes (tap = lob, hold = chest), Circle catches. Cross always
+    /// jumps — with the ball that's an attack hop so you can throw across a
+    /// line before landing; empty-handed it's the same hop. L1 force-returns
+    /// the ball for testing.
     ///
     /// Player control is single-active: a static Current reference points at
     /// the live input component. When a pass arrives at the intended target,
@@ -55,13 +54,6 @@ namespace Sportland.Sports.Dodgeball
         [Header("Pass timing")]
         [Tooltip("Hold longer than this (seconds) for chest pass; release sooner for lob.")]
         [SerializeField] private float passTapThreshold = 0.18f;
-
-        [Header("Evade")]
-        [Tooltip("Neutral-stick evade auto-picks a verb from the incoming throw's predicted " +
-                 "arrival height: at/above this, duck under it; below, jump over it.")]
-        [SerializeField] private float evadeDuckHeight = 0.75f;
-        [Tooltip("Empty-handed, pressing evade within this range of a loose/deflected ball dives for it.")]
-        [SerializeField] private float diveTriggerRange = 3f;
 
         [Header("Throw aim assist")]
         [Tooltip("Half-angle of the throw cone (degrees). Opponents whose bearing from the thrower " +
@@ -214,79 +206,21 @@ namespace Sportland.Sports.Dodgeball
                     movement.SetFacing((Vector2)cachedBall.transform.position - (Vector2)transform.position);
             }
 
-            // Keep the catch armed through a dive so the extended-reach grab lands.
+            // Keep the catch armed through a dive so the extended-reach grab
+            // lands (AI still dives; the human no longer starts one from Cross).
             if (movement.IsDiving) tracker.ArmCatch();
 
             movement.IsRunning = isRunning || actions.Sprint.IsPressed();
             movement.ApplyMove(input);
         }
 
-        // Cross is the smart-evade button. Holding the ball it's the offensive
-        // jump (cross a line and throw before landing). Empty-handed it's a
-        // context evade: a held direction dashes off the ball's line; a neutral
-        // stick reads the incoming throw and ducks a high ball / jumps a low one.
+        // Cross is always a jump. Holding the ball it's an attack hop so a
+        // throw can cross a line before landing; empty-handed it's the same
+        // hop. Duck / dash / dive / crow-hop used to share this button and
+        // made X feel unreliable — those stay available to the AI.
         private void OnEvadePressed(InputAction.CallbackContext _)
         {
-            if (tracker.HasBall)
-            {
-                // Running with the ball → crow hop (skip-step; time the throw
-                // release to the plant for a power/accuracy bonus). Otherwise
-                // the full jump attack.
-                if (movement.IsRunning) movement.CrowHop();
-                else movement.TryJump(attackJump: true);
-                return;
-            }
-
-            if (TryDiveForBall()) return;   // near a loose/deflected ball → lunge for it
-
-            Vector2 dir = actions.Move.ReadValue<Vector2>();
-            if (dir.sqrMagnitude > 0.04f) { movement.Dash(dir); return; }
-
-            if (TryGetIncomingThrowHeight(out float predictedHeight))
-            {
-                if (predictedHeight >= evadeDuckHeight) movement.Duck();
-                else                                    movement.TryJump();
-            }
-            else
-            {
-                movement.Duck();   // nothing incoming — brief crouch
-            }
-        }
-
-        // If a deflected (bouncing) or loose ball is nearby, dive toward where it
-        // will land and arm a catch (the dive extends the catch reach). A fresh
-        // incoming throw is left to the normal duck/jump/dodge evade. Returns
-        // true if a dive was started.
-        private bool TryDiveForBall()
-        {
-            if (cachedBall == null) cachedBall = FindAnyObjectByType<Ball>();
-            if (cachedBall == null) return false;
-
-            var st = cachedBall.CurrentState;
-            if (st != Ball.State.Bouncing && st != Ball.State.Loose) return false;
-
-            Vector2 me = transform.position;
-            Vector2 landing = cachedBall.PredictGroundPoint();
-            float near = Mathf.Min(Vector2.Distance(me, cachedBall.transform.position),
-                                   Vector2.Distance(me, landing));
-            if (near > diveTriggerRange) return false;
-
-            movement.Dive(landing - me);
-            if (!movement.IsDiving) return false;   // blocked (mid jump/dash/dive/recovery)
-            tracker.ArmCatch();
-            return true;
-        }
-
-        // Predicted arrival height of an in-flight thrown ball at our position,
-        // used to auto-pick duck vs jump for a neutral-stick evade.
-        private bool TryGetIncomingThrowHeight(out float predictedHeight)
-        {
-            predictedHeight = 0f;
-            var ball = FindAnyObjectByType<Ball>();
-            if (ball == null || ball.CurrentState != Ball.State.Thrown) return false;
-            float dist = Vector2.Distance(transform.position, ball.transform.position);
-            predictedHeight = ball.PredictHeightAfter(dist);
-            return true;
+            movement.TryJump(attackJump: tracker.HasBall);
         }
 
         private void OnDpadUpPressed(InputAction.CallbackContext _)    => HandleDpadPress(0);
