@@ -23,10 +23,11 @@ Build a standalone: menu **Sportland → Build → Windows** (`Assets/Editor/Dod
 |---|---|---|
 | Move | Left stick / D-pad | WASD / arrows |
 | Run | hold L2, **or** double-tap a D-pad direction (second tap while moving) | hold Left Shift |
-| Jump | Cross (✕) — always a hop; with the ball you can throw across a line before landing | Space |
-| Throw | Square (▢) | Q |
-| Pass | Triangle (△) — tap = lob, hold = chest | F |
-| Catch | Circle (◯) | E |
+| Jump | Cross (✕) | Space |
+| Throw (offense) | Square (▢) | Q |
+| Pass (offense; tap = lob, hold = chest) | Circle (◯) | E |
+| Catch (defense) | Circle (◯) | E |
+| Switch to nearest teammate (defense) | Triangle (△) | F |
 | Stance | R2 — toggle: face the ball, move slower, full catch/evade | Left Ctrl |
 | Return ball to me (debug) | L1 | 1 |
 | Flatten the court (debug) | — | V |

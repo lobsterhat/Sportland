@@ -5,11 +5,11 @@ namespace Sportland.Sports.Dodgeball
 {
     /// <summary>
     /// Routes PS4 / keyboard input into a single human-controlled Dodgeball
-    /// player. Move uses analog magnitude; L2 holds sprint. Square throws,
-    /// Triangle passes (tap = lob, hold = chest), Circle catches. Cross always
-    /// jumps — with the ball that's an attack hop so you can throw across a
-    /// line before landing; empty-handed it's the same hop. L1 force-returns
-    /// the ball for testing.
+    /// player. Move uses analog magnitude; L2 holds sprint. Face buttons split
+    /// by possession:
+    ///   offense — Cross jumps, Square throws, Circle passes
+    ///   defense — Cross jumps, Circle catches, Triangle takes the nearest teammate
+    /// L1 force-returns the ball for testing.
     ///
     /// Player control is single-active: a static Current reference points at
     /// the live input component. When a pass arrives at the intended target,
@@ -120,12 +120,12 @@ namespace Sportland.Sports.Dodgeball
             if (ai != null) ai.enabled = false;
 
             actions = new DodgeballInputActions();
-            actions.Evade.performed      += OnEvadePressed;
+            actions.Evade.performed      += OnJumpPressed;
             actions.Throw.started        += OnThrowStarted;
             actions.Throw.canceled       += OnThrowReleased;
-            actions.Pass.started         += OnPassStarted;
-            actions.Pass.canceled        += OnPassCanceled;
-            actions.Catch.performed      += OnCatchPressed;
+            actions.Circle.started       += OnCircleStarted;
+            actions.Circle.canceled      += OnCircleCanceled;
+            actions.Switch.performed     += OnSwitchPressed;
             actions.Stance.performed     += OnStancePressed;
             actions.ReturnBall.performed += OnReturnBallPressed;
             actions.DpadUp.started       += OnDpadUpPressed;
@@ -144,12 +144,12 @@ namespace Sportland.Sports.Dodgeball
         {
             if (actions != null)
             {
-                actions.Evade.performed      -= OnEvadePressed;
+                actions.Evade.performed      -= OnJumpPressed;
                 actions.Throw.started        -= OnThrowStarted;
                 actions.Throw.canceled       -= OnThrowReleased;
-                actions.Pass.started         -= OnPassStarted;
-                actions.Pass.canceled        -= OnPassCanceled;
-                actions.Catch.performed      -= OnCatchPressed;
+                actions.Circle.started       -= OnCircleStarted;
+                actions.Circle.canceled      -= OnCircleCanceled;
+                actions.Switch.performed     -= OnSwitchPressed;
                 actions.Stance.performed     -= OnStancePressed;
                 actions.ReturnBall.performed -= OnReturnBallPressed;
                 actions.DpadUp.started       -= OnDpadUpPressed;
@@ -218,7 +218,7 @@ namespace Sportland.Sports.Dodgeball
         // throw can cross a line before landing; empty-handed it's the same
         // hop. Duck / dash / dive / crow-hop used to share this button and
         // made X feel unreliable — those stay available to the AI.
-        private void OnEvadePressed(InputAction.CallbackContext _)
+        private void OnJumpPressed(InputAction.CallbackContext _)
         {
             movement.TryJump(attackJump: tracker.HasBall);
         }
@@ -244,11 +244,11 @@ namespace Sportland.Sports.Dodgeball
             lastMovementActiveTime = Time.unscaledTime;
         }
 
-        // Square/Q pressed: empty-handed, hand control to the teammate nearest a
-        // loose ball; holding the ball, START charging the throw.
+        // Square/Q: charge a throw. Does nothing empty-handed — switching
+        // players is Triangle on defense.
         private void OnThrowStarted(InputAction.CallbackContext _)
         {
-            if (!tracker.HasBall) { SwitchToClosestLooseBallTeammate(); return; }
+            if (!tracker.HasBall) return;
             throwChargeStart = Time.unscaledTime;
         }
 
@@ -440,15 +440,15 @@ namespace Sportland.Sports.Dodgeball
             return best;
         }
 
-        private void OnPassStarted(InputAction.CallbackContext _)
+        // Circle / E: pass while holding the ball (tap = lob, hold = chest),
+        // catch while empty-handed.
+        private void OnCircleStarted(InputAction.CallbackContext _)
         {
-            // Empty-handed, Triangle/F switches control to the infielder nearest
-            // the ball (to defend or make a play); with the ball it starts a pass.
-            if (!tracker.HasBall) { SwitchToClosestInfielderToBall(); return; }
-            passPressTime = Time.unscaledTime;
+            if (tracker.HasBall) passPressTime = Time.unscaledTime;
+            else tracker.ArmCatch();
         }
 
-        private void OnPassCanceled(InputAction.CallbackContext _)
+        private void OnCircleCanceled(InputAction.CallbackContext _)
         {
             if (passPressTime < 0f) return;
             float duration = Time.unscaledTime - passPressTime;
@@ -456,7 +456,6 @@ namespace Sportland.Sports.Dodgeball
 
             var ball = tracker.HeldBall;
             if (ball == null) return;
-
             DoPass(ball, isChest: duration >= passTapThreshold);
         }
 
@@ -505,13 +504,10 @@ namespace Sportland.Sports.Dodgeball
             return best;
         }
 
-        private void OnCatchPressed(InputAction.CallbackContext _)
+        private void OnSwitchPressed(InputAction.CallbackContext _)
         {
-            // Press-window reaction: arming a catch lets the Ball resolve a
-            // skill-checked catch when it arrives within reach. (A slow loose
-            // ball at the player's feet is still a free walk-over pickup.)
             if (tracker.HasBall) return;
-            tracker.ArmCatch();
+            SwitchToClosestTeammate();
         }
 
         // Toggle the defensive stance. No stance while carrying the ball — that's
@@ -550,50 +546,25 @@ namespace Sportland.Sports.Dodgeball
             subscribedToBall = true;
         }
 
-        // Square/Q with no ball in hand: if the ball is loose (it has hit a
-        // player or the ground — i.e. not held / passing / thrown), hand control
-        // to the teammate closest to it so you can make a play on the ball.
-        private void SwitchToClosestLooseBallTeammate()
+        // Triangle / F, empty-handed: take the nearest teammate so you can
+        // step in on a play. Possession-follows-control (OnBallAttached) still
+        // jumps you to a teammate who actually picks the ball up.
+        private void SwitchToClosestTeammate()
         {
-            var ball = FindAnyObjectByType<Ball>();
-            if (ball == null) return;
-            if (ball.CurrentState != Ball.State.Loose && ball.CurrentState != Ball.State.Bouncing) return;
-
             PlayerZoneTracker best = null;
             float bestDistSq = float.MaxValue;
-            Vector2 ballPos = ball.transform.position;
+            Vector2 here = transform.position;
             var team = tracker.Spawn.team;
             var trackers = PlayerZoneTracker.All;
             for (int i = 0; i < trackers.Count; i++)
             {
                 var t = trackers[i];
-                if (t == null || t.Spawn.team != team) continue;
-                float d = ((Vector2)t.transform.position - ballPos).sqrMagnitude;
+                if (t == null || t == tracker || t.Spawn.team != team) continue;
+                if (!t.gameObject.activeInHierarchy) continue;
+                float d = ((Vector2)t.transform.position - here).sqrMagnitude;
                 if (d < bestDistSq) { bestDistSq = d; best = t; }
             }
-            if (best != null && best != tracker) TransferControl(best.gameObject);
-        }
-
-        // Empty-handed Triangle/F: hand control to the infielder closest to the
-        // ball, so you can step up to defend an incoming throw or make a play.
-        private void SwitchToClosestInfielderToBall()
-        {
-            if (cachedBall == null) cachedBall = FindAnyObjectByType<Ball>();
-            if (cachedBall == null) return;
-            Vector2 ballPos = cachedBall.transform.position;
-
-            PlayerZoneTracker best = null;
-            float bestDistSq = float.MaxValue;
-            var team = tracker.Spawn.team;
-            var trackers = PlayerZoneTracker.All;
-            for (int i = 0; i < trackers.Count; i++)
-            {
-                var t = trackers[i];
-                if (t == null || t.Spawn.team != team || t.Spawn.role != PlayerRole.Infielder) continue;
-                float d = ((Vector2)t.transform.position - ballPos).sqrMagnitude;
-                if (d < bestDistSq) { bestDistSq = d; best = t; }
-            }
-            if (best != null && best != tracker) TransferControl(best.gameObject);
+            if (best != null) TransferControl(best.gameObject);
         }
 
         /// <summary>
