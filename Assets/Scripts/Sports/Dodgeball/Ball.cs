@@ -1273,7 +1273,7 @@ namespace Sportland.Sports.Dodgeball
             LastReleaseWasThrow = true;
             state = State.Thrown;
             // Record the ACTUAL release speed (carrier momentum included), so the lab's
-            // "spd" differs from the commanded "pow" on running / crow-hop throws.
+            // "spd" differs from the commanded "pow" on running throws.
             RecordRelease(rb.linearVelocity.magnitude);
             OnReleased?.Invoke(recentThrower, IntendedTarget, true);
         }

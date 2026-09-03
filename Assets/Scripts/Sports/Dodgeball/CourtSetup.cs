@@ -86,14 +86,19 @@ namespace Sportland.Sports.Dodgeball
         [Tooltip("Spawn the physics debug assistant (backtick opens it): records a rolling window of body state + game events and answers questions about it via the Anthropic API. Editor/dev builds only; needs ANTHROPIC_API_KEY in the environment.")]
         [SerializeField] private bool physicsDebugAssistant = true;
 
-        [Header("3/4 perspective view — toggle live with Q")]
-        [Tooltip("Render the court as a receding trapezoid (3/4 perspective) and project players/ball onto it. Toggle live in-game with the Q key. Sets the INITIAL state; Q flips it at runtime. Note: perspective brings back the top/bottom spacing difference a flat field avoids.")]
-        [SerializeField] private bool obliqueViewSpike = false;
-        [Tooltip("Far (top) edge scale vs the near (bottom) edge. Lower = stronger perspective.")]
-        [Range(0.2f, 1f)] [SerializeField] private float obliqueFarScale = 0.5f;
-        [Tooltip("How much depth bunches toward the far edge. 1 = flat oblique; higher = stronger perspective.")]
-        [Range(1f, 3f)] [SerializeField] private float obliqueDepthBunch = 1.6f;
-        [Range(1f, 3f)] [SerializeField] private float obliqueHeightExaggeration = 1.4f;
+        [Header("Angled court view — flatten live with V")]
+        [Tooltip("Draw the court at an angle (the Technos Super Dodge Ball look) instead of flat top-down. V flattens it live for an A/B look; the sim is identical either way.")]
+        [SerializeField] private bool angledView = true;
+        [Tooltip("Screen units per metre of depth, against 1 per metre of width. This is what tilts the floor away from the camera; lower lays it flatter and frees up more of the frame for the stands.")]
+        [Range(0.1f, 1f)] [SerializeField] private float depthSquash = CourtProjection.DefaultDepthSquash;
+        [Tooltip("Width of the far edge against the near edge. 1 = a plain rectangle (the NES look); lower narrows the back into a trapezoid (the arcade look).")]
+        [Range(0.2f, 1f)] [SerializeField] private float farScale = CourtProjection.DefaultFarScale;
+        [Tooltip("Extra curve in the depth axis. 1 = evenly spaced rows; above 1 bunches them toward the back. Keep near 1 — heavy bunching makes movement speed visibly change with depth.")]
+        [Range(1f, 3f)] [SerializeField] private float depthBunch = CourtProjection.DefaultDepthBunch;
+        [Tooltip("How much sprites shrink with depth. 0 keeps every character the same size at every depth, which is the Technos cheat and what stops pixel art resampling.")]
+        [Range(0f, 1f)] [SerializeField] private float spriteDepthScale = CourtProjection.DefaultSpriteDepthScale;
+        [Tooltip("Screen units per metre of jump/ball height. Depth is squashed and height is not, so 1 already makes a hop read clearly; raise it if jumps still need to pop.")]
+        [Range(0.1f, 3f)] [SerializeField] private float heightLift = CourtProjection.DefaultHeightLift;
 
         [Header("Match")]
         [Tooltip("Scoring rules asset. Leave null to use Start Mode below (built in code).")]
@@ -142,7 +147,6 @@ namespace Sportland.Sports.Dodgeball
 
         private DodgeballMatch match;
         private Ball ball;
-        private DodgeballObliqueView obliqueView;
         private GameMode.Preset currentPreset;
 
         /// <summary>The mode the match is currently running in (read by the controls panel).</summary>
@@ -207,6 +211,10 @@ namespace Sportland.Sports.Dodgeball
             }
 
             DodgeballUI.Font = uiFont;   // shared with the runtime-added IMGUI overlays
+            // Before anything draws. The court renderer bakes the projection
+            // into its geometry, and it builds in Start precisely so this has
+            // already run.
+            ApplyViewSettings();
             BuildCourt();
             SpawnAllPlayers();
             SpawnBall();
@@ -224,18 +232,11 @@ namespace Sportland.Sports.Dodgeball
                 currentPreset = startMode;
                 match.Configure(gameMode != null ? gameMode : GameMode.Create(startMode));
             }
-            // Oblique view: always present, toggled live with Q. Starts in the
-            // state of the inspector bool. Disabled = zero effect (the component's
-            // OnDisable restores the court and its projection stops, so the
-            // movement/ball scripts revert the visuals next frame).
-            obliqueView = gameObject.AddComponent<DodgeballObliqueView>();
-            obliqueView.farScale = obliqueFarScale;
-            obliqueView.depthBunch = obliqueDepthBunch;
-            obliqueView.heightExaggeration = obliqueHeightExaggeration;
-            // Re-toggle so OnEnable (which builds the floor) runs with the params
-            // set above, not the defaults AddComponent's auto-enable used.
-            obliqueView.enabled = false;
-            obliqueView.enabled = obliqueViewSpike;
+            // Places the moving parts on the angled floor every frame. Always
+            // present: with the projection flattened it does nothing and the
+            // owning components' own values stand.
+            gameObject.AddComponent<DodgeballCourtView>();
+            gameObject.AddComponent<DodgeballCameraRig>();
 
             if (attackLabMode) gameObject.AddComponent<DodgeballAttackLab>();
 
@@ -250,12 +251,13 @@ namespace Sportland.Sports.Dodgeball
             var kb = Keyboard.current;
             if (kb == null) return;
 
-            // Q toggles the oblique-view spike live (works regardless of the
-            // mode-switch gating below).
-            if (kb.qKey.wasPressedThisFrame && obliqueView != null)
+            // V flattens the court to the old top-down view and back, for an A/B
+            // look. Not Q — that is the keyboard Throw button.
+            if (kb.vKey.wasPressedThisFrame)
             {
-                obliqueView.enabled = !obliqueView.enabled;
-                Debug.Log($"[Dodgeball] Oblique view {(obliqueView.enabled ? "ON" : "off")}");
+                angledView = !angledView;
+                CourtProjection.Enabled = angledView;
+                Debug.Log($"[Dodgeball] Court view {(angledView ? "angled" : "flat")}");
             }
 
             // No mode-hopping in the middle of a league fixture.
@@ -355,6 +357,23 @@ namespace Sportland.Sports.Dodgeball
             // correctly front/back against them.
             if (ballGO.GetComponent<DodgeballDepthSort>() == null)
                 ballGO.AddComponent<DodgeballDepthSort>();
+        }
+
+        /// <summary>
+        /// Push the inspector's view knobs into <see cref="CourtProjection"/>,
+        /// which every renderer and the world-anchored IMGUI read from. Safe to
+        /// call at any time — the court renderer notices the change and rebuilds.
+        /// </summary>
+        public void ApplyViewSettings()
+        {
+            CourtProjection.Enabled = angledView;
+            CourtProjection.Configure(farScale, depthSquash, depthBunch, spriteDepthScale, heightLift);
+        }
+
+        // Drag a slider in the inspector mid-play and the court follows.
+        private void OnValidate()
+        {
+            if (Application.isPlaying) ApplyViewSettings();
         }
 
         private void BuildCourt()

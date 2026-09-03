@@ -31,22 +31,13 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private float acceleration = 40f;
 
         [Header("Jump")]
-        [SerializeField] private float jumpHeight = 1.5f;  // peak hop height
+        [Tooltip("Peak hop height in metres. Kept well under the ~1.6 m sprite so a jump reads as a hop, but it still has to clear DodgeballAI.lowBallThreshold (0.6) or jumping stops working as evasion.")]
+        [SerializeField] private float jumpHeight = 1f;  // peak hop height
         [SerializeField] private float jumpDuration = 0.6f;
         [Tooltip("Hang-time multiplier for ATTACK jumps (jump / run-jump throws): extends the airtime so the spike floats longer. Defensive evade hops stay at 1.")]
         [SerializeField] private float attackJumpHangMul = 1.4f;
         [Tooltip("Brief 'gather your feet' pause (s) after landing during which movement input is ignored. Prevents instant re-aim mid-stride; lets natural damping bleed off the jump's lateral momentum.")]
         public float jumpRecoverDuration = 0.15f;
-
-        [Header("Crow hop (skill-timed running attack)")]
-        [Tooltip("Length (s) of the crow-hop skip-step. The player keeps running through it — it's a hop, not a full jump.")]
-        [SerializeField] private float crowHopDuration = 0.4f;
-        [Tooltip("Peak height (u) of the skip — small, well below a jump.")]
-        [SerializeField] private float crowHopHeight = 0.45f;
-        [Tooltip("Normalized time (0..1) of the 'plant' — the moment to release the throw for the timing bonus.")]
-        [Range(0.3f, 1f)] [SerializeField] private float crowHopPlantT = 0.72f;
-        [Tooltip("Half-width (s) of the timing window around the plant. A throw released within this of the plant earns up to the full crow-hop bonus; outside, none.")]
-        [SerializeField] private float crowHopWindow = 0.12f;
 
         [Header("Pivot delay (sharp direction change)")]
         [Tooltip("When the input direction differs from current velocity by more than 90° AND the player is moving at >pivotMinSpeed, this delay (s) kicks in before the new direction is accepted. During the pivot, velocity actively tapers to zero (linear) — the player visibly brakes, then commits to the new direction. Scales down with GeneralAttributes.ChangeOfDirection01 (faster pivot for higher-stat players, with a floor at 0.4× the base).")]
@@ -104,7 +95,6 @@ namespace Sportland.Sports.Dodgeball
         private Rigidbody2D rb;
         private float jumpTimer = -1f;
         private float currentJumpDurationMul = 1f;   // 1 normal hop, >1 for attack jumps (more hang)
-        private float crowHopTimer = -1f;            // >=0 during a crow-hop skip-step
         private float jumpRecoverTimer = -1f;
         private float dampingBeforeJump = -1f;   // sentinel; >=0 means a jump is in progress and we've stashed the rb's linearDamping
         private Vector2 landingVelocity = Vector2.zero;   // captured at land; linearly tapered to zero over jumpRecoverDuration
@@ -131,26 +121,6 @@ namespace Sportland.Sports.Dodgeball
         private Transform spriteChild; // visual sprite that we'll bob up/down
 
         public bool IsAirborne => jumpTimer >= 0f;
-        /// <summary>Mid crow-hop skip-step (a running attack — the player keeps moving).</summary>
-        public bool IsCrowHopping => crowHopTimer >= 0f;
-        /// <summary>Absolute time offset (s) from the hop's start to the plant — the AI targets this for its release.</summary>
-        public float CrowHopPlantTime => crowHopDuration * crowHopPlantT;
-        /// <summary>
-        /// How well-timed a throw released RIGHT NOW is vs the crow-hop plant:
-        /// 1 = dead on the plant, falling to 0 at the edge of the window, 0 when
-        /// not crow-hopping. Drives the power + accuracy bonus.
-        /// </summary>
-        public float CrowHopTiming01
-        {
-            get
-            {
-                if (crowHopTimer < 0f) return 0f;
-                float off = Mathf.Abs(crowHopTimer - CrowHopPlantTime);
-                return Mathf.Clamp01(1f - off / Mathf.Max(0.01f, crowHopWindow));
-            }
-        }
-        /// <summary>Signed timing vs the plant right now: negative = early, positive = late (s); 0 when not hopping.</summary>
-        public float CrowHopSignedOffset => IsCrowHopping ? crowHopTimer - CrowHopPlantTime : 0f;
         public bool IsDucking => duckTimer >= 0f;
         public bool IsDashing => dashTimer >= 0f;
         /// <summary>Lunging for a diving catch (drives velocity, extended catch reach).</summary>
@@ -303,14 +273,6 @@ namespace Sportland.Sports.Dodgeball
             return pivotDuration * Mathf.Lerp(1.0f, 0.4f, generalCache.ChangeOfDirection01);
         }
 
-        /// <summary>Start a crow-hop skip-step (a small hop that does NOT stop the run).
-        /// Time a throw to the plant (CrowHopTiming01) for a power + accuracy bonus.</summary>
-        public void CrowHop()
-        {
-            if (!IsAirborne && !IsCrowHopping && !IsDucking && !IsDashing && !IsDiving && !IsRecovering)
-                crowHopTimer = 0f;
-        }
-
         public void TryJump(bool attackJump = false)
         {
             if (!IsAirborne && !IsDucking && !IsDashing && !IsDiving && !IsRecovering)
@@ -402,17 +364,6 @@ namespace Sportland.Sports.Dodgeball
                     rb.linearVelocity = Vector2.zero;
                     landingVelocity = Vector2.zero;
                 }
-            }
-
-            // Crow-hop skip-step: a small visual bob that runs alongside the
-            // run (no airborne state, no movement freeze). Only drives the
-            // sprite height when not in a full jump.
-            if (IsCrowHopping)
-            {
-                crowHopTimer += Time.deltaTime;
-                float ct = crowHopTimer / crowHopDuration;
-                if (ct >= 1f) { crowHopTimer = -1f; if (!IsAirborne) CurrentJumpHeight = 0f; }
-                else if (!IsAirborne) CurrentJumpHeight = 4f * ct * (1f - ct) * crowHopHeight;
             }
 
             if (IsPivoting)

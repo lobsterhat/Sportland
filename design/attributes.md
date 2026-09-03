@@ -64,8 +64,8 @@ feel, not by a number.
 A single read/"game-sense" skill, split by side of the ball:
 
 - **Offensive Anticipation** *(leading the target)* — already the entire job of today's
-  `anticipation` stat: it powers `LeadAim` (predicting where a moving target will be),
-  crow-hop release timing (`TimingSkill01`), and shooter-quality routing (`ScorePotential01`).
+  `anticipation` stat: it powers `LeadAim` (predicting where a moving target will be)
+  and shooter-quality routing (`ScorePotential01`).
   **100% offensive today** — there is no defensive use of it.
 - **Defensive Anticipation** *(evasiveness)* — **new.** Right now evasion has *no*
   attribute behind it: a human dodge is pure input timing (smart-evade reads the throw's

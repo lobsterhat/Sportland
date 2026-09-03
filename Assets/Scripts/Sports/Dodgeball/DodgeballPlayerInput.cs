@@ -5,12 +5,11 @@ namespace Sportland.Sports.Dodgeball
 {
     /// <summary>
     /// Routes PS4 / keyboard input into a single human-controlled Dodgeball
-    /// player. Move uses analog magnitude; L2 holds sprint. Square throws,
-    /// Triangle passes (tap = lob, hold = chest), Circle catches. Cross is the
-    /// smart-evade button: holding the ball it jumps (cross a line to throw);
-    /// empty-handed, a held direction dashes off the ball's line while a neutral
-    /// stick ducks a high throw or jumps a low one. L1 force-returns the ball
-    /// for testing.
+    /// player. Move uses analog magnitude; L2 holds sprint. Face buttons split
+    /// by possession:
+    ///   offense — Cross jumps, Square throws, Circle passes
+    ///   defense — Cross jumps, Circle catches, Triangle takes the nearest teammate
+    /// L1 force-returns the ball for testing.
     ///
     /// Player control is single-active: a static Current reference points at
     /// the live input component. When a pass arrives at the intended target,
@@ -47,21 +46,10 @@ namespace Sportland.Sports.Dodgeball
         [Range(0.1f, 1f)] [SerializeField] private float settlePowerFloor = 0.7f;
         [Tooltip("Accuracy scatter multiplier right after a catch (unsettled), fading to 1.")]
         [SerializeField] private float settleScatterMul = 1.6f;
-        [Tooltip("Max throw-power bonus at a perfectly-timed crow hop (0.3 = +30%).")]
-        [SerializeField] private float crowHopPowerBonus = 0.3f;
-        [Tooltip("Accuracy scatter multiplier at a perfectly-timed crow hop (<1 = tighter).")]
-        [SerializeField] private float crowHopAccuracyMul = 0.5f;
 
         [Header("Pass timing")]
         [Tooltip("Hold longer than this (seconds) for chest pass; release sooner for lob.")]
         [SerializeField] private float passTapThreshold = 0.18f;
-
-        [Header("Evade")]
-        [Tooltip("Neutral-stick evade auto-picks a verb from the incoming throw's predicted " +
-                 "arrival height: at/above this, duck under it; below, jump over it.")]
-        [SerializeField] private float evadeDuckHeight = 0.75f;
-        [Tooltip("Empty-handed, pressing evade within this range of a loose/deflected ball dives for it.")]
-        [SerializeField] private float diveTriggerRange = 3f;
 
         [Header("Throw aim assist")]
         [Tooltip("Half-angle of the throw cone (degrees). Opponents whose bearing from the thrower " +
@@ -86,17 +74,13 @@ namespace Sportland.Sports.Dodgeball
         private float passPressTime = -1f;
         private float throwChargeStart = -1f;   // when Square/Q was pressed (charge clock)
 
-        /// <summary>Last user crow-hop release verdict (early/late/perfect), for the diagnostics HUD. Static so it survives control transfer.</summary>
-        public static string LastCrowFeedback { get; private set; } = "";
-        public static float LastCrowFeedbackTime { get; private set; } = -999f;
-
         /// <summary>Telemetry of the last user attack throw, consumed by the attack-tuning lab.</summary>
         public struct UserAttackInfo
         {
             public bool valid;
             public float time;
-            public string type;     // Stationary / Running / Jump / RunJump / CrowHop
-            public string input;    // run / charge / crow / settle execution summary
+            public string type;     // Stationary / Running / Jump / RunJump
+            public string input;    // run / charge / settle execution summary
             public float power;     // computed throw power (pre-momentum)
             public float aimError;  // distance (u) the post-scatter aim missed the target center; -1 = no target
             public PlayerZoneTracker target;
@@ -128,12 +112,12 @@ namespace Sportland.Sports.Dodgeball
             if (ai != null) ai.enabled = false;
 
             actions = new DodgeballInputActions();
-            actions.Evade.performed      += OnEvadePressed;
+            actions.Evade.performed      += OnJumpPressed;
             actions.Throw.started        += OnThrowStarted;
             actions.Throw.canceled       += OnThrowReleased;
-            actions.Pass.started         += OnPassStarted;
-            actions.Pass.canceled        += OnPassCanceled;
-            actions.Catch.performed      += OnCatchPressed;
+            actions.Circle.started       += OnCircleStarted;
+            actions.Circle.canceled      += OnCircleCanceled;
+            actions.Switch.performed     += OnSwitchPressed;
             actions.Stance.performed     += OnStancePressed;
             actions.ReturnBall.performed += OnReturnBallPressed;
             actions.DpadUp.started       += OnDpadUpPressed;
@@ -152,12 +136,12 @@ namespace Sportland.Sports.Dodgeball
         {
             if (actions != null)
             {
-                actions.Evade.performed      -= OnEvadePressed;
+                actions.Evade.performed      -= OnJumpPressed;
                 actions.Throw.started        -= OnThrowStarted;
                 actions.Throw.canceled       -= OnThrowReleased;
-                actions.Pass.started         -= OnPassStarted;
-                actions.Pass.canceled        -= OnPassCanceled;
-                actions.Catch.performed      -= OnCatchPressed;
+                actions.Circle.started       -= OnCircleStarted;
+                actions.Circle.canceled      -= OnCircleCanceled;
+                actions.Switch.performed     -= OnSwitchPressed;
                 actions.Stance.performed     -= OnStancePressed;
                 actions.ReturnBall.performed -= OnReturnBallPressed;
                 actions.DpadUp.started       -= OnDpadUpPressed;
@@ -214,79 +198,21 @@ namespace Sportland.Sports.Dodgeball
                     movement.SetFacing((Vector2)cachedBall.transform.position - (Vector2)transform.position);
             }
 
-            // Keep the catch armed through a dive so the extended-reach grab lands.
+            // Keep the catch armed through a dive so the extended-reach grab
+            // lands (AI still dives; the human no longer starts one from Cross).
             if (movement.IsDiving) tracker.ArmCatch();
 
             movement.IsRunning = isRunning || actions.Sprint.IsPressed();
             movement.ApplyMove(input);
         }
 
-        // Cross is the smart-evade button. Holding the ball it's the offensive
-        // jump (cross a line and throw before landing). Empty-handed it's a
-        // context evade: a held direction dashes off the ball's line; a neutral
-        // stick reads the incoming throw and ducks a high ball / jumps a low one.
-        private void OnEvadePressed(InputAction.CallbackContext _)
+        // Cross is always a jump. Holding the ball it's an attack hop so a
+        // throw can cross a line before landing; empty-handed it's the same
+        // hop. Duck / dash / dive used to share this button and
+        // made X feel unreliable — those stay available to the AI.
+        private void OnJumpPressed(InputAction.CallbackContext _)
         {
-            if (tracker.HasBall)
-            {
-                // Running with the ball → crow hop (skip-step; time the throw
-                // release to the plant for a power/accuracy bonus). Otherwise
-                // the full jump attack.
-                if (movement.IsRunning) movement.CrowHop();
-                else movement.TryJump(attackJump: true);
-                return;
-            }
-
-            if (TryDiveForBall()) return;   // near a loose/deflected ball → lunge for it
-
-            Vector2 dir = actions.Move.ReadValue<Vector2>();
-            if (dir.sqrMagnitude > 0.04f) { movement.Dash(dir); return; }
-
-            if (TryGetIncomingThrowHeight(out float predictedHeight))
-            {
-                if (predictedHeight >= evadeDuckHeight) movement.Duck();
-                else                                    movement.TryJump();
-            }
-            else
-            {
-                movement.Duck();   // nothing incoming — brief crouch
-            }
-        }
-
-        // If a deflected (bouncing) or loose ball is nearby, dive toward where it
-        // will land and arm a catch (the dive extends the catch reach). A fresh
-        // incoming throw is left to the normal duck/jump/dodge evade. Returns
-        // true if a dive was started.
-        private bool TryDiveForBall()
-        {
-            if (cachedBall == null) cachedBall = FindAnyObjectByType<Ball>();
-            if (cachedBall == null) return false;
-
-            var st = cachedBall.CurrentState;
-            if (st != Ball.State.Bouncing && st != Ball.State.Loose) return false;
-
-            Vector2 me = transform.position;
-            Vector2 landing = cachedBall.PredictGroundPoint();
-            float near = Mathf.Min(Vector2.Distance(me, cachedBall.transform.position),
-                                   Vector2.Distance(me, landing));
-            if (near > diveTriggerRange) return false;
-
-            movement.Dive(landing - me);
-            if (!movement.IsDiving) return false;   // blocked (mid jump/dash/dive/recovery)
-            tracker.ArmCatch();
-            return true;
-        }
-
-        // Predicted arrival height of an in-flight thrown ball at our position,
-        // used to auto-pick duck vs jump for a neutral-stick evade.
-        private bool TryGetIncomingThrowHeight(out float predictedHeight)
-        {
-            predictedHeight = 0f;
-            var ball = FindAnyObjectByType<Ball>();
-            if (ball == null || ball.CurrentState != Ball.State.Thrown) return false;
-            float dist = Vector2.Distance(transform.position, ball.transform.position);
-            predictedHeight = ball.PredictHeightAfter(dist);
-            return true;
+            movement.TryJump(attackJump: tracker.HasBall);
         }
 
         private void OnDpadUpPressed(InputAction.CallbackContext _)    => HandleDpadPress(0);
@@ -310,11 +236,11 @@ namespace Sportland.Sports.Dodgeball
             lastMovementActiveTime = Time.unscaledTime;
         }
 
-        // Square/Q pressed: empty-handed, hand control to the teammate nearest a
-        // loose ball; holding the ball, START charging the throw.
+        // Square/Q: charge a throw. Does nothing empty-handed — switching
+        // players is Triangle on defense.
         private void OnThrowStarted(InputAction.CallbackContext _)
         {
-            if (!tracker.HasBall) { SwitchToClosestLooseBallTeammate(); return; }
+            if (!tracker.HasBall) return;
             throwChargeStart = Time.unscaledTime;
         }
 
@@ -329,28 +255,14 @@ namespace Sportland.Sports.Dodgeball
 
             var ball = tracker.HeldBall;
             if (ball == null) return;
-            // A crow hop releases at/over the line (like a jump), so it's eligible too.
-            if (!tracker.IsInZone && !movement.IsAirborne && !movement.IsCrowHopping) { ball.Drop(); return; }
+            if (!tracker.IsInZone && !movement.IsAirborne) { ball.Drop(); return; }
 
             float charge01 = Mathf.Clamp01(held / Mathf.Max(0.01f, maxChargeTime));
             float settle01 = movement.CatchSettle01;
-            float crow01 = movement.CrowHopTiming01;   // 0 unless mid crow hop
-
-            // Crow-hop timing verdict for the HUD (only when releasing mid-hop).
-            if (movement.IsCrowHopping)
-            {
-                float signed = movement.CrowHopSignedOffset;   // - early, + late
-                string verdict = crow01 >= 0.85f ? "PERFECT!"
-                               : signed < 0f ? $"EARLY {(-signed) * 1000f:F0}ms"
-                               : $"LATE {signed * 1000f:F0}ms";
-                LastCrowFeedback = $"crow hop {verdict}   timing {crow01:F2}  (+{crowHopPowerBonus * crow01 * 100f:F0}% power)";
-                LastCrowFeedbackTime = Time.realtimeSinceStartup;
-            }
 
             float power = ThrowReleaseSpeed()
                         * Mathf.Lerp(tapPowerFraction, 1f, charge01)
-                        * Mathf.Lerp(settlePowerFloor, 1f, settle01)
-                        * (1f + crowHopPowerBonus * crow01);
+                        * Mathf.Lerp(settlePowerFloor, 1f, settle01);
 
             var target = FindThrowTargetInCone(lastMoveDirection);
             ball.IntendedTarget = target;   // for the play-by-play log (may be null)
@@ -359,8 +271,8 @@ namespace Sportland.Sports.Dodgeball
                 // Anticipation leads the target; accuracy then scatters the aim.
                 Vector2 lead = ball.LeadAim(transform.position, target.transform.position,
                                             TargetVelocity(target), power, OwnAnticipation01());
-                Vector2 aim = ApplyAccuracyToAim(lead, charge01, settle01, crow01);
-                CaptureUserAttack(held, crow01, settle01, power, target, aim);
+                Vector2 aim = ApplyAccuracyToAim(lead, charge01, settle01);
+                CaptureUserAttack(held, settle01, power, target, aim);
                 ball.ThrowAt(aim, power);
             }
             else
@@ -368,22 +280,22 @@ namespace Sportland.Sports.Dodgeball
                 Vector2 dir = lastMoveDirection.sqrMagnitude > 0.0001f
                     ? lastMoveDirection.normalized
                     : Vector2.right;
-                CaptureUserAttack(held, crow01, settle01, power, null, Vector2.zero);
-                ball.Throw(ApplyAccuracyToDirection(dir, charge01, settle01, crow01), power);
+                CaptureUserAttack(held, settle01, power, null, Vector2.zero);
+                ball.Throw(ApplyAccuracyToDirection(dir, charge01, settle01), power);
             }
         }
 
         /// <summary>
         /// Programmatic throw at a target for the attack-lab auto-sweep: same power /
         /// aim / accuracy-scatter + telemetry as a human release at the given charge,
-        /// with no crow hop and no settle penalty. Caller must give this player the ball first.
+        /// with no settle penalty. Caller must give this player the ball first.
         /// </summary>
         public void AutoThrowAt(PlayerZoneTracker target, float charge01)
         {
             var ball = tracker.HeldBall;
             if (ball == null || target == null) return;
             charge01 = Mathf.Clamp01(charge01);
-            const float settle01 = 1f, crow01 = 0f;
+            const float settle01 = 1f;
 
             float power = ThrowReleaseSpeed()
                         * Mathf.Lerp(tapPowerFraction, 1f, charge01)
@@ -392,22 +304,20 @@ namespace Sportland.Sports.Dodgeball
             ball.IntendedTarget = target;
             Vector2 lead = ball.LeadAim(transform.position, target.transform.position,
                                         TargetVelocity(target), power, OwnAnticipation01());
-            Vector2 aim = ApplyAccuracyToAim(lead, charge01, settle01, crow01);
-            CaptureUserAttack(charge01 * maxChargeTime, crow01, settle01, power, target, aim);
+            Vector2 aim = ApplyAccuracyToAim(lead, charge01, settle01);
+            CaptureUserAttack(charge01 * maxChargeTime, settle01, power, target, aim);
             ball.ThrowAt(aim, power);
         }
 
         // Snapshot the attack's execution for the tuning lab: classify the type
-        // from the movement state and summarize the input (run / charge / crow /
+        // from the movement state and summarize the input (run / charge /
         // settle), the computed power, and the aim error vs the target center.
-        private void CaptureUserAttack(float held, float crow01, float settle01, float power, PlayerZoneTracker target, Vector2 aim)
+        private void CaptureUserAttack(float held, float settle01, float power, PlayerZoneTracker target, Vector2 aim)
         {
-            string type = movement.IsCrowHopping ? "CrowHop"
-                        : movement.IsAirborne ? (movement.Velocity.magnitude > 4f ? "RunJump" : "Jump")
+            string type = movement.IsAirborne ? (movement.Velocity.magnitude > 4f ? "RunJump" : "Jump")
                         : movement.IsRunning ? "Running"
                         : "Stationary";
             string input = (movement.IsRunning ? "run " : "") + $"chg {held:F2}s"
-                         + (crow01 > 0f ? $" crow {crow01:F2}" : "")
                          + (settle01 < 0.999f ? $" settle {settle01:F2}" : "");
             LastUserAttack = new UserAttackInfo
             {
@@ -445,24 +355,22 @@ namespace Sportland.Sports.Dodgeball
         // Accuracy scatters the aim point; the miss grows with distance, with how
         // far below 100 the thrower's accuracy is, with a low charge (a quick tap
         // is wilder), and with a low settle (a rushed counter off a fresh catch).
-        private Vector2 ApplyAccuracyToAim(Vector2 aimPoint, float charge01 = 1f, float settle01 = 1f, float crow01 = 0f)
+        private Vector2 ApplyAccuracyToAim(Vector2 aimPoint, float charge01 = 1f, float settle01 = 1f)
         {
             var attr = GetComponent<DodgeballAttributes>();
             float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
             float dist = Vector2.Distance(transform.position, aimPoint);
-            float scatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01) * Mathf.Lerp(settleScatterMul, 1f, settle01)
-                          * Mathf.Lerp(1f, crowHopAccuracyMul, crow01);
+            float scatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01) * Mathf.Lerp(settleScatterMul, 1f, settle01);
             float maxError = (1f - acc01) * accuracyErrorPerUnit * dist * scatter;
             return aimPoint + Random.insideUnitCircle * maxError;
         }
 
         // Untargeted throws scatter on angle instead of a point.
-        private Vector2 ApplyAccuracyToDirection(Vector2 dir, float charge01 = 1f, float settle01 = 1f, float crow01 = 0f)
+        private Vector2 ApplyAccuracyToDirection(Vector2 dir, float charge01 = 1f, float settle01 = 1f)
         {
             var attr = GetComponent<DodgeballAttributes>();
             float acc01 = attr != null ? attr.EffectiveThrowAccuracy01 : 0.6f;
-            float scatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01) * Mathf.Lerp(settleScatterMul, 1f, settle01)
-                          * Mathf.Lerp(1f, crowHopAccuracyMul, crow01);
+            float scatter = Mathf.Lerp(tapAccuracyMul, 1f, charge01) * Mathf.Lerp(settleScatterMul, 1f, settle01);
             float maxAngle = (1f - acc01) * maxInaccuracyAngleDeg * scatter;
             float angle = Random.Range(-maxAngle, maxAngle);
             Vector2 rotated = Quaternion.Euler(0f, 0f, angle) * (Vector3)dir;
@@ -506,15 +414,15 @@ namespace Sportland.Sports.Dodgeball
             return best;
         }
 
-        private void OnPassStarted(InputAction.CallbackContext _)
+        // Circle / E: pass while holding the ball (tap = lob, hold = chest),
+        // catch while empty-handed.
+        private void OnCircleStarted(InputAction.CallbackContext _)
         {
-            // Empty-handed, Triangle/F switches control to the infielder nearest
-            // the ball (to defend or make a play); with the ball it starts a pass.
-            if (!tracker.HasBall) { SwitchToClosestInfielderToBall(); return; }
-            passPressTime = Time.unscaledTime;
+            if (tracker.HasBall) passPressTime = Time.unscaledTime;
+            else tracker.ArmCatch();
         }
 
-        private void OnPassCanceled(InputAction.CallbackContext _)
+        private void OnCircleCanceled(InputAction.CallbackContext _)
         {
             if (passPressTime < 0f) return;
             float duration = Time.unscaledTime - passPressTime;
@@ -522,7 +430,6 @@ namespace Sportland.Sports.Dodgeball
 
             var ball = tracker.HeldBall;
             if (ball == null) return;
-
             DoPass(ball, isChest: duration >= passTapThreshold);
         }
 
@@ -571,13 +478,10 @@ namespace Sportland.Sports.Dodgeball
             return best;
         }
 
-        private void OnCatchPressed(InputAction.CallbackContext _)
+        private void OnSwitchPressed(InputAction.CallbackContext _)
         {
-            // Press-window reaction: arming a catch lets the Ball resolve a
-            // skill-checked catch when it arrives within reach. (A slow loose
-            // ball at the player's feet is still a free walk-over pickup.)
             if (tracker.HasBall) return;
-            tracker.ArmCatch();
+            SwitchToClosestTeammate();
         }
 
         // Toggle the defensive stance. No stance while carrying the ball — that's
@@ -616,50 +520,25 @@ namespace Sportland.Sports.Dodgeball
             subscribedToBall = true;
         }
 
-        // Square/Q with no ball in hand: if the ball is loose (it has hit a
-        // player or the ground — i.e. not held / passing / thrown), hand control
-        // to the teammate closest to it so you can make a play on the ball.
-        private void SwitchToClosestLooseBallTeammate()
+        // Triangle / F, empty-handed: take the nearest teammate so you can
+        // step in on a play. Possession-follows-control (OnBallAttached) still
+        // jumps you to a teammate who actually picks the ball up.
+        private void SwitchToClosestTeammate()
         {
-            var ball = FindAnyObjectByType<Ball>();
-            if (ball == null) return;
-            if (ball.CurrentState != Ball.State.Loose && ball.CurrentState != Ball.State.Bouncing) return;
-
             PlayerZoneTracker best = null;
             float bestDistSq = float.MaxValue;
-            Vector2 ballPos = ball.transform.position;
+            Vector2 here = transform.position;
             var team = tracker.Spawn.team;
             var trackers = PlayerZoneTracker.All;
             for (int i = 0; i < trackers.Count; i++)
             {
                 var t = trackers[i];
-                if (t == null || t.Spawn.team != team) continue;
-                float d = ((Vector2)t.transform.position - ballPos).sqrMagnitude;
+                if (t == null || t == tracker || t.Spawn.team != team) continue;
+                if (!t.gameObject.activeInHierarchy) continue;
+                float d = ((Vector2)t.transform.position - here).sqrMagnitude;
                 if (d < bestDistSq) { bestDistSq = d; best = t; }
             }
-            if (best != null && best != tracker) TransferControl(best.gameObject);
-        }
-
-        // Empty-handed Triangle/F: hand control to the infielder closest to the
-        // ball, so you can step up to defend an incoming throw or make a play.
-        private void SwitchToClosestInfielderToBall()
-        {
-            if (cachedBall == null) cachedBall = FindAnyObjectByType<Ball>();
-            if (cachedBall == null) return;
-            Vector2 ballPos = cachedBall.transform.position;
-
-            PlayerZoneTracker best = null;
-            float bestDistSq = float.MaxValue;
-            var team = tracker.Spawn.team;
-            var trackers = PlayerZoneTracker.All;
-            for (int i = 0; i < trackers.Count; i++)
-            {
-                var t = trackers[i];
-                if (t == null || t.Spawn.team != team || t.Spawn.role != PlayerRole.Infielder) continue;
-                float d = ((Vector2)t.transform.position - ballPos).sqrMagnitude;
-                if (d < bestDistSq) { bestDistSq = d; best = t; }
-            }
-            if (best != null && best != tracker) TransferControl(best.gameObject);
+            if (best != null) TransferControl(best.gameObject);
         }
 
         /// <summary>
