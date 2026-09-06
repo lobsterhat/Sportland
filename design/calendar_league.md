@@ -14,7 +14,7 @@ The calendar is the game's clock: hub actions spend days, and this doc defines w
 
 ## 2. League Structure — Divisions per Sport
 
-Each sport runs its own league, structured as **3–4 tiered divisions** *(final count open — see Section 7)*:
+Each sport runs its own league, structured as **3–4 tiered divisions** *(this doc left the count open; [character_management.md](character_management.md) proposes the ruling: **3 levels, 12 teams each, 36 clubs per sport**)*:
 
 ```
 Division 1  — the summit; its champion is the sport's champion

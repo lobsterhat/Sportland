@@ -88,6 +88,10 @@ the `Effective*` values only, so abilities are felt everywhere without per-syste
   season anatomy, and the overlapping multi-sport year.
 - [athlete_development.md](athlete_development.md) — the athlete pool: ceilings,
   growth/decline, development, familiarity, and the club-pool-vs-rosters model.
+- [character_management.md](character_management.md) — the **world** player pool:
+  3 levels × 12 teams (36 rosters per sport), sport-overall → natural level,
+  per-sport interest, and the rule that the pool **grows when a sport is added**
+  (seasons stagger; most people will not play every sport).
 - [rival_managers.md](rival_managers.md) — every AI club's manager-player: shared parts,
   personality-driven club AI, and drama-without-scripts.
 - [scouting.md](scouting.md) — scouting as activity channels (matches, 1v1 invitationals,
