@@ -2,7 +2,7 @@
 
 **Status:** Living design document (new plan)
 **Last updated:** 2026-09-06
-**Scope:** How Sportland staffs *every* team at *every* level of play — one shared athlete pool, three levels per sport, twelve clubs per level, and the rule that athletes can play anywhere but generally will not drop below the level their overall skill belongs in.
+**Scope:** How Sportland staffs *every* team at *every* level of play — one shared athlete pool, three levels per sport, twelve clubs per level, and the rule that athletes can play anywhere but generally will not drop below the level their overall skill belongs in. The pool is save-global, but **it grows when a sport is added**: seasons are staggered and most people will not play every sport, so we do not restaff hockey from the dodgeball list.
 
 > Separate from `athlete_development.md` (one club's growth, ceilings, familiarity) and `character_creator.md` (your own character). This doc is the **world**: who exists, where they belong, and how we fill 36 rosters without hand-authoring them.
 >
@@ -32,7 +32,7 @@ These numbers were left open in `calendar_league.md` §7. This plan pins them so
 | Teams per level | **12** | A real season (22-game single RR, or 22 of a double) without a 16-team slog. |
 | Teams per sport | **36** | 12 × 3. Each is a distinct club, not a reserve side of the same twelve brands. |
 | Ladder | **Promotion / relegation of clubs** | End of season, clubs move between levels. Athletes decide whether to stay. |
-| Pool | **One world pool per save** | Shared across sports. An athlete has one body, many sport ratings. |
+| Pool | **One world pool per save** | Shared identities. An athlete has one body, many sport ratings, and **per-sport interest**. The pool **grows with each sport** (Section 9). |
 
 Level names (working):
 
@@ -53,7 +53,8 @@ Every person in the pool is one `CareerAthlete`-shaped record:
 - Identity (name, age, look)
 - General ratings (the cross-sport body)
 - Per-sport ratings + hidden per-sport ceilings (`athlete_development.md` §3)
-- A derived **sport overall** and **natural level** (Section 4)
+- Per-sport **interest** (Section 9) — will they even take a roster spot in that sport?
+- A derived **sport overall** and **natural level** (Section 4), only meaningful where they have interest
 - Personality card (expectations, dispositions, volatility) — empty if ego-immune
 - Club membership (or free agent), and **per-sport roster assignment** (or none)
 - Career phase (growth / peak / decline)
@@ -114,7 +115,7 @@ Plus, **per sport**, a free-agent / unattached cushion so Parks clubs can always
 | Youth intake / year | ~1 per club (~36) + a small unattached class | Next season's Parks blood |
 | Total in-sport bodies | **~420–450** for a 9-man roster sport | Fits "a pretty big pool" without a thousand names to remember |
 
-A four-sport save that shares athletes (multi-sport people counted once) is not 4 × 450. Many Parks bodies only exist for one sport. Specialists dominate; genuine multi-sport names are the minority (`athlete_development.md` §3). Working save-wide unique athletes: **~800–1,200**, not 2,000.
+**Do not reuse that 420 as the whole save.** Each added sport needs its own dressed + FA pyramid. Seasons do not all run at once, and most athletes will not play every sport — both of those are reasons to **grow the pool**, not to stretch one list across two leagues. The formula is in Section 9.
 
 ### 5.2 The pyramid (who is generated where)
 
@@ -176,32 +177,102 @@ This is how the pyramid stays a pyramid after five seasons. A promoted Parks clu
 
 Your franchise is not exempt. Promotion is how you meet better players; it is also how your old core starts to look small.
 
-## 9. One pool, many sports
+## 9. Many sports — stagger the year, grow the pool
 
-The pool is save-global. Assignment is per sport.
+There will be more than dodgeball. The year wheel (`calendar_league.md` §4) already says seasons **do not all happen at the same time**. That is a gift for the *dual-sport minority* (they can finish Parks dodgeball and still dress for City basketball). It is **not** a reason to staff the new league from the old names.
 
-- Rostered in dodgeball Parks and unrostered for basketball: fine.
-- Rostered in two sports whose seasons overlap: legal, costly (fatigue + Playing Time ego in both — `calendar_league.md` §4).
-- Natural level is **per sport**. The same person can be Summit-natural in one and Parks-natural in another. They will accept a Parks hockey roster and refuse a Parks dodgeball roster.
+Most people will not want to play most sports. Interest is a first-class fact, next to ability.
 
-Generation should stamp an **aptitude profile** first (specialist vs multi), then roll sports, then derive each sport overall / natural level. Do not roll four sports independently at 0–20 or everyone is a secret Superstar.
+### 9.1 Interest ≠ ability
+
+| | High interest | No interest |
+|---|---|---|
+| High ceiling | Will sign, will dress, will care about minutes | Will not take the roster spot. A wasted hockey body. |
+| Low ceiling | Parks specialist. The churn weather. | Not in that sport's pool at all. |
+
+Interest is rolled with the aptitude profile, not from the rating. A gifted athlete who "doesn't do hockey" is flavor and a recruiting dead end. A modest athlete who *only* does hockey is how Parks stays full.
+
+Working split of the world (pin with playtest):
+
+| Profile | Share | Sports they will actually dress |
+|---|---|---|
+| Specialist | ~70% | One. Maybe a dead second rating they will never accept minutes in. |
+| Dual | ~25% | Two, usually on opposite sides of the year wheel. |
+| Rare multi | ~5% | Three+. The tempting mistake from `calendar_league.md` §4. |
+
+Uninterested sports get a low/placeholder rating and **no natural level**. They do not appear on that sport's free-agent list. Scouting does not offer them as a hockey target.
+
+### 9.2 Staggered seasons
+
+Because windows overlap only at the edges:
+
+- A dual-sport name can hold two roster spots **without being on two courts the same week**, most of the year.
+- Overlap weeks are the designed crunch: fatigue and Playing Time ego apply in both (`calendar_league.md` §4).
+- AI clubs prefer duals whose *other* sport is asleep. They will not build a Summit hockey roster out of people still in a dodgeball postseason unless the manager personality is greedy.
+
+Stagger lets the **same person** serve two sports. It does not let **one pyramid** serve two sports.
+
+### 9.3 Grow the pool when a sport is added
+
+Each sport still needs ~36 × roster + FA (Section 5.1). Specialists cannot be borrowed. So launch (or unlock) of a sport **adds people**.
+
+Working intake when sport *N* comes online:
+
+| Source | Share of that sport's ~420–450 | Who they are |
+|---|---|---|
+| **New specialists** | ~70–80% | Generated for this sport. Did not exist yesterday. |
+| **Existing duals** | ~20–30% | People already in the save who roll interest + a real ceiling here. |
+
+```
+unique athletes ≈ 450 × (1 + 0.75 × (sports − 1))
+```
+
+| Sports in the save | Unique people (working) |
+|---|---|
+| 1 (dodgeball only) | ~450 |
+| 2 | ~790 |
+| 3 | ~1,130 |
+| 4 | ~1,460 |
+
+That is the "increase the player pool for each sport we add" rule. A four-sport save is **not** 450 names wearing four hats, and it is **not** 1,800 isolated lists. It is one city that got bigger every time a league opened.
+
+When a sport is added mid-career (you enroll hockey in year three):
+
+1. Generate the new specialist cohort (pyramid, 36 clubs + FA).
+2. Roll a limited dual pass over the *existing* pool — some Parks dodgeballers discover they will take a hockey roster, a few City names are real two-way.
+3. Stand up 36 hockey clubs (or however many that sport uses) and fill in-band from the new combined list.
+4. Do **not** give every living athlete a hockey rating. Uninterested people stay out of that sport.
+
+Youth intake each offseason is **per active sport**, not one global class. A two-sport year produces two specialist-weighted classes, plus a few duals.
+
+### 9.4 Assignment (unchanged, now with interest)
+
+The pool is save-global. A roster spot requires **interest + assignment** in that sport.
+
+- Interested in dodgeball Parks, no hockey interest: cannot be on a hockey card.
+- Dual, two sports, seasons mostly apart: the high-wire act when they overlap.
+- Natural level stays **per sport**, and only exists where there is interest. Summit-natural dodgeball / Parks-natural hockey is a real person; they will take Parks hockey and refuse Parks dodgeball.
+
+Generation order: aptitude profile → **interest set** → ratings/ceilings for interested sports only → sport overall / natural level. Do not roll four sports independently at 0–20.
 
 ## 10. System dependencies
 
-1. **World-pool generator** — N unique athletes, pyramid weights, aptitude profiles, enough in-band bodies to dress 36 clubs + FA cushion, refreshed each offseason (intake + retirement).
-2. **Sport-overall + natural-level derivation** — deterministic from current ratings so a developed kid *changes band* when they grow through 9 or 15.
+1. **World-pool generator** — pyramid weights, aptitude + **interest**, enough in-band bodies to dress 36 clubs + FA **per sport**. Adding a sport runs the Section 9.3 intake (new specialists + a dual pass), not a re-roll of the city.
+2. **Sport-overall + natural-level derivation** — deterministic from current ratings so a developed kid *changes band* when they grow through 9 or 15. No natural level in a sport they have no interest in.
 3. **Club fill / AI resign** — in-band first, personality outliers second, never a silent roster of the wrong level.
 4. **Willingness hook for "playing down"** — the soft lock. Same interview/retention action as today; the reason code is new.
 5. **Boundary stay/go** — promotion/relegation as an input to the existing offseason evaluation (`conflict_chemistry.md` §6.1).
 6. **36 club records per sport** — identity, level, manager-player, roster pointers into the pool.
 7. **Assignment windows** (if we keep the soft lock from being cheesed).
+8. **Per-sport youth intake** — each offseason, one class per *active* sport, specialist-weighted.
+9. **Interest gate on FA lists and sign/assign** — uninterested athletes never appear as candidates for that sport.
 
 ## 11. Code alignment (2026-09)
 
-- `CareerAthlete` already has identity, age, generals, personality, captain/mentor/player flags. It does **not** yet have per-sport ratings, ceilings, sport-overall, natural level, or a world-pool container — only the names you signed for the intro match.
+- `CareerAthlete` already has identity, age, generals, personality, captain/mentor/player flags. It does **not** yet have per-sport ratings, ceilings, **interest**, sport-overall, natural level, or a world-pool container — only the names you signed for the intro match.
 - `CareerManager` + hub screens generate a *club* roster, not 36. The Parks League fixture is a slice, not the ecology.
-- `calendar_league.md` still says "3–4 divisions, ≥8 teams." This plan is the proposed ruling: **3 levels, 12 teams.** When accepted, that doc should drop the open question and point here for population.
-- `athlete_development.md` §2 asked for "hundreds." This plan gives the first real number: **~400+ dressed-and-FA per sport, ~800–1,200 unique per save.**
+- `calendar_league.md` still says "3–4 divisions, ≥8 teams." This plan is the proposed ruling: **3 levels, 12 teams.** When accepted, that doc should drop the open question and point here for population. That doc already owns the year wheel; this one owns the consequence: stagger is for duals, **new sports still add people**.
+- `athlete_development.md` §2 asked for "hundreds." This plan gives the first real number: **~420–450 dressed-and-FA per sport**, growing as `450 × (1 + 0.75 × (sports − 1))`.
 - Match modules keep reading ratings only. They must not know what level a club is in.
 
 ## 12. Open questions
@@ -213,6 +284,9 @@ Generation should stamp an **aptitude profile** first (specialist vs multi), the
 - **Display.** Do we show natural level on a card ("City-level player"), or only imply it through grade + willingness text?
 - **Your character's natural level.** Superstar-A is Summit-natural from day one but the club starts in Parks. Exception: the player character *always* dresses. Ego-immune. The rest of the roster still follows the rule — you are the one mismatch Parks is built around.
 - **Skip.** Mentor, ego-immune, always willing. He can play Parks forever. That is flavor, not a hole in the rule.
+- **Interest is hidden or shown?** "Doesn't play hockey" as a scouting reveal vs. a hard filter on the FA list from day one.
+- **When a sport unlocks mid-save.** Instant 36-club generate, or a shorter exhibition year while the new pyramid settles?
+- **Dual share (20–30%).** If duals are rarer, each new sport adds closer to a full 450. If they are common, the city stays smaller and overlap weeks get uglier.
 
 ## 13. Parking lot
 
