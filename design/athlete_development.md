@@ -10,7 +10,7 @@
 
 ## 1. Purpose
 
-With **at least 8 teams per division**, 3–4 divisions per sport, and multiple sports, Sportland needs a big, living player pool — hundreds of athletes with somewhere to be. This doc defines that pool's ecology: lower divisions churn with low-ceiling and declining players, while **player development is a core pillar** — patiently building athletes up, and the familiarity that comes with keeping them, is meant to be the deepest strategy in the game.
+With **at least 8 teams per division**, 3–4 divisions per sport, and multiple sports, Sportland needs a big, living player pool — hundreds of athletes with somewhere to be. The world-scale headcount, the 3×12 league shape, and the "won't play below their overall" rule live in [character_management.md](character_management.md); this doc is what happens to those people once a club has them. This doc defines that pool's ecology: lower divisions churn with low-ceiling and declining players, while **player development is a core pillar** — patiently building athletes up, and the familiarity that comes with keeping them, is meant to be the deepest strategy in the game.
 
 ## 2. The Athlete Pool
 
