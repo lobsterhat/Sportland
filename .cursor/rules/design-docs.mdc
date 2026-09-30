@@ -1,0 +1,35 @@
+---
+description: How the Sportland design canvas works — the think/persist/lock loop and doc conventions
+globs: design/**/*.md,docs/**/*.md
+alwaysApply: false
+---
+
+`design/` and `docs/` do different jobs. Don't blur them.
+
+- **`design/` is the canvas** — specs for systems that are mostly *not built yet*,
+  plus idea backlogs and parking lots. Aspirational by design.
+- **`docs/` describes shipped behaviour** — `docs/Dodgeball.md` is the manual for code
+  that exists. If you change how a built system behaves, update `docs/`.
+
+## The loop
+
+Chat to *think* (float a half-formed idea, pressure-test it, find edge cases) →
+**design docs** to *persist* the keepers → **`.cursor/rules/`** to *lock* what's
+decided so every future session inherits it.
+
+Raw ideas belong in the **Idea backlog** / **Parking lot** sections. As an idea firms
+up, shape it into the spec body. Once it's settled and load-bearing for future work,
+distil it into a rule — rules are for decided things, not ideation.
+
+## Conventions
+
+- Prose wraps at ~90 characters. Keep it.
+- Cross-link sibling docs with relative links; `design/README.md` is the index and
+  should be updated when a doc is added.
+- Mark status honestly. These docs distinguish built / partly built / designed-only,
+  and that distinction is the main thing a reader needs. Never describe a designed
+  system in the present tense as though it ships.
+- When a design doc's system gets built, the doc doesn't get deleted — add or update
+  its status note and point at the implementing code.
+- Attribute tables use the hidden 0–20 scale with the F–S grade mapping from
+  `design/attributes.md`. Don't introduce a second scale.
