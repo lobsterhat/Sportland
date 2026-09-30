@@ -1,142 +1,108 @@
-# Sportland - Code Organization
+# Sportland — Code Organization
 
-This document explains the folder structure and namespace organization for the Sportland multi-sport management game.
+How `Assets/Scripts/` is laid out, and which parts of it are actually live.
+For project-wide conventions and the agent contract, see [AGENTS.md](../../AGENTS.md).
 
-## Namespace Convention
+## Namespace convention
 
-All namespaces follow the folder structure pattern: `Sportland.<FolderPath>`
+Namespaces mirror folder paths: `Sportland.<FolderPath>`.
 
-Example:
 - `Assets/Scripts/Core/GameManagement/` → `namespace Sportland.Core.GameManagement`
-- `Assets/Scripts/Sports/Basketball/Gameplay/` → `namespace Sportland.Sports.Basketball.Gameplay`
+- `Assets/Scripts/Sports/Dodgeball/` → `namespace Sportland.Sports.Dodgeball`
 
-## Folder Structure
+Two established exceptions: `Core/Athlete/` uses `Sportland.Core.Athletes` and
+`Sports/_Shared/` uses `Sportland.Sports.Shared`.
+
+There are no asmdefs, so every script compiles into a single `Assembly-CSharp`. Any
+type is reachable from any other, and one compile error takes the whole game down.
+
+## Folder structure
 
 ```
 Assets/Scripts/
-├── Core/                          # Central systems (persist across all sports)
-│   ├── GameManagement/            # Game lifecycle & sport loading
-│   │   ├── CoreGameManager.cs     # Main singleton managing everything
-│   │   └── ISportModule.cs        # Interface for all sports
-│   ├── Athlete/                   # Player/athlete data
-│   │   └── Athlete.cs             # ScriptableObject for athletes
-│   ├── Flags/                     # Flag system (TODO)
-│   ├── Player/                    # Player character & classes (TODO)
-│   ├── Calendar/                  # Time/season management (TODO)
-│   └── Utilities/                 # Shared utilities
+├── Core/
+│   ├── Rating.cs              The 0–20 rating scale + F–S grade mapping
+│   ├── GameManagement/        CoreGameManager, ISportModule  (legacy — see below)
+│   ├── Athlete/               Athlete ScriptableObject
+│   ├── Calendar/              CalendarSystem      (placeholder)
+│   ├── Flags/                 FlagManager         (placeholder)
+│   └── Player/                PlayerCharacter     (placeholder)
 │
-├── Sports/                        # All sport implementations
-│   ├── _Shared/                   # Shared sport utilities
-│   ├── Basketball/                # Basketball sport module
-│   │   ├── Gameplay/              # Core gameplay scripts
-│   │   │   ├── BasketballPlayer.cs
-│   │   │   ├── Ball.cs
-│   │   │   ├── Hoop.cs
-│   │   │   └── BasketballGameController.cs
-│   │   ├── Stats/                 # Basketball-specific calculations
-│   │   │   ├── ShotOutcomeCalculator.cs
-│   │   │   └── ShotMissCalculator.cs
-│   │   └── Flags/                 # Basketball-specific flags (TODO)
-│   └── Baseball/                  # Future: Baseball implementation
+├── Career/                    The career layer: CareerManager, League, Club,
+│                              CareerAthlete, AthleteGenerator, Archetype, Traits,
+│                              CareerMatchContext
 │
-├── HubWorld/                      # Hub world systems
-│   ├── Buildings/                 # Arena selector, management buildings (TODO)
-│   ├── Navigation/                # Hub navigation (TODO)
-│   └── UI/                        # Hub-specific UI (TODO)
+├── Sports/
+│   ├── Dodgeball/             The live sport. Match, AI, ball, movement, abilities,
+│   │                          court build-out, diagnostics HUD, career bridge.
+│   ├── Demoball/              Shove / scoring-ring prototype
+│   ├── Basketball/            The original sport, now dormant
+│   │   ├── Gameplay/          BasketballPlayer, Ball, Hoop, Backboard, controller
+│   │   └── Stats/             ShotOutcomeCalculator, ShotMissCalculator
+│   ├── Tag/                   Tag prototype (safe zones, reset, "it" assignment)
+│   └── _Shared/               BaseSportModule
 │
-├── Management/                    # Team management layer
-│   ├── TeamManagement/            # Roster & lineup management (TODO)
-│   ├── Events/                    # Team building events (TODO)
-│   ├── Training/                  # Practice & development (TODO)
-│   └── Scouting/                  # Player evaluation (TODO)
+├── Hub/                       The live hub: HubBootstrap, HubBuilding, HubInteractor,
+│                              HubScreens, HubPlayerController, HubCameraFollow, HubHud
+├── UI/Hub/                    HubMenuController  (legacy — see below)
 │
-└── UI/                            # User interface
-    ├── Shared/                    # Reusable UI components (TODO)
-    ├── Hub/                       # Hub world UI
-    │   └── HubMenuController.cs
-    ├── Management/                # Management screens (TODO)
-    └── Sports/                    # Sport-specific UI (TODO)
+├── InputHandling/             IInputSource, InputBroker, Player/Ai sources
+├── Movement/                  BaseMovementController, MovementProfile
+├── Rendering/                 Pixel-art renderer, sprite facing/sorting/offsets,
+│                              stamina bar, player info bar, status icons
+├── Diagnostics/               Physics recorder/overlay + Claude-backed debug assistant
+│                              (dev builds only — see Diagnostics/README.md)
+└── World/                     SurfaceDefinition, SurfaceType, SurfaceZone
 ```
 
-## Key Design Patterns
+## How a match actually starts
 
-### 1. Sport Module Pattern
-All sports implement `ISportModule` interface allowing CoreGameManager to load/unload them dynamically.
+The live path is scene-based, not module-based:
 
-### 2. Singleton Pattern
-`CoreGameManager` persists across all scenes using DontDestroyOnLoad.
+`Hub/HubInteractor` → `SceneManager.LoadScene("Dodgeball")` → `CourtSetup` (on the
+`DodgeballField` object) builds the court, spawns 12 players, the ball, the HUD, and
+the debug cannon in `Start()`. For a league fixture, `CareerMatchDirector` carries the
+career context in and returns to `HubWorld` at the end.
 
-### 3. ScriptableObject Pattern
-Athletes are data assets (ScriptableObjects) that persist independently of scenes.
+**Consequence:** most components are added at runtime and never pass through the
+Inspector, so their tuning comes from **script field defaults**. To change a tuned
+value, change the default in the script. New runtime systems get added to `CourtSetup`
+behind a bool flag, the way `showDiagnosticsHud`, `spawnDebugCannon`, and
+`physicsDebugAssistant` do.
 
-### 4. Additive Scene Loading
-Hub World stays loaded while sport scenes load additively on top.
+## Legacy: the sport module pattern
 
-## Adding a New Sport
+`Core/GameManagement/` defines `ISportModule` + a `CoreGameManager` singleton
+(`DontDestroyOnLoad`, additive scene loading, `SportType` enum), and
+`Sports/_Shared/BaseSportModule` is its abstract base. This was the original
+architecture. Today **only the dormant Basketball path and `UI/Hub/HubMenuController`
+use it** — dodgeball, demoball, tag, and the live `Hub/` do not.
 
-To add a new sport (e.g., Baseball):
+Don't build new work on it without deciding first whether it's being revived or
+retired. `Hub/HubInteractor` is the pattern that's actually in use.
 
-1. Create folder structure:
-   ```
-   Sports/Baseball/
-   ├── Gameplay/
-   ├── Stats/
-   └── Flags/
-   ```
+## Key patterns in live code
 
-2. Create `BaseballModule.cs` implementing `ISportModule`:
-   ```csharp
-   namespace Sportland.Sports.Baseball
-   {
-       public class BaseballModule : MonoBehaviour, ISportModule
-       {
-           public SportType GetSportType() => SportType.Baseball;
-           // ... implement other interface methods
-       }
-   }
-   ```
+- **Ratings.** `Sportland.Core.Rating` is the single source of truth: `To01(v) = v/20`
+  for gameplay math, `Grade(v)` for the player-facing F–S letter. Gameplay code reads
+  `Effective*` values (base × ability × stamina), never raw bases — that seam is what
+  makes Special Abilities apply everywhere with no per-system code.
+- **Input indirection.** Gameplay reads `IInputSource` through `InputBroker`, with
+  interchangeable player and AI sources, so the same movement code drives both.
+- **Decoupled ball physics.** Lateral motion (court plane, with drag) is separate from
+  a vertical `Height` with its own gravity sim. Don't collapse them into a 3D vector.
+- **ScriptableObject data.** Athletes are data assets that persist independently of
+  scenes.
 
-3. Create Baseball.unity scene
+## Adding a new sport
 
-4. Add `Baseball` to `SportType` enum in `ISportModule.cs`
+Follow dodgeball, not the module pattern:
 
-5. CoreGameManager will automatically handle loading via ISportModule
-
-## TODO Systems
-
-The following systems have folder placeholders but need implementation:
-
-- **Flag System** (`Core/Flags/`) - Player trait/personality system
-- **Player Character** (`Core/Player/`) - User's character & class system
-- **Calendar System** (`Core/Calendar/`) - Multi-sport season management
-- **Hub Buildings** (`HubWorld/Buildings/`) - Arena selection & management
-- **Management Systems** (`Management/`) - Team building, training, scouting
-- **Additional Sports** (`Sports/Baseball/`, etc.) - Baseball, Football, etc.
-
-## Current Namespace Usage
-
-### Core
-- `Sportland.Core.GameManagement` - Game lifecycle
-- `Sportland.Core.Athlete` - Athlete data
-
-### Sports
-- `Sportland.Sports.Basketball.Gameplay` - Basketball gameplay
-- `Sportland.Sports.Basketball.Stats` - Basketball calculations
-
-### UI
-- `Sportland.UI.Hub` - Hub world UI
-
-## Migration Notes
-
-**Changes from previous structure:**
-- `Sportland.Core` → Split into `GameManagement`, `Athlete`, etc.
-- `Sportland.Basketball` → `Sportland.Sports.Basketball.Gameplay`
-- `Sportland.UI` → `Sportland.UI.Hub`
-
-**Unity references:** MonoBehaviours and ScriptableObjects remain intact - Unity tracks by class name, not namespace.
-
-**Compilation:** All using statements updated to reflect new namespaces.
-
----
-
-Last updated: 2026-01-02
+1. `Sports/<Sport>/` with `namespace Sportland.Sports.<Sport>`.
+2. A `<Sport>Setup` component that builds the field and spawns participants in
+   `Start()`, plus a scene in `Assets/Scenes/` containing just that one object.
+3. Reuse `Core/Rating`, `InputHandling/`, `Movement/`, and `Rendering/` rather than
+   re-deriving them; add only sport-specific attributes alongside `GeneralAttributes`.
+4. Point a hub building at the new scene in `Hub/HubInteractor`.
+5. Add a doc to `docs/` describing what shipped, and run
+   `node tools/unity-meta.mjs --check` before committing.
