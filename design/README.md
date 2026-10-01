@@ -7,17 +7,22 @@ version-controlled and grow with the game.
 
 The loop:
 
-- **Chat (with Claude)** to *think* — float a half-formed idea, pressure-test it,
-  find edge cases, organize a messy list. The back-and-forth is where ideas get sharp.
-  But chat is ephemeral.
+- **Chat** to *think* — float a half-formed idea, pressure-test it, find edge cases,
+  organize a messy list. The back-and-forth is where ideas get sharp. But chat is
+  ephemeral.
 - **These docs** to *persist* — land the keepers here. This is the bridge from idea
   to implementation; when an idea matures it becomes code, and this is its backlog.
-- **Claude memory** (`<repo>/.claude/.../memory/`) to *lock* — once a decision is
-  settled, it's distilled into a memory file for cross-session recall. Memory is for
-  decided things, not raw ideation.
+- **[`.cursor/rules/`](../.cursor/rules)** to *lock* — once a decision is settled,
+  distil it into a rule so every future session inherits it. Rules are for decided
+  things, not raw ideation.
 
 Raw ideas go in the **Idea backlog** / **Parking lot** sections. As an idea firms up,
-shape it into the spec body; when it's decided, note the lock in Claude memory.
+shape it into the spec body; when it's decided, lock it in a rule.
+
+> The lock layer used to be Claude Code memory files under `claude/.claude/.../memory/`,
+> which lived only on the machine that wrote them. `.cursor/rules/` replaces them and
+> is version-controlled. References to memory files below are historical — anything
+> still worth keeping should be ported into a rule. See [AGENTS.md](../AGENTS.md).
 
 ## The game (vision)
 
@@ -95,7 +100,12 @@ the `Effective*` values only, so abilities are felt everywhere without per-syste
 
 ## Status
 
-Built in dodgeball (branch `dodgeball_ai`): the 3-layer attribute seam, the ability
-engine, two abilities (Hot Head, Sole Survivor), roster wiring, and a HUD readout. The
-code map and commit list live in Claude memory `project_special_abilities.md`. The
-multi-sport / career layer is still all design (this folder).
+Built in dodgeball and merged to `main`: the 3-layer attribute seam, the ability
+engine, two abilities (Hot Head, Sole Survivor), roster wiring, and a HUD readout.
+See `Assets/Scripts/Sports/Dodgeball/` and [docs/Dodgeball.md](../docs/Dodgeball.md).
+
+A first career slice also exists under `Assets/Scripts/Career/` — clubs, leagues,
+athlete generation, traits — feeding real fixtures onto the dodgeball court via
+`CareerMatchDirector`. The hub (`Assets/Scripts/Hub/`) has a bootstrap, buildings, and
+screens. Everything else in this folder — the calendar, conflict/chemistry, hub action
+economy, scouting, rival managers, additional sports — is still design only.

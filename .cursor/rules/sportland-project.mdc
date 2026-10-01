@@ -1,0 +1,33 @@
+---
+description: Core Sportland project context — what the repo is, and the constraints every change works under
+alwaysApply: true
+---
+
+Sportland is a multi-sport arcade sports-RPG in **Unity 6000.0.29f1** (2D sprites,
+new Input System). `design/` holds the design canvas (mostly unbuilt systems);
+`docs/` documents what is actually built. `AGENTS.md` is the full orientation.
+
+Live code: **dodgeball** is the deep, playable sport. Demoball, Basketball, and Tag
+are prototypes at varying stages. The career layer (`Assets/Scripts/Career/`) drives
+league fixtures into the dodgeball court.
+
+## Constraints that shape every change
+
+- **Nothing here compiles your C#.** Unity isn't available in cloud environments and
+  there's no headless build or test suite. Grep to confirm a symbol exists instead of
+  assuming an API shape, keep edits narrow, and hand off with "open scene X, press Y,
+  expect Z" so the human's Unity Console can be the compiler.
+- **Assets under `Assets/` need a sibling `.meta` file** with a stable GUID, and the
+  repo commits them. Run `node tools/unity-meta.mjs --check` after adding or removing
+  files there; `--fix` generates what's missing.
+- **Don't hand-edit** `.unity`, `.prefab`, or `ProjectSettings/*.asset`. Describe the
+  Editor change for the human instead.
+
+## Two facts that are easy to get wrong
+
+- **Ratings are 0–20 internally, surfaced as F–S letters.** `Sportland.Core.Rating`
+  is the only source of truth (`To01`, `Grade`). Gameplay math reads `Effective*`
+  values (base × ability × stamina), never raw bases.
+- **F is a playable floor, not a broken one.** An F player always *executes* the
+  basic action, just weakly and unreliably. Never fail to act — only fail to act
+  *well*. Protect the basic action when tuning a range's low end.

@@ -55,7 +55,7 @@ Questions the multi-sport layer needs to answer. Spitball below.
 - How do players grow — XP, attribute training, ability unlocks, aging/decline? *(→ training
   + minutes toward hidden ceilings, growth/peak/decline arcs; ability unlocks still open)*
 - Persistence: how is the player pool stored across matches and sports? (The
-  `PlayerProfile` asset thread — see special_abilities.md / Claude memory — is the
+  `PlayerProfile` asset thread — see special_abilities.md — is the
   likely home for a character's stats + abilities across sports; the career docs assume
   this thread and add traits, ceilings, familiarity, and reveal states to it.)
 
