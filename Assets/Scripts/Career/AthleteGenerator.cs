@@ -60,7 +60,7 @@ namespace Sportland.Career
                 a.dispositions[i] = new TraitEntry(RollRating(rng, 10f, 5f));
 
             a.volatility = new TraitEntry(RollRating(rng, 8f, 5f));
-
+            StampDodgeball(a, rng, talent);
             return a;
         }
 
@@ -77,6 +77,9 @@ namespace Sportland.Career
             };
             for (int i = 0; i < a.generalRatings.Length; i++)
                 a.generalRatings[i] = new TraitEntry(10f, revealed: true); // C-grade all-rounder pending the creator
+            a.phase = CareerAthlete.PhaseForAge(a.age);
+            a.abilities = AthleteAbility.None;
+            a.SetUniformDodgeball(10f, 6f, 14f); // C now, D floor, B ceiling — the creator overwrites this
             return a;
         }
 
@@ -93,6 +96,9 @@ namespace Sportland.Career
             };
             for (int i = 0; i < a.generalRatings.Length; i++)
                 a.generalRatings[i] = new TraitEntry(2f, revealed: true); // F across the board — and fieldable anyway
+            a.phase = DevelopmentPhase.Decline;
+            a.abilities = AthleteAbility.None;
+            a.SetUniformDodgeball(2f, 0f, 4f); // F now, a sliver of E left in the ceiling
             return a;
         }
 
@@ -108,7 +114,43 @@ namespace Sportland.Career
             captain.isCaptain = true;
             captain.age = 26 + rng.Next(12); // captains skew veteran
             captain.archetypeId = Archetypes.All[rng.Next(Archetypes.All.Length)].id;
+            // Age moved after the first stamp, so the sheet has to match the veteran.
+            StampDodgeball(captain, rng, 0.5f);
             return captain;
+        }
+
+        /// <summary>
+        /// Dodgeball sheet for one athlete. Ceiling rises with talent. Current
+        /// sits low in the band while growing, near the ceiling at the peak,
+        /// and partway back down in decline. At most one ability flag.
+        /// </summary>
+        private static void StampDodgeball(CareerAthlete athlete, System.Random rng, float talent)
+        {
+            athlete.phase = CareerAthlete.PhaseForAge(athlete.age);
+            athlete.dodgeball = new SkillRating[DodgeballSkills.Count];
+            for (int i = 0; i < athlete.dodgeball.Length; i++)
+                athlete.dodgeball[i] = RollSkill(rng, talent, athlete.phase);
+
+            float hot = 0.08f + talent * 0.20f;
+            float sole = 0.05f + talent * 0.12f;
+            double roll = rng.NextDouble();
+            if (roll < hot) athlete.abilities = AthleteAbility.HotHead;
+            else if (roll < hot + sole) athlete.abilities = AthleteAbility.SoleSurvivor;
+            else athlete.abilities = AthleteAbility.None;
+        }
+
+        private static SkillRating RollSkill(System.Random rng, float talent, DevelopmentPhase phase)
+        {
+            float ceiling = RollRating(rng, 6f + talent * 10f, 2.5f);
+            float floor = RollRating(rng, 1f + talent * 4f, 1.5f);
+            if (floor > ceiling - 1f) floor = ceiling - 1f;
+            if (floor < 0f) floor = 0f;
+
+            float along = phase == DevelopmentPhase.Growth ? 0.35f
+                : phase == DevelopmentPhase.Peak ? 0.90f
+                : 0.55f;
+            float current = RollRating(rng, floor + (ceiling - floor) * along, 1.2f);
+            return SkillRating.Make(current, floor, ceiling);
         }
 
         /// <summary>

@@ -179,16 +179,20 @@ namespace Sportland.Sports.Dodgeball
             sp.z = -cam.transform.position.z;               // distance to the z=0 play plane
             Vector2 wp = cam.ScreenToWorldPoint(sp);
 
+            // Picking and dragging happen in the projected view; the dummy's
+            // position is in sim metres. Convert at the boundary so the handle
+            // stays under the cursor on the angled court.
             if (mouse.leftButton.wasPressedThisFrame
-                && Vector2.Distance(wp, dummy.transform.position) <= dragPickRadius)
+                && Vector2.Distance(wp, CourtProjection.BodyPoint(dummy.transform.position)) <= dragPickRadius)
                 dragging = true;
             if (mouse.leftButton.wasReleasedThisFrame)
                 dragging = false;
 
             if (dragging)
             {
-                float x = Mathf.Clamp(wp.x, -CourtSetup.PlayAreaHalfWidth, CourtSetup.PlayAreaHalfWidth);
-                float y = Mathf.Clamp(wp.y, -CourtSetup.PlayAreaHalfHeight, CourtSetup.PlayAreaHalfHeight);
+                Vector2 sim = CourtProjection.UnprojectBody(wp);
+                float x = Mathf.Clamp(sim.x, -CourtSetup.PlayAreaHalfWidth, CourtSetup.PlayAreaHalfWidth);
+                float y = Mathf.Clamp(sim.y, -CourtSetup.PlayAreaHalfHeight, CourtSetup.PlayAreaHalfHeight);
                 var p = dummy.transform.position;
                 dummy.transform.position = new Vector3(x, y, p.z);
             }

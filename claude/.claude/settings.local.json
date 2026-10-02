@@ -25,7 +25,9 @@
       "Bash(git -C D:/Unity/Sportland add Assets/Scripts/Sports/Dodgeball/Rating.cs Assets/Scripts/Sports/Dodgeball/Rating.cs.meta Assets/Scripts/Sports/Dodgeball/DodgeballAttributes.cs Assets/Scripts/Sports/Dodgeball/CourtSetup.cs Assets/Scripts/Sports/Dodgeball/DodgeballAI.cs Assets/Scripts/Sports/Dodgeball/DodgeballPlayerInput.cs Assets/Scripts/Sports/Dodgeball/DodgeballTuningPanel.cs Assets/Scripts/Sports/Dodgeball/DodgeballAttackLab.cs Assets/Scripts/Sports/Dodgeball/DodgeballAttackLab.cs.meta Assets/Scripts/Sports/Dodgeball/DodgeballUI.cs.meta Assets/Scripts/Sports/Dodgeball/PlayerStamina.cs.meta)",
       "Bash(grep -n \"wallRestitution\" \"D:/Unity/Sportland/Assets/Prefabs/Dodgeball/Dodgeball.prefab\" \"D:/Unity/Sportland/Assets/Scripts/Sports/Dodgeball/Ball.cs\")",
       "Read(//d/Unity/Sportland/**)",
-      "Bash(rm -f design/ideas-inbox.md)"
+      "Bash(rm -f design/ideas-inbox.md)",
+      "Read(//c/Users/epilnock/AppData/Roaming/Claude/local-agent-mode-sessions/skills-plugin/421240ce-959e-46e4-81fb-75288903f43b/33bc17f4-6911-4145-91e7-a1ffe25941bf/skills/docx/**)",
+      "Bash(npm install *)"
     ],
     "ask": [
       "Bash(git -C \"D:/Unity/Sportland\" push:*)"

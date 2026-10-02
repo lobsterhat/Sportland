@@ -1,0 +1,59 @@
+---
+description: C# conventions for Sportland scripts — namespaces, runtime wiring, Unity idioms
+globs: Assets/Scripts/**/*.cs,Assets/Editor/**/*.cs
+alwaysApply: false
+---
+
+## Namespaces mirror folders
+
+`Assets/Scripts/Sports/Dodgeball/Foo.cs` → `namespace Sportland.Sports.Dodgeball`.
+No asmdefs exist, so everything shares one `Assembly-CSharp` — a compile error
+anywhere takes the whole game down, and any type is reachable from any other.
+
+Existing namespaces: `Sportland.Core`, `.Core.GameManagement`, `.Core.Athletes`,
+`.Core.Calendar`, `.Core.Flags`, `.Core.Player`, `.Career`, `.Sports.Dodgeball`,
+`.Sports.Demoball`, `.Sports.Basketball.Gameplay`, `.Sports.Basketball.Stats`,
+`.Sports.Tag`, `.Sports.Shared`, `.Hub`, `.UI.Hub`, `.InputHandling`, `.Movement`,
+`.Rendering`, `.Diagnostics`, `.World`.
+
+## Wiring is mostly runtime, not scene-authored
+
+`CourtSetup` (on `DodgeballField`) builds the court, spawns the 12 players, the ball,
+the diagnostics HUD, and the debug cannon in `Start()`. Components it adds never pass
+through the Inspector, so **their tuning comes from script field defaults**. To change
+a tuned value, change the default in the script — don't write instructions to set it
+in the Inspector, and don't add a serialized field expecting someone to populate it.
+
+Adding a new runtime-spawned system means extending `CourtSetup` behind a bool flag,
+the way `showDiagnosticsHud`, `spawnDebugCannon`, and `physicsDebugAssistant` work.
+
+## Stats and ratings
+
+- Read `Effective*` properties, never raw base attributes — that's the seam that makes
+  Special Abilities and stamina apply everywhere without per-system code.
+- Convert with `Rating.To01(v)`; display with `Rating.Grade(v)`. Don't reintroduce the
+  legacy 0–100 attribute scale in new code.
+- A rating maps to its in-sim effect through a **linear floor→ceiling** mapping
+  (e.g. Throw Power → 12 u/s at 0, 36 u/s at 20). Elite differentiation is supposed to
+  come from the abilities layer, not from curving a base stat.
+- Abilities are on/off per player, compose multiplicatively, and clamp to [0,1].
+  See `design/special_abilities.md` for the locked architecture before adding one.
+
+## Unity idioms in this codebase
+
+- 1 Unity unit = 1 metre; the dodgeball court is 18 × 9 with origin at centre.
+- Ball physics decouple **lateral** motion (court plane, with drag) from a separate
+  vertical `Height` with its own gravity sim. Don't collapse them into a 3D vector.
+- Hit detection uses each player's vertical body band (`BodyBottom`/`BodyTop`), which
+  jumping and ducking reshape.
+- Input flows through `IInputSource` / `InputBroker`, with parallel player and AI
+  sources — add behaviour there rather than reading devices directly in gameplay code.
+- Dev-only tooling must be compiled out or self-destruct in release builds, the way
+  `PhysicsDebugAssistant` does.
+- Match the surrounding comment style: sparse, explaining *why* a model was chosen.
+  Don't narrate what the code does.
+
+## New files
+
+A new `.cs` file needs a sibling `.cs.meta`. Generate it with
+`node tools/unity-meta.mjs --fix`, and commit both.

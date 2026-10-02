@@ -36,9 +36,24 @@ namespace Sportland.Sports.Dodgeball
                 rt.Deactivate();
         }
 
+        /// <summary>
+        /// A runtime copy with the signature modifiers. Career athletes carry
+        /// an ability flag, not an asset reference; the match builds this when
+        /// it applies the roster.
+        /// </summary>
+        public static HotHeadAbility CreateRuntime()
+        {
+            var ability = CreateInstance<HotHeadAbility>();
+            ability.hideFlags = HideFlags.HideAndDontSave;
+            ability.ApplySignature();
+            return ability;
+        }
+
         // Seed Hot Head's signature values on a freshly created asset (the
         // editor calls Reset on creation). Tune in the Inspector afterward.
-        private void Reset()
+        private void Reset() => ApplySignature();
+
+        private void ApplySignature()
         {
             id = "hot_head";
             displayName = "Hot Head";

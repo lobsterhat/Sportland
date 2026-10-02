@@ -93,5 +93,7 @@ The club signs athletes into **one club pool**; each sport team the club operate
 ## Code Alignment (2026-07)
 
 - **`Core/Athlete/Athlete.cs` is legacy** (0–100 stats, six-grade helper, string flag list) — the athlete record should rebuild on the `PlayerProfile` thread with `Rating`-scale attributes. `attributes.md`'s general/sport-specific split is exactly the per-sport stats structure this doc's ceilings attach to.
-- **Ceilings and aptitude** are additional hidden rated values per sport; development moves base ratings toward them — the same numbers whose per-stat floor→ceiling mappings `attributes.md` defines.
+- **The small pool is JSON, not a database.** `CareerManager` already writes `sportland_career.json` (JsonUtility, `Application.persistentDataPath`). A few dozen `[Serializable]` athletes live in that file with the rest of the career. A database is a second source of truth this slice does not need.
+- **Dodgeball sheet** (`SkillRating` on `CareerAthlete.dodgeball`): each skill stores `current` (the base the match reads), `floor` (regression stops here), and `ceiling` (progression stops here), all on the 0–20 scale and shown as F–S via `Rating.Grade`. `DevelopSkills` steps current toward the ceiling in growth and toward the floor in decline; peak holds. The overnight tick does not call it — training will.
+- **Ability flags** (`AthleteAbility`): Hot Head and Sole Survivor, on or off, fixed to the athlete. The match builds the runtime ability from the flag.
 - **The "F is a playable floor" tenet** (`design/README.md`) is load-bearing here: lower divisions are full of F/E athletes, and the churn ecology only works if their games are still real games.

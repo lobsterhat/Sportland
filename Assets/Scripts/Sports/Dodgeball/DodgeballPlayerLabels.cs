@@ -18,8 +18,8 @@ namespace Sportland.Sports.Dodgeball
         [SerializeField] private bool show = true;
         [Tooltip("Show the AI's current chain decision under each player. Toggleable live from the Match controls panel.")]
         [SerializeField] private bool showAIDecisions = true;
-        [Tooltip("World-space height (units) above the player root to float the label.")]
-        [SerializeField] private float heightAbove = 1.3f;
+        [Tooltip("Metres above the floor to float the label. Measured from the floor rather than from the player root so it lands correctly on the angled court, where the two are not the same point.")]
+        [SerializeField] private float heightAbove = 2.1f;
         [SerializeField] private int fontSize = 16;
         [Tooltip("Smaller font for the AI decision line (debug only).")]
         [SerializeField] private int decisionFontSize = 11;
@@ -48,7 +48,8 @@ namespace Sportland.Sports.Dodgeball
                 var t = all[i];
                 if (t == null) continue;
 
-                Vector3 screen = cam.WorldToScreenPoint(t.transform.position + Vector3.up * heightAbove);
+                Vector3 screen = cam.WorldToScreenPoint(
+                    CourtProjection.Point(t.transform.position, heightAbove));
                 if (screen.z <= 0f) continue;   // behind the camera
 
                 // WorldToScreenPoint's origin is bottom-left; GUI's is top-left.
@@ -92,7 +93,10 @@ namespace Sportland.Sports.Dodgeball
             // chase before their clock fires.
             if (match != null && match.DelayClockRunning && ball != null)
             {
-                Vector3 ballScreen = cam.WorldToScreenPoint(ball.transform.position + Vector3.up * 0.7f);
+                // Rides the ball's flight height too, so the clock stays pinned
+                // to it rather than to the floor underneath.
+                Vector3 ballScreen = cam.WorldToScreenPoint(
+                    CourtProjection.Point(ball.transform.position, ball.Height + 0.7f));
                 if (ballScreen.z > 0f)
                 {
                     var dRect = new Rect(ballScreen.x - 28f, Screen.height - ballScreen.y - 12f, 56f, 22f);

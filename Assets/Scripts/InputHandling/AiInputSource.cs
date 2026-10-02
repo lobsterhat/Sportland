@@ -513,7 +513,7 @@ namespace Sportland.InputHandling
                 }
 
                 Vector2 perpendicular = Vector2.Perpendicular(fleeDir);
-                float swerve = Mathf.Sin(Time.time * 2f + characterTransform.GetInstanceID()) * 0.3f;
+                float swerve = Mathf.Sin(Time.time * 2f + (float)characterTransform.GetEntityId().GetHashCode()) * 0.3f;
                 fleeDir = (fleeDir + perpendicular * swerve).normalized;
 
                 currentDesiredDirection = ApplyWallAvoidance(fleeDir);
@@ -683,7 +683,7 @@ namespace Sportland.InputHandling
             if (standoffLeanTimer <= 0f)
             {
                 // Pick a new lean direction
-                float id = character != null ? character.GetInstanceID() : 0f;
+                float id = character != null ? (float)character.GetEntityId().GetHashCode() : 0f;
                 float randomVal = Mathf.PerlinNoise(Time.time * 3f, id * 0.1f);
 
                 if (randomVal < 0.35f)
@@ -1050,7 +1050,7 @@ namespace Sportland.InputHandling
 
         private void Wander()
         {
-            float id = character != null ? character.GetInstanceID() * 0.1f : 0f;
+            float id = character != null ? (float)character.GetEntityId().GetHashCode() * 0.1f : 0f;
             float wanderAngle = Mathf.PerlinNoise(Time.time * 0.5f, id) * 360f;
             Vector2 wanderDir = new Vector2(
                 Mathf.Cos(wanderAngle * Mathf.Deg2Rad),

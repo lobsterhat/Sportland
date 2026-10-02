@@ -10,18 +10,14 @@ namespace Sportland.Sports.Dodgeball
     ///                 (analog magnitude respected on the stick; D-pad is digital)
     ///   Sprint      — L2 / Left Shift                  (hold)
     ///   Run         — D-pad double-tap (any direction) (sticky while D-pad held)
-    ///   Evade       — Cross / Space                    (smart evade — holding the ball: jump
-    ///                                                   to cross a line and throw; empty-handed:
-    ///                                                   a held direction dashes, neutral stick
-    ///                                                   ducks a high throw / jumps a low one)
-    ///   Throw       — Square / Q                       (only fires while holding the ball)
-    ///   Pass        — Triangle / F                     (with the ball: tap = lob,
-    ///                                                   hold = chest; empty-handed:
-    ///                                                   switch to the infielder
-    ///                                                   nearest the ball)
-    ///   Catch       — Circle / E                       (active grab of a nearby ball)
-    ///   Stance      — R2 / Left-Ctrl                   (toggle defensive stance: face the ball,
-    ///                                                   move slower, full catch/evade)
+    ///   Jump        — Cross / Space                    (always a hop; with the ball it's an
+    ///                                                   attack jump so you can throw across a
+    ///                                                   line before landing)
+    ///   Throw       — Square / Q                       (offense only)
+    ///   Pass        — Circle / E                       (offense: tap = lob, hold = chest)
+    ///   Catch       — Circle / E                       (defense: arm a catch)
+    ///   Switch      — Triangle / F                     (defense: take the nearest teammate)
+    ///   Stance      — R2 / Left-Ctrl                   (toggle defensive stance)
     ///   ReturnBall  — L1 / 1                           (debug: snap ball to player)
     /// </summary>
     public class DodgeballInputActions
@@ -30,8 +26,8 @@ namespace Sportland.Sports.Dodgeball
         public InputAction Sprint     { get; private set; }
         public InputAction Evade      { get; private set; }
         public InputAction Throw      { get; private set; }
-        public InputAction Pass       { get; private set; }
-        public InputAction Catch      { get; private set; }
+        public InputAction Circle     { get; private set; }  // pass on offense, catch on defense
+        public InputAction Switch     { get; private set; }  // defense: take the nearest teammate
         public InputAction Stance     { get; private set; }
         public InputAction ReturnBall { get; private set; }
 
@@ -87,13 +83,13 @@ namespace Sportland.Sports.Dodgeball
             Throw.AddBinding("<Keyboard>/q");
             Throw.AddBinding("<Gamepad>/buttonWest");   // Square
 
-            Pass = actionMap.AddAction("Pass", InputActionType.Button);
-            Pass.AddBinding("<Keyboard>/f");
-            Pass.AddBinding("<Gamepad>/buttonNorth");   // Triangle
+            Circle = actionMap.AddAction("Circle", InputActionType.Button);
+            Circle.AddBinding("<Keyboard>/e");
+            Circle.AddBinding("<Gamepad>/buttonEast");   // Circle / O
 
-            Catch = actionMap.AddAction("Catch", InputActionType.Button);
-            Catch.AddBinding("<Keyboard>/e");
-            Catch.AddBinding("<Gamepad>/buttonEast");   // Circle
+            Switch = actionMap.AddAction("Switch", InputActionType.Button);
+            Switch.AddBinding("<Keyboard>/f");
+            Switch.AddBinding("<Gamepad>/buttonNorth");   // Triangle
 
             Stance = actionMap.AddAction("Stance", InputActionType.Button);
             Stance.AddBinding("<Keyboard>/leftCtrl");

@@ -562,7 +562,7 @@ namespace Sportland.Sports.Dodgeball
             var cam = Camera.main;
             if (cam == null) return null;
             var screen3 = new Vector3(screenPos.x, screenPos.y, -cam.transform.position.z);
-            Vector2 worldPos = cam.ScreenToWorldPoint(screen3);
+            Vector2 clicked = cam.ScreenToWorldPoint(screen3);
 
             PlayerZoneTracker best = null;
             float bestDistSq = pickRadius * pickRadius;
@@ -571,7 +571,9 @@ namespace Sportland.Sports.Dodgeball
             {
                 var t = all[i];
                 if (t == null) continue;
-                float d = ((Vector2)t.transform.position - worldPos).sqrMagnitude;
+                // Compare where the player is drawn, not where they stand: on
+                // the angled court those are a body height apart.
+                float d = (CourtProjection.BodyPoint(t.transform.position) - clicked).sqrMagnitude;
                 if (d < bestDistSq) { bestDistSq = d; best = t; }
             }
             return best;
@@ -587,7 +589,7 @@ namespace Sportland.Sports.Dodgeball
 
         private void DrawMarker(Camera cam, PlayerZoneTracker t, string text, Color color)
         {
-            Vector3 sp = cam.WorldToScreenPoint(t.transform.position + Vector3.up * 1.8f);
+            Vector3 sp = cam.WorldToScreenPoint(CourtProjection.Point(t.transform.position, 2.6f));
             if (sp.z <= 0f) return;
             var rect = new Rect(sp.x - 18f, Screen.height - sp.y - 14f, 36f, 26f);
             var prev = markerStyle.normal.textColor;

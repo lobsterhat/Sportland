@@ -3,6 +3,12 @@
 **Date:** January 2, 2026
 **Status:** ✅ Complete
 
+> **Historical record.** This describes a one-off reorganization that has long since
+> landed, and the structure below has since changed again — the `HubWorld/` and
+> `Management/` folders it plans were never built, and Dodgeball, Demoball, Tag, Career,
+> and Hub arrived afterwards. For the current layout see
+> [`Assets/Scripts/README.md`](Assets/Scripts/README.md) and [`AGENTS.md`](AGENTS.md).
+
 ## Overview
 
 Successfully reorganized the Sportland codebase from a flat structure into a hierarchical, scalable architecture that supports multi-sport gameplay, hub world management, and future system expansion.

@@ -1,0 +1,52 @@
+---
+description: Handling Unity-serialized assets — scenes, prefabs, .meta files, project settings
+globs: Assets/**/*.meta,Assets/**/*.unity,Assets/**/*.prefab,Assets/**/*.asset,ProjectSettings/**,Packages/manifest.json
+alwaysApply: false
+---
+
+These files are Unity-serialized YAML knitted together by GUIDs. Treat them as
+generated output that happens to be text.
+
+## Default: don't edit them
+
+Scenes (`.unity`), prefabs (`.prefab`), and `ProjectSettings/*.asset` should change
+through the Unity Editor. Instead of editing, write the human a precise instruction:
+which object, which component, which field, which value.
+
+The narrow exception is a single obviously-scoped scalar you can point at exactly
+(a physics value, a flag). Never add, remove, or reorder components, and never touch a
+`fileID` or `guid` by hand.
+
+`Packages/manifest.json` should change via the Package Manager so
+`packages-lock.json` stays consistent.
+
+## `.meta` files
+
+Every asset under `Assets/` has a sibling `.meta` carrying its GUID, and the repo
+commits them (`.gitignore` explicitly un-ignores them). The GUID is the only thing
+scenes and prefabs use to find an asset.
+
+If you create `Foo.cs` and don't commit `Foo.cs.meta`, Unity mints a *different* GUID
+on every machine that opens the project — references resolve on yours and break on
+everyone else's. So:
+
+```bash
+node tools/unity-meta.mjs --check   # report missing + orphaned .meta files
+node tools/unity-meta.mjs --fix     # create the missing ones
+```
+
+Rules:
+
+- A GUID is permanent. Never change one on an existing asset, and never reuse one.
+- Deleting an asset means deleting its `.meta` too.
+- Moving an asset means moving its `.meta` with it — that's what preserves references.
+- Renaming a script requires the class name to match the filename for MonoBehaviours,
+  and the `.meta` travels along.
+
+## Committed DLLs
+
+`Assets/Packages/` holds the Anthropic .NET SDK dependency closure as plain DLLs. Each
+`.dll.meta` sets `validateReferences: 0` so Unity's import validator loads it. There's
+no package manager tracking these — read `Assets/Scripts/Diagnostics/README.md` before
+changing anything there, including the deliberate *omission* of shims that Unity 6's
+.NET Standard 2.1 profile already provides.

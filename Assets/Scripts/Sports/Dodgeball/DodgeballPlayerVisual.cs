@@ -75,6 +75,18 @@ namespace Sportland.Sports.Dodgeball
         private Transform shadowTransform;
         private float shadowFootY;
 
+        /// <summary>
+        /// Where the arrows orbit, relative to the player, on the flat floor and
+        /// before any view projection. <see cref="DodgeballCourtView"/> moves the
+        /// arrows onto the angled court and so cannot read their transforms back
+        /// — it would be reading its own output. It needs the authored value,
+        /// and these keep their last one on the frames the updates skip.
+        /// </summary>
+        public Vector2 MovementArrowOffset { get; private set; }
+
+        /// <inheritdoc cref="MovementArrowOffset"/>
+        public Vector2 FacingArrowOffset { get; private set; }
+
         public void Configure(Team team, PlayerRole role, PlayerZoneTracker zoneTracker)
         {
             tracker = zoneTracker;
@@ -248,7 +260,8 @@ namespace Sportland.Sports.Dodgeball
 
             Vector2 n = v.normalized;
             float ang = Mathf.Atan2(n.y, n.x) * Mathf.Rad2Deg;
-            movementArrowTransform.localPosition = new Vector3(n.x * movementArrowDistance, n.y * movementArrowDistance, 0f);
+            MovementArrowOffset = n * movementArrowDistance;
+            movementArrowTransform.localPosition = new Vector3(MovementArrowOffset.x, MovementArrowOffset.y, 0f);
             movementArrowTransform.localRotation = Quaternion.Euler(0f, 0f, ang);
         }
 
@@ -264,7 +277,8 @@ namespace Sportland.Sports.Dodgeball
             Vector2 f = movement.Facing;
             if (f.sqrMagnitude < 0.0001f) return;
             float ang = Mathf.Atan2(f.y, f.x) * Mathf.Rad2Deg;
-            facingArrowTransform.localPosition = new Vector3(f.x * facingArrowDistance, f.y * facingArrowDistance, 0f);
+            FacingArrowOffset = f * facingArrowDistance;
+            facingArrowTransform.localPosition = new Vector3(FacingArrowOffset.x, FacingArrowOffset.y, 0f);
             facingArrowTransform.localRotation = Quaternion.Euler(0f, 0f, ang);
         }
 

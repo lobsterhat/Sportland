@@ -1,8 +1,9 @@
 # Special Abilities — Design
 
 Cross-sport conditional modifiers that stack on top of a player's base stats. The
-architecture is locked and the engine is built in dodgeball (code map + commits in
-Claude memory `project_special_abilities.md`). This doc is the **design canvas**: the
+architecture is locked and the engine is built in dodgeball (see
+`Assets/Scripts/Sports/Dodgeball/AbilityRuntime.cs` and `SpecialAbility.cs`). This doc
+is the **design canvas**: the
 frame, a template, worked examples, and an idea backlog to spitball into.
 
 ---

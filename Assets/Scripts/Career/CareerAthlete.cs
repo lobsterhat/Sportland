@@ -43,6 +43,15 @@ namespace Sportland.Career
         public TraitEntry[] dispositions = new TraitEntry[3];      // DispositionTrait
         public TraitEntry volatility;
 
+        [Tooltip("Growth, peak, or decline. Set from age; DevelopSkills reads it.")]
+        public DevelopmentPhase phase;
+
+        [Tooltip("Dodgeball sheet: current / floor / ceiling per skill, indexed by DodgeballSkill.")]
+        public SkillRating[] dodgeball = new SkillRating[DodgeballSkills.Count];
+
+        [Tooltip("Special abilities this athlete has. Flags, fixed to the person.")]
+        public AthleteAbility abilities;
+
         public string FullName => string.IsNullOrEmpty(lastName) ? firstName : $"{firstName} {lastName}";
 
         /// <summary>Ego immunity — the player character and the mentor.</summary>
@@ -51,6 +60,86 @@ namespace Sportland.Career
         public TraitEntry GetGeneral(GeneralRating r) => generalRatings[(int)r];
         public TraitEntry GetExpectation(ExpectationTrait t) => expectations[(int)t];
         public TraitEntry GetDisposition(DispositionTrait t) => dispositions[(int)t];
+
+        public SkillRating GetDodgeball(DodgeballSkill skill) => dodgeball[(int)skill];
+
+        /// <summary>Names of the abilities this athlete has, or empty.</summary>
+        public string AbilityLabel
+        {
+            get
+            {
+                string label = "";
+                if ((abilities & AthleteAbility.HotHead) != 0) label = "Hot Head";
+                if ((abilities & AthleteAbility.SoleSurvivor) != 0)
+                    label = label.Length == 0 ? "Sole Survivor" : label + ", Sole Survivor";
+                return label;
+            }
+        }
+
+        public static DevelopmentPhase PhaseForAge(int years)
+        {
+            if (years < 24) return DevelopmentPhase.Growth;
+            if (years <= 30) return DevelopmentPhase.Peak;
+            return DevelopmentPhase.Decline;
+        }
+
+        /// <summary>
+        /// Stamp every dodgeball skill with the same band. Used when character
+        /// creation locks an archetype template onto the player.
+        /// </summary>
+        public void SetUniformDodgeball(float current, float floor, float ceiling)
+        {
+            if (dodgeball == null || dodgeball.Length != DodgeballSkills.Count)
+                dodgeball = new SkillRating[DodgeballSkills.Count];
+            var skill = SkillRating.Make(current, floor, ceiling);
+            for (int i = 0; i < dodgeball.Length; i++)
+                dodgeball[i] = skill;
+        }
+
+        /// <summary>
+        /// Old saves predate the dodgeball sheet. Fill it from the general
+        /// ratings so a loaded career still has a band to read.
+        /// </summary>
+        public void EnsureDodgeballSkills()
+        {
+            phase = PhaseForAge(age);
+            if (dodgeball != null && dodgeball.Length == DodgeballSkills.Count)
+                return;
+
+            float speed = GeneralOr(GeneralRating.Speed, 10f);
+            float agility = GeneralOr(GeneralRating.Agility, 10f);
+            float endurance = GeneralOr(GeneralRating.Endurance, 10f);
+            float toughness = GeneralOr(GeneralRating.Toughness, 10f);
+
+            dodgeball = new SkillRating[DodgeballSkills.Count];
+            dodgeball[(int)DodgeballSkill.ThrowPower] = BandAround(toughness * 0.6f + speed * 0.4f);
+            dodgeball[(int)DodgeballSkill.ThrowTechnique] = BandAround(agility);
+            dodgeball[(int)DodgeballSkill.CatchTechnique] = BandAround((agility + endurance) * 0.5f);
+            dodgeball[(int)DodgeballSkill.Anticipation] = BandAround(agility);
+        }
+
+        /// <summary>
+        /// One development tick across the dodgeball sheet. Growth climbs toward
+        /// each ceiling, decline slides toward each floor, peak holds. Training
+        /// calls this; the overnight tick does not.
+        /// </summary>
+        public void DevelopSkills(float step)
+        {
+            EnsureDodgeballSkills();
+            for (int i = 0; i < dodgeball.Length; i++)
+                dodgeball[i].Develop(phase, step);
+        }
+
+        private float GeneralOr(GeneralRating rating, float fallback)
+        {
+            if (generalRatings == null || (int)rating >= generalRatings.Length) return fallback;
+            return generalRatings[(int)rating].value;
+        }
+
+        private static SkillRating BandAround(float current)
+        {
+            return SkillRating.Make(current, current - 3f, current + 3f);
+        }
 
         /// <summary>
         /// Reveal one hidden personality trait, if any remain. Returns a
