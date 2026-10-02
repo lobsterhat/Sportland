@@ -314,16 +314,21 @@ namespace Sportland.Hub
 
             if (tab == RosterTab.Squad)
             {
+                int i = 0;
                 foreach (var a in career.club.pool)
                 {
                     string lineupTag = career.league.LineupTagOf(a.id);
                     string suffix = lineupTag != null
                         ? $"   <color=#7FE87F>[{lineupTag}]</color>"
                         : $"   {Dim}[inactive]</alpha>";
-                    sb.AppendLine("  " + AthleteLine(a) + suffix);
+                    string line = AthleteLine(a) + suffix;
+                    sb.AppendLine(i == selectedIndex
+                        ? $"<color=#FFD75F>> {line}</color>"
+                        : $"  {line}");
+                    i++;
                 }
                 sb.AppendLine();
-                sb.AppendLine($"{Hint}R/Triangle: next tab    Esc/Circle: close</alpha>");
+                sb.AppendLine($"{Hint}W/S: select    F/Square: player card    R/Triangle: next tab    Esc/Circle: close</alpha>");
             }
             else // Pool
             {
@@ -343,7 +348,7 @@ namespace Sportland.Hub
                 }
                 sb.AppendLine();
                 sb.AppendLine($"{Hint}Bottom-division pool — modest talent, and everyone accepts (for now; interviews come later).</alpha>");
-                sb.AppendLine($"{Hint}W/S: select    E/Cross: sign    R/Triangle: next tab    Esc/Circle: close</alpha>");
+                sb.AppendLine($"{Hint}W/S: select    E/Cross: sign    F/Square: player card    R/Triangle: next tab    Esc/Circle: close</alpha>");
             }
 
             return sb.ToString();

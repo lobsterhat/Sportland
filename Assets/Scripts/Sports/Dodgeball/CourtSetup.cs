@@ -237,6 +237,8 @@ namespace Sportland.Sports.Dodgeball
             // owning components' own values stand.
             gameObject.AddComponent<DodgeballCourtView>();
             gameObject.AddComponent<DodgeballCameraRig>();
+            var viewer = gameObject.AddComponent<Sportland.UI.PlayerViewer>();
+            viewer.controlMatch = true;
 
             if (attackLabMode) gameObject.AddComponent<DodgeballAttackLab>();
 

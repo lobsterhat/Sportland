@@ -124,6 +124,12 @@ namespace Sportland.Career
                 if (league != null && (league.rivals == null || league.rivals.Count == 0))
                     PopulateRivalRosters();
 
+                EnsureSheets(club.pool);
+                EnsureSheets(freeAgents);
+                if (league != null && league.rivals != null)
+                    for (int i = 0; i < league.rivals.Count; i++)
+                        EnsureSheets(league.rivals[i].roster);
+
                 Debug.Log($"Career loaded: {club.clubName}, day {day}.");
                 return true;
             }
@@ -132,6 +138,13 @@ namespace Sportland.Career
                 Debug.LogWarning($"Career load failed, starting fresh: {e.Message}");
                 return false;
             }
+        }
+
+        private static void EnsureSheets(List<CareerAthlete> athletes)
+        {
+            if (athletes == null) return;
+            for (int i = 0; i < athletes.Count; i++)
+                if (athletes[i] != null) athletes[i].EnsureDodgeballSkills();
         }
 
         /// <summary>Delete the save and start over (debug/testing affordance — F9 in the hub).</summary>
@@ -190,6 +203,10 @@ namespace Sportland.Career
             pc.archetypeId = archetype.id;
             for (int i = 0; i < pc.generalRatings.Length; i++)
                 pc.generalRatings[i] = new TraitEntry(archetype.generalRatingValue, revealed: true);
+
+            float v = archetype.generalRatingValue;
+            pc.phase = CareerAthlete.PhaseForAge(pc.age);
+            pc.SetUniformDodgeball(v, v - 4f, v + 3f);
 
             actionsPerDay = archetype.actionsPerDay;
             actionsRemaining = actionsPerDay;
@@ -561,9 +578,10 @@ namespace Sportland.Career
 
         public static float Overall(CareerAthlete a)
         {
+            a.EnsureDodgeballSkills();
             float sum = 0f;
-            foreach (var r in a.generalRatings) sum += r.value;
-            return sum / a.generalRatings.Length;
+            for (int i = 0; i < a.dodgeball.Length; i++) sum += a.dodgeball[i].current;
+            return sum / a.dodgeball.Length;
         }
 
         // ── Day loop ────────────────────────────────────────────────────

@@ -32,9 +32,24 @@ namespace Sportland.Sports.Dodgeball
             else if (!lastStanding && rt.active) rt.Deactivate();
         }
 
+        /// <summary>
+        /// A runtime copy with the signature modifiers. Career athletes carry
+        /// an ability flag, not an asset reference; the match builds this when
+        /// it applies the roster.
+        /// </summary>
+        public static SoleSurvivorAbility CreateRuntime()
+        {
+            var ability = CreateInstance<SoleSurvivorAbility>();
+            ability.hideFlags = HideFlags.HideAndDontSave;
+            ability.ApplySignature();
+            return ability;
+        }
+
         // Seed Sole Survivor's signature values on a freshly created asset.
         // Tune in the Inspector afterward.
-        private void Reset()
+        private void Reset() => ApplySignature();
+
+        private void ApplySignature()
         {
             id = "sole_survivor";
             displayName = "Sole Survivor";

@@ -1,3 +1,4 @@
+using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.SceneManagement;
 using Sportland.Career;
@@ -12,6 +13,7 @@ namespace Sportland.Sports.Dodgeball
     {
         public string athleteId;
         public string fullName;
+        public string abilityLabel;
     }
 
     /// <summary>
@@ -165,13 +167,15 @@ namespace Sportland.Sports.Dodgeball
         }
 
         /// <summary>
-        /// Career record → match components. Career general ratings live on
-        /// the shared 0-20 scale; dodgeball-specific ratings are derived from
-        /// them until athletes carry per-sport ratings of their own.
+        /// Career record → match components. Dodgeball skills are the stored
+        /// 0–20 sheet. Anticipation on the match component is still 0–100, so
+        /// the career value is scaled by 5 on the way in. General attributes
+        /// (endurance, toughness, agility) still come from the cross-sport ratings.
         /// </summary>
         private static void ApplyAthlete(GameObject go, CareerAthlete athlete)
         {
-            float speed = athlete.GetGeneral(GeneralRating.Speed).value;
+            athlete.EnsureDodgeballSkills();
+
             float agility = athlete.GetGeneral(GeneralRating.Agility).value;
             float endurance = athlete.GetGeneral(GeneralRating.Endurance).value;
             float toughness = athlete.GetGeneral(GeneralRating.Toughness).value;
@@ -179,10 +183,10 @@ namespace Sportland.Sports.Dodgeball
             var dba = go.GetComponent<DodgeballAttributes>();
             if (dba != null)
             {
-                dba.throwSpeedRating = Mathf.Clamp(toughness * 0.6f + speed * 0.4f, 0f, 20f);
-                dba.throwAccuracyRating = Mathf.Clamp(agility, 0f, 20f);
-                dba.catchTechniqueRating = Mathf.Clamp((agility + endurance) * 0.5f, 0f, 20f);
-                dba.anticipation = Mathf.Clamp(agility * 5f, 0f, 100f);
+                dba.throwSpeedRating = athlete.GetDodgeball(DodgeballSkill.ThrowPower).current;
+                dba.throwAccuracyRating = athlete.GetDodgeball(DodgeballSkill.ThrowTechnique).current;
+                dba.catchTechniqueRating = athlete.GetDodgeball(DodgeballSkill.CatchTechnique).current;
+                dba.anticipation = Mathf.Clamp(athlete.GetDodgeball(DodgeballSkill.Anticipation).current * 5f, 0f, 100f);
             }
 
             var gen = go.GetComponent<GeneralAttributes>();
@@ -194,9 +198,35 @@ namespace Sportland.Sports.Dodgeball
                 gen.luck = 50f;
             }
 
+            ApplyAbilityFlags(go, athlete.abilities);
+
             var tag = go.AddComponent<CareerAthleteTag>();
             tag.athleteId = athlete.id;
             tag.fullName = athlete.FullName;
+            tag.abilityLabel = athlete.AbilityLabel;
+        }
+
+        /// <summary>
+        /// The career flag is the source of truth for a league match. Replace
+        /// whatever debug roll CourtSetup attached.
+        /// </summary>
+        private static void ApplyAbilityFlags(GameObject go, AthleteAbility flags)
+        {
+            var existing = go.GetComponent<PlayerAbilities>();
+            if (flags == AthleteAbility.None)
+            {
+                if (existing != null) Object.Destroy(existing);
+                return;
+            }
+
+            var chosen = new List<SpecialAbility>();
+            if ((flags & AthleteAbility.HotHead) != 0)
+                chosen.Add(HotHeadAbility.CreateRuntime());
+            if ((flags & AthleteAbility.SoleSurvivor) != 0)
+                chosen.Add(SoleSurvivorAbility.CreateRuntime());
+
+            if (existing == null) existing = go.AddComponent<PlayerAbilities>();
+            existing.SetAbilities(chosen);
         }
 
         private void Update()
@@ -241,6 +271,8 @@ namespace Sportland.Sports.Dodgeball
             string ratings = dba != null
                 ? $"   THR {dba.ThrowSpeedGrade} · ACC {dba.ThrowAccuracyGrade} · CAT {dba.CatchTechniqueGrade}"
                 : "";
+            if (tag != null && !string.IsNullOrEmpty(tag.abilityLabel))
+                ratings += $"   {tag.abilityLabel}";
 
             EnsureNameplateStyle();
             const float w = 460f, h = 28f;

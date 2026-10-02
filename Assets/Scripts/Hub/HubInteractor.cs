@@ -2,6 +2,7 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using UnityEngine.SceneManagement;
 using Sportland.Career;
+using Sportland.UI;
 
 namespace Sportland.Hub
 {
@@ -31,6 +32,8 @@ namespace Sportland.Hub
         private bool viewingRivalRoster;
         private RosterTab rosterTab;
         private int poolIndex;
+        private int squadIndex;
+        private PlayerViewer viewer;
         private int lineupSlot;
         private bool assignMode;
         private int pickIndex;
@@ -41,6 +44,7 @@ namespace Sportland.Hub
             this.buildings = buildings;
             this.hud = hud;
             movement = GetComponent<HubPlayerController>();
+            viewer = gameObject.AddComponent<PlayerViewer>();
         }
 
         // ── Input helpers ───────────────────────────────────────────────
@@ -232,7 +236,7 @@ namespace Sportland.Hub
                 case Screen.Roster:
                     hud.ShowScreen(rosterTab == RosterTab.Lineup
                         ? HubScreens.Lineup(career, lineupSlot, assignMode, pickIndex)
-                        : HubScreens.Roster(career, rosterTab, poolIndex));
+                        : HubScreens.Roster(career, rosterTab, rosterTab == RosterTab.Squad ? squadIndex : poolIndex));
                     break;
                 case Screen.PreGame:
                     hud.ShowScreen(HubScreens.PreGame(career));
@@ -245,6 +249,13 @@ namespace Sportland.Hub
 
         private void HandleScreen(CareerManager career)
         {
+            if (viewer != null && viewer.IsOpen)
+            {
+                if (CancelPressed() || AutoFillPressed())
+                    viewer.Close();
+                return;
+            }
+
             switch (screen)
             {
                 case Screen.Creator:      HandleCreator(career); break;
@@ -423,6 +434,30 @@ namespace Sportland.Hub
 
             switch (rosterTab)
             {
+                case RosterTab.Squad:
+                    if (career.club.pool.Count > 0)
+                    {
+                        if (NavUpPressed())
+                        {
+                            squadIndex = Mathf.Max(0, squadIndex - 1);
+                            RedrawScreen(career);
+                            return;
+                        }
+                        if (NavDownPressed())
+                        {
+                            squadIndex = Mathf.Min(career.club.pool.Count - 1, squadIndex + 1);
+                            RedrawScreen(career);
+                            return;
+                        }
+                        if (AutoFillPressed() && viewer != null)
+                        {
+                            squadIndex = Mathf.Clamp(squadIndex, 0, career.club.pool.Count - 1);
+                            viewer.Show(PlayerCard.FromAthlete(career.club.pool[squadIndex]), null);
+                            return;
+                        }
+                    }
+                    break;
+
                 case RosterTab.Pool:
                     if (career.freeAgents.Count > 0)
                     {
@@ -436,6 +471,11 @@ namespace Sportland.Hub
                         {
                             poolIndex = Mathf.Min(career.freeAgents.Count - 1, poolIndex + 1);
                             RedrawScreen(career);
+                            return;
+                        }
+                        if (AutoFillPressed() && viewer != null)
+                        {
+                            viewer.Show(PlayerCard.FromAthlete(career.freeAgents[poolIndex]), null);
                             return;
                         }
                         if (ConfirmPressed())
@@ -534,6 +574,7 @@ namespace Sportland.Hub
                     {
                         rosterTab = RosterTab.Squad;
                         poolIndex = 0;
+                        squadIndex = 0;
                         lineupSlot = 0;
                         OpenScreen(Screen.Roster, career);
                     }

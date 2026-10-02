@@ -31,6 +31,7 @@ Build a standalone: menu **Sportland → Build → Windows** (`Assets/Editor/Dod
 | Stance | R2 — toggle: face the ball, move slower, full catch/evade | Left Ctrl |
 | Return ball to me (debug) | L1 | 1 |
 | Flatten the court (debug) | — | V |
+| Player card | — | Tab (Left/Right changes player, Esc closes) |
 
 The human controls one player (`A_In_2` by default). Control transfers to a
 teammate when a pass you throw is caught.
